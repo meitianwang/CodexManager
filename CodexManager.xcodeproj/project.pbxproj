@@ -781,6 +781,7 @@
 			buildPhases = (
 				B4C3FC97404590F36561CD1A /* Sources */,
 				23DF351D99411A4F73F4394C /* Resources */,
+				045C45BE7BBDF6B9F7F024C9 /* Inject CFBundleIconFile */,
 			);
 			buildRules = (
 			);
@@ -862,6 +863,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		045C45BE7BBDF6B9F7F024C9 /* Inject CFBundleIconFile */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Inject CFBundleIconFile";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/usr/libexec/PlistBuddy -c \"Add :CFBundleIconFile string AppIcon\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :CFBundleIconFile AppIcon\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B4C3FC97404590F36561CD1A /* Sources */ = {
