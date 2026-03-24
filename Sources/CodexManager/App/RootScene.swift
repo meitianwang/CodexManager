@@ -102,22 +102,28 @@ struct RootScene: View {
             }
         }
         #else
-        NavigationSplitView {
-            List(AppTab.allCases, selection: $selectedTab) { tab in
-                NavigationLink(value: tab) {
-                    Label(tab.toolbarTitle, systemImage: tab.iconName)
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.vertical, 4)
+        VStack(spacing: 0) {
+            // Top toolbar with segmented picker
+            HStack {
+                Picker("", selection: $selectedTab) {
+                    ForEach(AppTab.allCases) { tab in
+                        Label(tab.toolbarTitle, systemImage: tab.iconName)
+                            .tag(tab)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 240)
+
+                Spacer()
             }
-            .listStyle(.sidebar)
-            .navigationTitle("CodexManager")
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-            .navigationSplitViewStyle(.prominentDetail)
-        } detail: {
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            Divider()
+
             activePage
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(NSColor.windowBackgroundColor))
         }
         #endif
     }

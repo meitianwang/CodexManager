@@ -67,15 +67,15 @@ enum LayoutRules {
     }
 
     static var minimumPanelWidth: CGFloat {
-        accountsPageTargetWidth + 200 // Add sidebar width
+        accountsPageTargetWidth
     }
 
     static var defaultPanelWidth: CGFloat {
-        accountsPageTargetWidth + 240
+        accountsPageTargetWidth
     }
 
     static var maximumPanelWidth: CGFloat {
-        accountsPageTargetWidth + 500
+        accountsPageTargetWidth + 200
     }
 
     static func iOSAccountsContentTopPadding(safeAreaTop: CGFloat) -> CGFloat {
