@@ -12,6 +12,8 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/CodexManager
+        excludes:
+          - "Resources/LaunchScreen.storyboard"
     resources:
       - path: Sources/CodexManager/Resources
     settings:

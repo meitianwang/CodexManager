@@ -64,16 +64,16 @@ struct CodexManagerApp: App {
             return Image(nsImage: icon)
         }
         #endif
-        return Image(systemName: "tray.2")
+        return Image(systemName: "chevron.left.forwardslash.chevron.right")
     }
 
     #if canImport(AppKit)
     private func makeMenuBarSymbolImage() -> NSImage? {
-        guard let base = NSImage(systemSymbolName: "tray.2", accessibilityDescription: "CodexManager") else {
+        guard let base = NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: "CodexManager") else {
             return nil
         }
 
-        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 17, weight: .black, scale: .large)
+        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 15, weight: .bold, scale: .medium)
         let configured = base.withSymbolConfiguration(symbolConfig) ?? base
 
         let canvasSize = NSSize(width: 18, height: 18)
@@ -83,7 +83,7 @@ struct CodexManagerApp: App {
             return configured
         }
 
-        let fitScale = min(canvasSize.width / symbolSize.width, canvasSize.height / symbolSize.height) * 1.08
+        let fitScale = min(canvasSize.width / symbolSize.width, canvasSize.height / symbolSize.height) * 1.0
         let drawSize = NSSize(width: symbolSize.width * fitScale, height: symbolSize.height * fitScale)
         let drawRect = NSRect(
             x: (canvasSize.width - drawSize.width) / 2,
@@ -165,7 +165,7 @@ struct TrayPopoverView: View {
         VStack(alignment: .leading, spacing: 6) {
             // App icon + title
             HStack(spacing: 10) {
-                Image(systemName: "tray.2.fill")
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.accentColor)
 

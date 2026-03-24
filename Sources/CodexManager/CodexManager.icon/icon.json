@@ -1,6 +1,6 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+    "automatic-gradient" : "extended-srgb:0.26275,0.21961,0.79216,1.00000"
   },
   "groups" : [
     {
@@ -9,10 +9,10 @@
           "fill" : {
             "automatic-gradient" : "extended-gray:1.00000,1.00000"
           },
-          "image-name" : "figure.pool.swim.png",
-          "name" : "figure.pool.swim",
+          "image-name" : "codex_shield.png",
+          "name" : "codex_shield",
           "position" : {
-            "scale" : 0.8,
+            "scale" : 0.75,
             "translation-in-points" : [
               0,
               0
@@ -22,11 +22,11 @@
       ],
       "shadow" : {
         "kind" : "neutral",
-        "opacity" : 0.5
+        "opacity" : 0.4
       },
       "translucency" : {
         "enabled" : true,
-        "value" : 0.5
+        "value" : 0.4
       }
     }
   ],
