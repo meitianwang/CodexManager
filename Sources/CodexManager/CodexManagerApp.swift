@@ -275,6 +275,9 @@ private struct TrayActionButton: View {
 private final class CodexManagerAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
+        // Hide Dock icon at runtime (instead of LSUIElement in Info.plist)
+        // This keeps the app discoverable in Spotlight while behaving as a menu bar app
+        NSApplication.shared.setActivationPolicy(.accessory)
         NSApplication.shared.registerForRemoteNotifications()
     }
 

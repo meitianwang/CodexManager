@@ -1166,7 +1166,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = CodexManager;
 				INFOPLIST_KEY_CFBundleName = CodexManager;
 				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
-				INFOPLIST_KEY_LSUIElement = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1191,7 +1190,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = CodexManager;
 				INFOPLIST_KEY_CFBundleName = CodexManager;
 				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
-				INFOPLIST_KEY_LSUIElement = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
