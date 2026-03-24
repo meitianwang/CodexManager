@@ -32,6 +32,13 @@ struct CodexManagerApp: App {
     var body: some Scene {
         #if os(macOS)
         MenuBarExtra {
+            TrayPopoverView(trayModel: trayModel)
+        } label: {
+            menuBarIcon
+        }
+        .menuBarExtraStyle(.window)
+
+        Window("CodexManager", id: "main-panel") {
             RootScene(container: container, trayModel: trayModel)
                 .frame(
                     minWidth: LayoutRules.minimumPanelWidth,
@@ -40,10 +47,9 @@ struct CodexManagerApp: App {
                     minHeight: LayoutRules.minimumPanelHeight,
                     idealHeight: LayoutRules.defaultPanelHeight
                 )
-        } label: {
-            menuBarIcon
         }
-        .menuBarExtraStyle(.window)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
         #else
         WindowGroup {
             RootScene(container: container, trayModel: trayModel)
@@ -58,12 +64,12 @@ struct CodexManagerApp: App {
             return Image(nsImage: icon)
         }
         #endif
-        return Image(systemName: "figure.pool.swim")
+        return Image(systemName: "tray.2")
     }
 
     #if canImport(AppKit)
     private func makeMenuBarSymbolImage() -> NSImage? {
-        guard let base = NSImage(systemSymbolName: "figure.pool.swim", accessibilityDescription: "CodexManager") else {
+        guard let base = NSImage(systemSymbolName: "tray.2", accessibilityDescription: "CodexManager") else {
             return nil
         }
 
@@ -77,7 +83,6 @@ struct CodexManagerApp: App {
             return configured
         }
 
-        // Keep aspect ratio while slightly enlarging to improve optical size.
         let fitScale = min(canvasSize.width / symbolSize.width, canvasSize.height / symbolSize.height) * 1.08
         let drawSize = NSSize(width: symbolSize.width * fitScale, height: symbolSize.height * fitScale)
         let drawRect = NSRect(
@@ -102,6 +107,168 @@ struct CodexManagerApp: App {
     #endif
     #endif
 }
+
+// MARK: - Tray Popover View
+
+#if os(macOS)
+struct TrayPopoverView: View {
+    @ObservedObject var trayModel: TrayMenuModel
+    @Environment(\.openWindow) private var openWindow
+
+    private var currentAccount: AccountSummary? {
+        trayModel.accounts.first(where: { $0.isCurrent })
+    }
+
+    private var totalAccounts: Int {
+        trayModel.accounts.count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Status header
+            statusSection
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+            Divider()
+                .padding(.horizontal, 12)
+
+            // Actions
+            VStack(spacing: 2) {
+                TrayActionButton(
+                    icon: "macwindow",
+                    title: L10n.tr("tray.action.open_panel"),
+                    action: {
+                        openWindow(id: "main-panel")
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                )
+
+                TrayActionButton(
+                    icon: "power",
+                    title: L10n.tr("tray.action.quit"),
+                    isDestructive: true,
+                    action: {
+                        NSApp.terminate(nil)
+                    }
+                )
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+        }
+        .frame(width: 260)
+    }
+
+    @ViewBuilder
+    private var statusSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // App icon + title
+            HStack(spacing: 10) {
+                Image(systemName: "tray.2.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CodexManager")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    if let account = currentAccount {
+                        Text(L10n.tr("tray.status.current_format", account.label))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(L10n.tr("tray.status.no_account"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            // Quick stats
+            if totalAccounts > 0 {
+                HStack(spacing: 12) {
+                    StatChip(
+                        icon: "person.2.fill",
+                        text: L10n.tr("tray.status.accounts_count_format", "\(totalAccounts)")
+                    )
+
+                    if let account = currentAccount, let usage = account.usage?.fiveHour {
+                        let remaining = max(0, Int((100 - usage.usedPercent).rounded()))
+                        StatChip(
+                            icon: "chart.bar.fill",
+                            text: L10n.tr("tray.status.remaining_format", "\(remaining)%")
+                        )
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+}
+
+private struct StatChip: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background {
+            Capsule()
+                .fill(.quaternary)
+        }
+    }
+}
+
+private struct TrayActionButton: View {
+    let icon: String
+    let title: String
+    var isDestructive: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 20, alignment: .center)
+                Text(title)
+                    .font(.system(size: 13))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isDestructive ? Color.red : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.clear)
+        }
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+}
+#endif
+
+// MARK: - App Delegates
 
 #if os(macOS)
 @MainActor

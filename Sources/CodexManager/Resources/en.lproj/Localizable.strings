@@ -210,11 +210,17 @@
 
 "tray.refresh_usage" = "Refresh usage";
 "tray.no_accounts" = "No accounts";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodexManager";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "Current · ";
 "tray.account.line.format" = "%@%@ | 5h %@ | 1w %@";
+"tray.action.open_panel" = "Open Main Panel";
+"tray.action.quit" = "Quit";
+"tray.status.current_format" = "Using: %@";
+"tray.status.no_account" = "No account selected";
+"tray.status.accounts_count_format" = "%@ accounts";
+"tray.status.remaining_format" = "%@ remaining";
 
 "error.app.repo_root_not_found" = "Unable to locate repository root (missing src-tauri/proxyd/Cargo.toml).";
 "error.accounts.account_not_found_for_update" = "Target account for update was not found";

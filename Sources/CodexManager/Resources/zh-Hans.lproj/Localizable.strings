@@ -210,11 +210,17 @@
 
 "tray.refresh_usage" = "刷新用量";
 "tray.no_accounts" = "暂无账号";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodexManager";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "当前 · ";
 "tray.account.line.format" = "%@%@ | 5h %@ | 1w %@";
+"tray.action.open_panel" = "打开主面板";
+"tray.action.quit" = "退出";
+"tray.status.current_format" = "正在使用：%@";
+"tray.status.no_account" = "未选择账号";
+"tray.status.accounts_count_format" = "%@ 个账号";
+"tray.status.remaining_format" = "剩余 %@";
 
 "error.app.repo_root_not_found" = "无法定位仓库根目录，缺少 src-tauri/proxyd/Cargo.toml";
 "error.accounts.account_not_found_for_update" = "找不到要更新的账号";
