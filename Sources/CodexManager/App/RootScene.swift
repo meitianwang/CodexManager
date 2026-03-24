@@ -102,15 +102,22 @@ struct RootScene: View {
             }
         }
         #else
-        VStack(spacing: 0) {
-            AppTabToolbarSwitcher(selection: $selectedTab, tabs: AppTab.allCases)
-                .frame(maxWidth: LayoutRules.tabSwitcherMaxWidth)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.horizontal, LayoutRules.pagePadding)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-
+        NavigationSplitView {
+            List(AppTab.allCases, selection: $selectedTab) { tab in
+                NavigationLink(value: tab) {
+                    Label(tab.toolbarTitle, systemImage: tab.iconName)
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.vertical, 4)
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationTitle("CodexManager")
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+            .navigationSplitViewStyle(.prominentDetail)
+        } detail: {
             activePage
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.windowBackgroundColor))
         }
         #endif
     }
@@ -216,105 +223,12 @@ private struct WindowSizeEnforcer: View {
 }
 #endif
 
-private struct AppTabToolbarSwitcher: View {
-    @Binding var selection: AppTab
-    let tabs: [AppTab]
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        selection = tab
-                    }
-                } label: {
-                    Image(systemName: tab.iconName)
-                        .font(.system(size: 16, weight: selection == tab ? .semibold : .medium))
-                        .foregroundStyle(selection == tab ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                }
-                .buttonStyle(.plain)
-                .background {
-                    if selection == tab {
-                        selectedBackground
-                            .padding(3)
-                    }
-                }
-                .overlay(alignment: .trailing) {
-                    if shouldShowDivider(after: index) {
-                        Rectangle()
-                            .fill(separatorColor.opacity(0.55))
-                            .frame(width: 1, height: 20)
-                    }
-                }
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
-                .accessibilityLabel(Text(tab.titleKey))
-            }
-        }
-        .background { containerBackground }
-        .overlay {
-            Capsule()
-                .strokeBorder(separatorColor, lineWidth: 1)
-        }
-        .clipShape(Capsule())
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Sections"))
-    }
-
-    @ViewBuilder
-    private var containerBackground: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            Capsule()
-                .fill(.clear)
-                .glassEffect(.regular, in: .capsule)
-        } else {
-            Capsule()
-                .fill(.ultraThinMaterial)
-        }
-    }
-
-    @ViewBuilder
-    private var selectedBackground: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            Capsule()
-                .fill(.clear)
-                .glassEffect(
-                    .regular
-                        .tint(Color.accentColor.opacity(0.16))
-                        .interactive(),
-                    in: .capsule
-                )
-        } else {
-            Capsule()
-                .fill(.regularMaterial)
-                .overlay {
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.12))
-                }
-        }
-    }
-
-    private func shouldShowDivider(after index: Int) -> Bool {
-        guard index < tabs.count - 1 else { return false }
-        let current = tabs[index]
-        let next = tabs[index + 1]
-        return selection != current && selection != next
-    }
-
-    private var separatorColor: Color {
-        #if canImport(AppKit)
-        Color(nsColor: .separatorColor).opacity(0.9)
-        #else
-        Color.secondary.opacity(0.22)
-        #endif
-    }
-}
 
 private extension AppTab {
     var iconName: String {
         switch self {
-        case .accounts: return "person.2"
-        case .settings: return "gearshape"
+        case .accounts: return "person.2.fill"
+        case .settings: return "gearshape.fill"
         }
     }
 

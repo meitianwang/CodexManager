@@ -95,41 +95,37 @@ private struct AccountsMacPageShell: View {
     let onRefreshAccountUsage: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
-    private var pageContentWidth: CGFloat {
-        LayoutRules.accountsPageContentWidth(isCompactWidth: false) ?? LayoutRules.accountsPageTargetWidth
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-            AccountsActionBarContainer(
-                model: model,
-                onTriggerAction: onTriggerAction,
-                onToggleCollapse: onToggleCollapse
-            )
-            .padding(.horizontal, LayoutRules.pagePadding)
-            .frame(width: pageContentWidth, alignment: .leading)
+        GeometryReader { proxy in
+            VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
+                AccountsActionBarContainer(
+                    model: model,
+                    onTriggerAction: onTriggerAction,
+                    onToggleCollapse: onToggleCollapse
+                )
+                .padding(.horizontal, LayoutRules.pagePadding * 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    AccountsPageContentSection(
-                        model: model,
-                        availableViewportSize: CGSize(
-                            width: pageContentWidth,
-                            height: LayoutRules.defaultPanelHeight
-                        ),
-                        areCardsPresented: areCardsPresented,
-                        onSwitchAccount: onSwitchAccount,
-                        onRefreshAccountUsage: onRefreshAccountUsage,
-                        onDeleteAccount: onDeleteAccount
-                    )
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        AccountsPageContentSection(
+                            model: model,
+                            availableViewportSize: proxy.size,
+                            areCardsPresented: areCardsPresented,
+                            onSwitchAccount: onSwitchAccount,
+                            onRefreshAccountUsage: onRefreshAccountUsage,
+                            onDeleteAccount: onDeleteAccount
+                        )
+                    }
+                    .padding(.bottom, 24)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.bottom, 12)
-                .frame(width: pageContentWidth, alignment: .leading)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.top, LayoutRules.pagePadding * 1.5)
         }
-        .frame(width: pageContentWidth, alignment: .topLeading)
-        .padding(.top, LayoutRules.pagePadding)
     }
 }
 

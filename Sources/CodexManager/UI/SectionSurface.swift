@@ -159,9 +159,11 @@ struct CardSurfaceModifier: ViewModifier {
                     tint == nil ? .regular : .regular.tint(tint!.opacity(0.28)),
                     in: .rect(cornerRadius: cornerRadius)
                 )
+                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
         } else {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(.regularMaterial)
+                .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
         }
     }
 
