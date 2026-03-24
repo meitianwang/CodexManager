@@ -11,7 +11,6 @@ struct RootScene: View {
     @State private var selectedTab: AppTab = .accounts
     @StateObject private var accountsModel: AccountsPageModel
     @StateObject private var settingsModel: SettingsPageModel
-    @StateObject private var deferredProxyModel = DeferredProxyModelStore()
     @ObservedObject private var trayModel: TrayMenuModel
     private let container: AppContainer
 
@@ -30,8 +29,6 @@ struct RootScene: View {
         switch selectedTab {
         case .accounts:
             return accountsModel.notice
-        case .proxy:
-            return deferredProxyModel.model?.notice
         case .settings:
             return settingsModel.notice
         }
@@ -39,14 +36,6 @@ struct RootScene: View {
 
     private var currentAppLocale: AppLocale {
         AppLocale.resolve(settingsModel.settings.locale)
-    }
-
-    private var visibleTabs: [AppTab] {
-        #if os(iOS)
-        [.accounts, .proxy]
-        #else
-        AppTab.allCases
-        #endif
     }
 
     var body: some View {
@@ -64,20 +53,8 @@ struct RootScene: View {
         .onReceive(trayModel.$isFetchingRemoteUsage.removeDuplicates()) { isRefreshing in
             accountsModel.syncRemoteUsageRefreshActivity(isRefreshing: isRefreshing)
         }
-        .onChange(of: selectedTab) { _, value in
-            guard value == .proxy else { return }
-            deferredProxyModel.loadIfNeeded(using: container)
-        }
         .task {
             await settingsModel.loadIfNeeded()
-        }
-        .task(id: settingsModel.hasLoaded) {
-            guard settingsModel.hasLoaded else { return }
-            #if os(macOS)
-            deferredProxyModel.loadIfNeeded(using: container)
-            #endif
-            guard let proxyModel = deferredProxyModel.model else { return }
-            await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
         }
         .rootSceneNoticePresentation(currentNotice)
         #if os(macOS)
@@ -123,21 +100,10 @@ struct RootScene: View {
                     Image(systemName: AppTab.accounts.iconName)
                 }
             }
-            NavigationStack {
-                proxyTabContent
-            }
-            .tag(AppTab.proxy)
-            .tabItem {
-                Label {
-                    Text(AppTab.proxy.toolbarTitle)
-                } icon: {
-                    Image(systemName: AppTab.proxy.iconName)
-                }
-            }
         }
         #else
         VStack(spacing: 0) {
-            AppTabToolbarSwitcher(selection: $selectedTab, tabs: visibleTabs)
+            AppTabToolbarSwitcher(selection: $selectedTab, tabs: AppTab.allCases)
                 .frame(maxWidth: LayoutRules.tabSwitcherMaxWidth)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, LayoutRules.pagePadding)
@@ -160,33 +126,9 @@ struct RootScene: View {
                     settingsModel.setLocale(locale.identifier)
                 }
             )
-        case .proxy:
-            proxyTabContent
         case .settings:
             SettingsPageView(model: settingsModel)
         }
-    }
-
-    @ViewBuilder
-    private var proxyTabContent: some View {
-        if let proxyModel = deferredProxyModel.model {
-            ProxyPageView(model: proxyModel)
-        } else {
-            DeferredPagePlaceholder()
-                .task {
-                    deferredProxyModel.loadIfNeeded(using: container)
-                }
-        }
-    }
-}
-
-@MainActor
-private final class DeferredProxyModelStore: ObservableObject {
-    @Published private(set) var model: ProxyPageModel?
-
-    func loadIfNeeded(using container: AppContainer) {
-        guard model == nil else { return }
-        model = container.proxyModel
     }
 }
 
@@ -372,7 +314,6 @@ private extension AppTab {
     var iconName: String {
         switch self {
         case .accounts: return "person.2"
-        case .proxy: return "network"
         case .settings: return "gearshape"
         }
     }
@@ -380,7 +321,6 @@ private extension AppTab {
     var titleTranslationKey: String {
         switch self {
         case .accounts: return "tab.accounts"
-        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }
@@ -388,7 +328,6 @@ private extension AppTab {
     var titleKey: LocalizedStringKey {
         switch self {
         case .accounts: return "tab.accounts"
-        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }
