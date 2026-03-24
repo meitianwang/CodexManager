@@ -781,7 +781,7 @@
 			buildPhases = (
 				B4C3FC97404590F36561CD1A /* Sources */,
 				23DF351D99411A4F73F4394C /* Resources */,
-				045C45BE7BBDF6B9F7F024C9 /* Inject CFBundleIconFile */,
+				7332653AFDE79D98118A6FC2 /* Inject Bundle Metadata */,
 			);
 			buildRules = (
 			);
@@ -865,7 +865,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		045C45BE7BBDF6B9F7F024C9 /* Inject CFBundleIconFile */ = {
+		7332653AFDE79D98118A6FC2 /* Inject Bundle Metadata */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -874,14 +874,14 @@
 			);
 			inputPaths = (
 			);
-			name = "Inject CFBundleIconFile";
+			name = "Inject Bundle Metadata";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/usr/libexec/PlistBuddy -c \"Add :CFBundleIconFile string AppIcon\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :CFBundleIconFile AppIcon\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n";
+			shellScript = "PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleIconFile string AppIcon\" \"$PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :CFBundleIconFile AppIcon\" \"$PLIST\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundlePackageType string APPL\" \"$PLIST\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType APPL\" \"$PLIST\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

@@ -29,9 +29,11 @@ targets:
         DEVELOPMENT_TEAM: KLU8GF65GP
         PRODUCT_BUNDLE_IDENTIFIER: com.nik.mei.codexmanager
     postBuildScripts:
-      - name: "Inject CFBundleIconFile"
+      - name: "Inject Bundle Metadata"
         script: |
-          /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$PLIST" 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :CFBundlePackageType APPL" "$PLIST"
   CodexManagerTests:
     type: bundle.unit-test
     platform: macOS
