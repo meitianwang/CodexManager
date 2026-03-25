@@ -4,7 +4,6 @@ enum SettingsToggleIntent: String, Hashable {
     case launchAtStartup
     case launchAfterSwitch
     case autoStartProxy
-    case localProxyHostAPIOnly
     case autoSmartSwitch
     case restartEditorsOnSwitch
 }
@@ -69,11 +68,6 @@ enum SettingsControlPresentation {
                     intent: .autoStartProxy,
                     titleKey: "settings.auto_start_api_proxy",
                     isOn: settings.autoStartApiProxy
-                ),
-                SettingsToggleDescriptor(
-                    intent: .localProxyHostAPIOnly,
-                    titleKey: "settings.local_proxy_host_api_only",
-                    isOn: settings.localProxyHostAPIOnly
                 )
             ]
         )

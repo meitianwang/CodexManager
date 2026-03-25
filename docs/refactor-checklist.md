@@ -1,4 +1,4 @@
-# Copool Refactor Checklist
+# CodexManager Refactor Checklist
 
 ## Scope
 
@@ -11,9 +11,9 @@
 
 ## Refactor Targets
 
-- `Sources/Copool/Features/Accounts/AccountsPageView.swift`
-- `Sources/Copool/Features/Proxy/ProxyPageView.swift`
-- `Sources/Copool/Features/Proxy/ProxyPageModel.swift`
-- `Sources/Copool/Behavior/ProxyControlBridge.swift`
-- `Sources/Copool/Layout/LayoutRules.swift`
-- `Tests/CopoolTests`
+- `Sources/CodexManager/Features/Accounts/AccountsPageView.swift`
+- `Sources/CodexManager/Features/Proxy/ProxyPageView.swift`
+- `Sources/CodexManager/Features/Proxy/ProxyPageModel.swift`
+- `Sources/CodexManager/Behavior/ProxyControlBridge.swift`
+- `Sources/CodexManager/Layout/LayoutRules.swift`
+- `Tests/CodexManagerTests`

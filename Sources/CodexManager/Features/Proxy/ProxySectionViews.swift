@@ -6,13 +6,8 @@ struct ApiProxySectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-
-            if model.apiProxySectionExpanded {
-                proxyHeroContent
-                proxyDetailCards
-            } else {
-                collapsedSummaryPills
-            }
+            proxyHeroContent
+            proxyDetailCards
         }
         .padding(16)
         .cardSurface(cornerRadius: LayoutRules.cardRadius)
@@ -24,29 +19,6 @@ struct ApiProxySectionView: View {
                 .font(.headline)
 
             Spacer(minLength: 0)
-
-            CollapseChevronButton(isExpanded: model.apiProxySectionExpanded) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    model.apiProxySectionExpanded.toggle()
-                }
-            }
-        }
-    }
-
-    private var collapsedSummaryPills: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                ProxyStatusPill(isRunning: model.proxyStatus.running)
-                ProxyMetricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
-                ProxyMetricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ProxyStatusPill(isRunning: model.proxyStatus.running)
-                    ProxyMetricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
-                }
-                ProxyMetricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
-            }
         }
     }
 

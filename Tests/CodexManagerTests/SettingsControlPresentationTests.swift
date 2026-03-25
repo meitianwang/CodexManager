@@ -12,7 +12,7 @@ final class SettingsControlPresentationTests: XCTestCase {
 
         XCTAssertEqual(
             presentation.toggles.map(\.intent),
-            [.autoSmartSwitch, .syncOpencodeOpenaiAuth, .restartEditorsOnSwitch]
+            [.autoSmartSwitch, .restartEditorsOnSwitch]
         )
         XCTAssertFalse(presentation.restartEditorTargetPicker.isEnabled)
         XCTAssertEqual(
@@ -26,13 +26,10 @@ final class SettingsControlPresentationTests: XCTestCase {
             launchAtStartup: false,
             launchCodexAfterSwitch: true,
             autoSmartSwitch: true,
-            syncOpencodeOpenaiAuth: true,
-            localProxyHostAPIOnly: true,
             restartEditorsOnSwitch: true,
             restartEditorTargets: [.vscode],
             autoStartApiProxy: false,
             proxyConfiguration: .defaultValue,
-            remoteServers: [],
             locale: AppLocale.english.identifier
         )
 
@@ -55,13 +52,10 @@ final class SettingsControlPresentationTests: XCTestCase {
             launchAtStartup: false,
             launchCodexAfterSwitch: true,
             autoSmartSwitch: false,
-            syncOpencodeOpenaiAuth: false,
-            localProxyHostAPIOnly: false,
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
             autoStartApiProxy: false,
             proxyConfiguration: .defaultValue,
-            remoteServers: [],
             locale: "zh_CN"
         )
 

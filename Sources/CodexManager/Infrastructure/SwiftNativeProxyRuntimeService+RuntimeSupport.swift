@@ -135,28 +135,13 @@ extension SwiftNativeProxyRuntimeService {
             }
         }
 
-        if statusCode == 200, shouldSyncCurrentAuthOnSuccessfulProxyResponse() {
-            try? authRepository.writeCurrentAuth(candidate.authJSON)
-        }
         return UpstreamResponse(statusCode: statusCode, body: responseBody)
-    }
-
-    static func shouldSyncCurrentAuthOnSuccessfulProxyResponse(localProxyHostAPIOnly: Bool) -> Bool {
-        !localProxyHostAPIOnly
     }
 
     static func normalizedForwardHeader(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    func shouldSyncCurrentAuthOnSuccessfulProxyResponse() -> Bool {
-        let localProxyHostAPIOnly = (try? settingsRepository.loadSettings().localProxyHostAPIOnly)
-            ?? AppSettings.defaultValue.localProxyHostAPIOnly
-        return Self.shouldSyncCurrentAuthOnSuccessfulProxyResponse(
-            localProxyHostAPIOnly: localProxyHostAPIOnly
-        )
     }
 
     static func normalizeConfiguredBaseURL(_ configuredBaseURL: String) -> String {

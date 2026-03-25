@@ -122,7 +122,7 @@
 
 "proxy.section.api_proxy" = "API 프록시";
 "proxy.callout.remote_control.title" = "Mac 원격 제어";
-"proxy.callout.remote_control.message" = "이 페이지는 macOS에서 실행 중인 API Proxy를 원격 제어하기 위한 화면입니다. 명령 수신과 최신 상태 동기화를 위해 Mac의 Copool을 계속 실행해 두세요.";
+"proxy.callout.remote_control.message" = "이 페이지는 macOS에서 실행 중인 API Proxy를 원격 제어하기 위한 화면입니다. 명령 수신과 최신 상태 동기화를 위해 Mac의 CodexManager을 계속 실행해 두세요.";
 "proxy.status.running" = "실행 중";
 "proxy.status.stopped" = "중지됨";
 "proxy.status_line_format" = "상태: %@";
@@ -144,14 +144,14 @@
 "proxy.section.remote_servers_backend" = "원격 서버(백엔드 위임)";
 "proxy.remote.description" = "SSH로 원격 Linux 서버의 API 프록시 노드를 배포하고 관리합니다.";
 "proxy.remote.backend_managed_message" = "원격 배포 작업은 백엔드 서비스에 위임됩니다. iOS 클라이언트 간 운영 일관성을 위해 이 모드를 유지하세요.";
-"proxy.remote.unavailable_message" = "iOS 로컬 실행 모드에서는 SSH/SCP 관리가 불가능합니다. 백엔드 위임 모드로 전환하거나 macOS용 Copool을 사용하세요.";
+"proxy.remote.unavailable_message" = "iOS 로컬 실행 모드에서는 SSH/SCP 관리가 불가능합니다. 백엔드 위임 모드로 전환하거나 macOS용 CodexManager을 사용하세요.";
 "proxy.action.add_server" = "서버 추가";
 "proxy.remote.empty.title" = "원격 서버가 없습니다";
 "proxy.remote.empty.message" = "먼저 Linux 서버를 추가하고 proxyd를 업로드해 원격으로 시작하세요.";
 "proxy.section.public_access" = "공개 접근";
 "proxy.section.public_access_backend" = "공개 접근(백엔드 위임)";
 "proxy.public.backend_managed_message" = "공개 터널 작업은 백엔드 서비스에 위임됩니다. cloudflared는 서버에서 구성하고, 이 앱은 계정/프록시 제어에 사용하세요.";
-"proxy.public.unavailable_message" = "iOS 로컬 실행 모드에서는 cloudflared 관리를 지원하지 않습니다. 백엔드 위임 모드로 전환하거나 macOS용 Copool을 사용하세요.";
+"proxy.public.unavailable_message" = "iOS 로컬 실행 모드에서는 cloudflared 관리를 지원하지 않습니다. 백엔드 위임 모드로 전환하거나 macOS용 CodexManager을 사용하세요.";
 "proxy.toggle.enable_public_access" = "cloudflared로 공개 접근 활성화";
 "proxy.switch.on" = "켜짐";
 "proxy.switch.off" = "꺼짐";
@@ -210,7 +210,7 @@
 
 "tray.refresh_usage" = "사용량 새로고침";
 "tray.no_accounts" = "계정 없음";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodexManager";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "현재 · ";
@@ -366,7 +366,7 @@
 "proxy.remote.discovery.state.binary_missing" = "Binary missing";
 "proxy.remote.help.title" = "Action Guide";
 "proxy.remote.help.save" = "Persist the current card settings locally before running remote operations.";
-"proxy.remote.help.remove_local" = "Delete only this saved card from Copool. The remote service keeps running.";
+"proxy.remote.help.remove_local" = "Delete only this saved card from CodexManager. The remote service keeps running.";
 "proxy.remote.help.discover" = "Scan this server over SSH and list compatible proxyd services already installed there.";
 "proxy.remote.help.deploy" = "Upload the proxy binary and accounts file, install or replace the systemd service, and start it.";
 "proxy.remote.help.sync_accounts" = "Push the latest local accounts.json to this remote server without changing other settings.";

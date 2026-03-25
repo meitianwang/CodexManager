@@ -26,7 +26,7 @@
                                 <preferredSymbolConfiguration key="preferredSymbolConfiguration" pointSize="76" weight="regular" scale="large"/>
                                 <imageReference key="image" image="figure.pool.swim" catalog="system" symbolScale="default"/>
                             </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="Copool" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="0Uz-QV-PQ2">
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="CodexManager" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="0Uz-QV-PQ2">
                                 <rect key="frame" x="139" y="467" width="113" height="29"/>
                                 <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="24"/>
                                 <color key="textColor" systemColor="labelColor"/>

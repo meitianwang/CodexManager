@@ -64,18 +64,6 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         )
     }
 
-    func testHostAPIOnlyDisablesCurrentAuthSyncAfterSuccessfulProxyResponse() {
-        XCTAssertFalse(
-            SwiftNativeProxyRuntimeService.shouldSyncCurrentAuthOnSuccessfulProxyResponse(
-                localProxyHostAPIOnly: true
-            )
-        )
-        XCTAssertTrue(
-            SwiftNativeProxyRuntimeService.shouldSyncCurrentAuthOnSuccessfulProxyResponse(
-                localProxyHostAPIOnly: false
-            )
-        )
-    }
 
     func testResolvesUpstreamRouteFamilyByModel() {
         XCTAssertEqual(

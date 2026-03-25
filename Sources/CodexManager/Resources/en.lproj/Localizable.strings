@@ -122,7 +122,7 @@
 
 "proxy.section.api_proxy" = "API Proxy";
 "proxy.callout.remote_control.title" = "Mac Remote Control";
-"proxy.callout.remote_control.message" = "This page only controls the API Proxy running on macOS. Keep Copool running on your Mac so it can receive commands and publish fresh status.";
+"proxy.callout.remote_control.message" = "This page only controls the API Proxy running on macOS. Keep CodexManager running on your Mac so it can receive commands and publish fresh status.";
 "proxy.status.running" = "Running";
 "proxy.status.stopped" = "Stopped";
 "proxy.status_line_format" = "Status: %@";
@@ -144,14 +144,14 @@
 "proxy.section.remote_servers_backend" = "Remote Servers (Backend-managed)";
 "proxy.remote.description" = "Deploy and manage API proxy nodes on remote Linux servers over SSH.";
 "proxy.remote.backend_managed_message" = "Remote deployment is delegated to your backend service. Keep this mode for status visibility and operational consistency across iOS clients.";
-"proxy.remote.unavailable_message" = "Remote SSH/SCP management is unavailable on iOS local-device mode. Switch to backend-managed mode or use Copool on macOS.";
+"proxy.remote.unavailable_message" = "Remote SSH/SCP management is unavailable on iOS local-device mode. Switch to backend-managed mode or use CodexManager on macOS.";
 "proxy.action.add_server" = "Add server";
 "proxy.remote.empty.title" = "No remote servers yet";
 "proxy.remote.empty.message" = "Add a Linux server first, then upload proxyd and start it remotely.";
 "proxy.section.public_access" = "Public Access";
 "proxy.section.public_access_backend" = "Public Access (Backend-managed)";
 "proxy.public.backend_managed_message" = "Public tunnel operations are delegated to your backend service. Configure cloudflared on the server side and keep this app for account and proxy controls.";
-"proxy.public.unavailable_message" = "cloudflared management is unavailable on iOS local-device mode. Switch to backend-managed mode or use Copool on macOS.";
+"proxy.public.unavailable_message" = "cloudflared management is unavailable on iOS local-device mode. Switch to backend-managed mode or use CodexManager on macOS.";
 "proxy.toggle.enable_public_access" = "Enable public access with cloudflared";
 "proxy.switch.on" = "On";
 "proxy.switch.off" = "Off";
@@ -382,7 +382,7 @@
 "proxy.remote.discovery.state.binary_missing" = "Binary missing";
 "proxy.remote.help.title" = "Action Guide";
 "proxy.remote.help.save" = "Persist the current card settings locally before running remote operations.";
-"proxy.remote.help.remove_local" = "Delete only this saved card from Copool. The remote service keeps running.";
+"proxy.remote.help.remove_local" = "Delete only this saved card from CodexManager. The remote service keeps running.";
 "proxy.remote.help.discover" = "Scan this server over SSH and list compatible proxyd services already installed there.";
 "proxy.remote.help.deploy" = "Upload the proxy binary and accounts file, install or replace the systemd service, and start it.";
 "proxy.remote.help.sync_accounts" = "Push the latest local accounts.json to this remote server without changing other settings.";
@@ -391,3 +391,12 @@
 "proxy.remote.help.stop" = "Stop the running remote systemd service.";
 "proxy.remote.help.logs" = "Load recent journal logs from the remote service.";
 "proxy.remote.help.uninstall_remote" = "Stop and remove the remote service plus deployed binary and accounts file, while keeping the server record locally.";
+
+"proxy.dashboard.available_models" = "Available Models";
+"proxy.dashboard.no_models" = "No models";
+"proxy.dashboard.curl_example" = "cURL Example";
+"proxy.claude.restore" = "Restore";
+"proxy.claude.restored" = "Restored";
+"proxy.claude.write" = "Write Config";
+"proxy.claude.saved" = "Saved";
+"proxy.claude.empty" = "empty";

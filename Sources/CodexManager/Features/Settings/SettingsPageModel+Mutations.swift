@@ -23,10 +23,6 @@ extension SettingsPageModel {
     }
 
 
-    func setLocalProxyHostAPIOnly(_ value: Bool) {
-        updateToggle(.localProxyHostAPIOnly, to: value)
-    }
-
     func setRestartEditorsOnSwitch(_ value: Bool) {
         updateToggle(.restartEditorsOnSwitch, to: value)
     }
@@ -47,8 +43,6 @@ extension SettingsPageModel {
             Task { await update(AppSettingsPatch(launchCodexAfterSwitch: value)) }
         case .autoStartProxy:
             Task { await update(AppSettingsPatch(autoStartApiProxy: value)) }
-        case .localProxyHostAPIOnly:
-            Task { await update(AppSettingsPatch(localProxyHostAPIOnly: value)) }
         case .autoSmartSwitch:
             Task { await update(AppSettingsPatch(autoSmartSwitch: value)) }
         case .restartEditorsOnSwitch:

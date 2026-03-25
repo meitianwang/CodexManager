@@ -4,7 +4,6 @@ struct AppSettings: Codable, Equatable {
     var launchAtStartup: Bool
     var launchCodexAfterSwitch: Bool
     var autoSmartSwitch: Bool
-    var localProxyHostAPIOnly: Bool
     var restartEditorsOnSwitch: Bool
     var restartEditorTargets: [EditorAppID]
     var autoStartApiProxy: Bool
@@ -15,7 +14,6 @@ struct AppSettings: Codable, Equatable {
         case launchAtStartup
         case launchCodexAfterSwitch
         case autoSmartSwitch
-        case localProxyHostAPIOnly
         case restartEditorsOnSwitch
         case restartEditorTargets
         case autoStartApiProxy
@@ -27,7 +25,6 @@ struct AppSettings: Codable, Equatable {
         launchAtStartup: Bool,
         launchCodexAfterSwitch: Bool,
         autoSmartSwitch: Bool,
-        localProxyHostAPIOnly: Bool = false,
         restartEditorsOnSwitch: Bool,
         restartEditorTargets: [EditorAppID],
         autoStartApiProxy: Bool,
@@ -37,7 +34,6 @@ struct AppSettings: Codable, Equatable {
         self.launchAtStartup = launchAtStartup
         self.launchCodexAfterSwitch = launchCodexAfterSwitch
         self.autoSmartSwitch = autoSmartSwitch
-        self.localProxyHostAPIOnly = localProxyHostAPIOnly
         self.restartEditorsOnSwitch = restartEditorsOnSwitch
         self.restartEditorTargets = restartEditorTargets
         self.autoStartApiProxy = autoStartApiProxy
@@ -51,7 +47,6 @@ struct AppSettings: Codable, Equatable {
         launchAtStartup = try container.decodeIfPresent(Bool.self, forKey: .launchAtStartup) ?? defaults.launchAtStartup
         launchCodexAfterSwitch = try container.decodeIfPresent(Bool.self, forKey: .launchCodexAfterSwitch) ?? defaults.launchCodexAfterSwitch
         autoSmartSwitch = try container.decodeIfPresent(Bool.self, forKey: .autoSmartSwitch) ?? defaults.autoSmartSwitch
-        localProxyHostAPIOnly = try container.decodeIfPresent(Bool.self, forKey: .localProxyHostAPIOnly) ?? defaults.localProxyHostAPIOnly
         restartEditorsOnSwitch = try container.decodeIfPresent(Bool.self, forKey: .restartEditorsOnSwitch) ?? defaults.restartEditorsOnSwitch
         restartEditorTargets = try container.decodeIfPresent([EditorAppID].self, forKey: .restartEditorTargets) ?? defaults.restartEditorTargets
         autoStartApiProxy = try container.decodeIfPresent(Bool.self, forKey: .autoStartApiProxy) ?? defaults.autoStartApiProxy
@@ -64,7 +59,6 @@ struct AppSettings: Codable, Equatable {
         try container.encode(launchAtStartup, forKey: .launchAtStartup)
         try container.encode(launchCodexAfterSwitch, forKey: .launchCodexAfterSwitch)
         try container.encode(autoSmartSwitch, forKey: .autoSmartSwitch)
-        try container.encode(localProxyHostAPIOnly, forKey: .localProxyHostAPIOnly)
         try container.encode(restartEditorsOnSwitch, forKey: .restartEditorsOnSwitch)
         try container.encode(restartEditorTargets, forKey: .restartEditorTargets)
         try container.encode(autoStartApiProxy, forKey: .autoStartApiProxy)
@@ -77,7 +71,6 @@ struct AppSettings: Codable, Equatable {
             launchAtStartup: false,
             launchCodexAfterSwitch: true,
             autoSmartSwitch: false,
-            localProxyHostAPIOnly: false,
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
             autoStartApiProxy: false,
@@ -91,7 +84,6 @@ struct AppSettingsPatch {
     var launchAtStartup: Bool? = nil
     var launchCodexAfterSwitch: Bool? = nil
     var autoSmartSwitch: Bool? = nil
-    var localProxyHostAPIOnly: Bool? = nil
     var restartEditorsOnSwitch: Bool? = nil
     var restartEditorTargets: [EditorAppID]? = nil
     var autoStartApiProxy: Bool? = nil

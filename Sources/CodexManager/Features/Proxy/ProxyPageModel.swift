@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if canImport(AppKit)
+import AppKit
+#endif
 
 @MainActor
 final class ProxyPageModel: ObservableObject {
@@ -17,7 +20,23 @@ final class ProxyPageModel: ObservableObject {
     @Published var proxyStatus: ApiProxyStatus = .idle
     @Published var preferredPortText = "8787"
     @Published var autoStartProxy = false
-    @Published var apiProxySectionExpanded = false
+
+    // Model list
+    @Published var availableModels: [String] = []
+    @Published var isLoadingModels = false
+
+    // cURL example
+    @Published var selectedCurlModel: String?
+    @Published var copiedField: String?
+
+    // Claude Code config
+    @Published var claudeOpusModel = ""
+    @Published var claudeSonnetModel = ""
+    @Published var claudeHaikuModel = ""
+    @Published var claudeConfigSaving = false
+    @Published var claudeConfigSaved = false
+    @Published var claudeConfigResetting = false
+    @Published var claudeConfigReset = false
 
     @Published var loading = false
     @Published var notice: NoticeMessage? {

@@ -7,6 +7,13 @@ struct ProxyPageView: View {
         ScrollView {
             VStack(spacing: LayoutRules.sectionSpacing) {
                 ApiProxySectionView(model: model)
+
+                ProxyClaudeConfigSection(model: model)
+
+                HStack(alignment: .top, spacing: LayoutRules.sectionSpacing) {
+                    ProxyModelListSection(model: model)
+                    ProxyCurlExampleSection(model: model)
+                }
             }
             .padding(LayoutRules.pagePadding)
         }

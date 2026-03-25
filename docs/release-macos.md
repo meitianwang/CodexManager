@@ -1,7 +1,7 @@
 # macOS Release Workflow
 
 ## Scope
-- Builds the macOS `Copool.app` from `Copool.xcodeproj`
+- Builds the macOS `CodexManager.app` from `CodexManager.xcodeproj`
 - Exports a Developer ID signed `.app`
 - Optionally notarizes it with `asc` or `notarytool`
 - Packages a distributable zip and checksum
@@ -11,7 +11,7 @@
 ## Prerequisites
 - Xcode command line tools
 - A valid `Developer ID Application` certificate in the local keychain
-- A matching macOS Developer ID provisioning profile for `com.alick.copool`
+- A matching macOS Developer ID provisioning profile for `com.nik.mei.codexmanager`
 - One notarization path configured:
   - `asc auth login`
   - or a `notarytool` keychain profile

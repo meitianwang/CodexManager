@@ -16,6 +16,11 @@ extension ProxyPageModel {
         do {
             proxyStatus = try await coordinator.startProxy(preferredPort: preferredPort)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.api_proxy_started"))
+            // Auto-fetch models after start, matching kiro-gateway-swift behavior
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                self.fetchModels()
+            }
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }

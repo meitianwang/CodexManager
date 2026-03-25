@@ -1,4 +1,4 @@
-# Copool iOS 26 Capability Matrix
+# CodexManager iOS 26 Capability Matrix
 
 ## Deployment Modes
 
@@ -22,12 +22,12 @@
 ## Source of Truth
 
 - Capability rules are centralized in:
-  - `Sources/Copool/Domain/CapabilityMatrix.swift`
+  - `Sources/CodexManager/Domain/CapabilityMatrix.swift`
 - Persisted mode field:
   - `AppSettings.backendServiceMode`
 
 ## Test Contracts
 
-- `Tests/CopoolTests/CapabilityMatrixTests.swift`
+- `Tests/CodexManagerTests/CapabilityMatrixTests.swift`
   - Verifies iOS local vs backend-managed behavior for remote/public capabilities.
   - Verifies macOS capabilities stay available regardless of deployment mode.
