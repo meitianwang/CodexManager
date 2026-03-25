@@ -50,7 +50,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     let settingsCoordinator: SettingsCoordinator
     let cloudSyncService: AccountsCloudSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
-    let remoteAccountsMutationSyncService: RemoteAccountsMutationSyncServiceProtocol?
     let backgroundRefreshPolicy: BackgroundRefreshPolicy
     let dateProvider: DateProviding
     let snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy
@@ -74,7 +73,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         settingsCoordinator: SettingsCoordinator,
         cloudSyncService: AccountsCloudSyncServiceProtocol?,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?,
-        remoteAccountsMutationSyncService: RemoteAccountsMutationSyncServiceProtocol? = nil,
         backgroundRefreshPolicy: BackgroundRefreshPolicy,
         dateProvider: DateProviding = SystemDateProvider(),
         snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy = AccountsSnapshotFreshnessPolicy(),
@@ -85,7 +83,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         self.settingsCoordinator = settingsCoordinator
         self.cloudSyncService = cloudSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
-        self.remoteAccountsMutationSyncService = remoteAccountsMutationSyncService
         self.backgroundRefreshPolicy = backgroundRefreshPolicy
         self.dateProvider = dateProvider
         self.snapshotFreshnessPolicy = snapshotFreshnessPolicy

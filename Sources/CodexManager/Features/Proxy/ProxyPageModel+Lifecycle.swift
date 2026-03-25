@@ -6,18 +6,6 @@ extension ProxyPageModel {
         didRunLaunchBootstrap = true
 
         applySettings(settings)
-        if usesRemoteMacControl {
-            configureProxyPushHandlingIfNeeded()
-            await ensureProxyPushSubscriptionIfNeeded()
-            await refreshRemoteSnapshot(showErrors: false)
-            if shouldRequestRemoteSnapshotRefresh() {
-                await requestRemoteSnapshotRefresh(showErrors: false)
-            }
-            startRemoteSnapshotSyncIfNeeded()
-            return
-        }
-
-        stopRemoteSnapshotSync()
         await refreshLocalRuntimeStatus()
 
         guard settings.autoStartApiProxy, !proxyStatus.running else { return }
@@ -39,14 +27,6 @@ extension ProxyPageModel {
     }
 
     func refreshForTabEntry() async {
-        if usesRemoteMacControl {
-            await refreshRemoteSnapshot(showErrors: false)
-            if shouldRequestRemoteSnapshotRefresh() {
-                await requestRemoteSnapshotRefresh(showErrors: false)
-            }
-            return
-        }
-
         do {
             let settings = try await settingsCoordinator.currentSettings()
             applySettings(settings)
@@ -63,19 +43,7 @@ extension ProxyPageModel {
         do {
             let settings = try await settingsCoordinator.currentSettings()
             applySettings(settings)
-            if usesRemoteMacControl {
-                configureProxyPushHandlingIfNeeded()
-                await ensureProxyPushSubscriptionIfNeeded()
-                await refreshRemoteSnapshot(showErrors: true)
-                if shouldRequestRemoteSnapshotRefresh() {
-                    await requestRemoteSnapshotRefresh(showErrors: false)
-                }
-                startRemoteSnapshotSyncIfNeeded()
-            } else {
-                stopRemoteSnapshotSync()
-                await refreshLocalRuntimeStatus()
-                await refreshAllRemoteStatuses()
-            }
+            await refreshLocalRuntimeStatus()
             hasLoaded = true
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)

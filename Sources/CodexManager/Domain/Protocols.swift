@@ -61,27 +61,6 @@ protocol ProxyRuntimeService: Sendable {
     func syncAccountsStore() async throws
 }
 
-protocol CloudflaredServiceProtocol: Sendable {
-    func status() async -> CloudflaredStatus
-    func install() async throws -> CloudflaredStatus
-    func start(_ input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus
-    func stop() async -> CloudflaredStatus
-}
-
-protocol RemoteProxyServiceProtocol: Sendable {
-    func status(server: RemoteServerConfig) async -> RemoteProxyStatus
-    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance]
-    func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func stop(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func readLogs(server: RemoteServerConfig, lines: Int) async throws -> String
-    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus
-}
-
-protocol RemoteAccountsMutationSyncServiceProtocol: Sendable {
-    func syncConfiguredRemoteAccounts() async -> RemoteAccountsMutationSyncReport
-}
 
 protocol CodexCLIServiceProtocol: Sendable {
     func launchApp(workspacePath: String?) throws -> Bool
@@ -96,9 +75,6 @@ protocol EditorAppServiceProtocol: Sendable {
     func restartSelectedApps(_ targets: [EditorAppID]) -> (restarted: [EditorAppID], error: String?)
 }
 
-protocol OpencodeAuthSyncServiceProtocol: Sendable {
-    func syncFromCodexAuth(_ authJSON: JSONValue) throws
-}
 
 protocol LaunchAtStartupServiceProtocol: Sendable {
     func setEnabled(_ enabled: Bool) throws
@@ -114,17 +90,6 @@ protocol AccountsCloudSyncServiceProtocol: Sendable {
     func ensurePushSubscriptionIfNeeded() async throws
 }
 
-protocol ProxyControlCloudSyncServiceProtocol: Sendable {
-    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws
-    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot?
-    func enqueueCommand(_ command: ProxyControlCommand) async throws
-    func pullPendingCommand() async throws -> ProxyControlCommand?
-    func ensurePushSubscriptionIfNeeded() async throws
-}
-
-protocol ProxyLocalCommandServiceProtocol: Sendable {
-    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot
-}
 
 protocol CurrentAccountSelectionSyncServiceProtocol: Sendable {
     func recordLocalSelection(accountID: String) async throws

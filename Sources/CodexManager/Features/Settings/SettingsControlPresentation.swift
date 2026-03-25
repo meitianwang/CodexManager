@@ -6,7 +6,6 @@ enum SettingsToggleIntent: String, Hashable {
     case autoStartProxy
     case localProxyHostAPIOnly
     case autoSmartSwitch
-    case syncOpencodeOpenaiAuth
     case restartEditorsOnSwitch
 }
 
@@ -102,11 +101,6 @@ enum SettingsControlPresentation {
                     intent: .autoSmartSwitch,
                     titleKey: "settings.auto_smart_switch",
                     isOn: settings.autoSmartSwitch
-                ),
-                SettingsToggleDescriptor(
-                    intent: .syncOpencodeOpenaiAuth,
-                    titleKey: "settings.sync_opencode_openai_auth",
-                    isOn: settings.syncOpencodeOpenaiAuth
                 ),
                 SettingsToggleDescriptor(
                     intent: .restartEditorsOnSwitch,

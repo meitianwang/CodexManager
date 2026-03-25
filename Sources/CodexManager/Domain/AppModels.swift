@@ -2,6 +2,7 @@ import Foundation
 
 enum AppTab: String, CaseIterable, Identifiable {
     case accounts
+    case proxy
     case settings
 
     var id: String { rawValue }
@@ -26,15 +27,11 @@ struct InstalledEditorApp: Equatable, Identifiable {
 
 struct SwitchAccountExecutionResult: Equatable {
     var usedFallbackCLI: Bool
-    var opencodeSynced: Bool
-    var opencodeSyncError: String?
     var restartedEditorApps: [EditorAppID]
     var editorRestartError: String?
 
     static let idle = SwitchAccountExecutionResult(
         usedFallbackCLI: false,
-        opencodeSynced: false,
-        opencodeSyncError: nil,
         restartedEditorApps: [],
         editorRestartError: nil
     )

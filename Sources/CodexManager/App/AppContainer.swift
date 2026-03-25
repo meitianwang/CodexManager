@@ -13,34 +13,11 @@ final class AppContainer {
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
     private let proxyCoordinator: ProxyCoordinator
-    private let proxyControlCloudSyncService: CloudKitProxyControlSyncService
     private var accountsWidgetSnapshotCancellable: AnyCancellable?
-
-    lazy var proxyControlBridge: ProxyControlBridge = ProxyControlBridge(
-        proxyCoordinator: proxyCoordinator,
-        settingsCoordinator: settingsCoordinator,
-        cloudSyncService: proxyControlCloudSyncService
-    )
 
     lazy var proxyModel: ProxyPageModel = ProxyPageModel(
         coordinator: proxyCoordinator,
-        settingsCoordinator: settingsCoordinator,
-        proxyControlCloudSyncService: proxyControlCloudSyncService,
-        localProxyCommandService: proxyControlBridge,
-        chooseIdentityFilePath: {
-            #if canImport(AppKit)
-            let panel = NSOpenPanel()
-            panel.canChooseFiles = true
-            panel.canChooseDirectories = false
-            panel.allowsMultipleSelection = false
-            panel.canCreateDirectories = false
-            panel.title = "Select SSH key file"
-            guard panel.runModal() == .OK else { return nil }
-            return panel.url?.path
-            #else
-            return nil
-            #endif
-        }
+        settingsCoordinator: settingsCoordinator
     )
 
     static func liveOrCrash() -> AppContainer {
@@ -55,7 +32,6 @@ final class AppContainer {
             let chatGPTOAuthLoginService = OpenAIChatGPTOAuthLoginService(configPath: paths.codexConfigPath)
             let codexCLIService = CodexCLIService()
             let editorAppService = EditorAppService()
-            let opencodeSyncService = OpencodeAuthSyncService()
             let launchAtStartupService = LaunchAtStartupService()
             let cloudSyncService = CloudKitAccountsSyncService(storeRepository: storeRepository)
             let cloudSyncAvailabilityService = CloudSyncAvailabilityService()
@@ -69,14 +45,8 @@ final class AppContainer {
                     storeRepository: storeRepository,
                     settingsRepository: settingsRepository,
                     authRepository: authRepository
-                ),
-                cloudflaredService: CloudflaredService(paths: paths),
-                remoteService: RemoteProxyService(
-                    repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
-                    sourceAccountStorePath: paths.accountStorePath
                 )
             )
-            let proxyControlCloudSyncService = CloudKitProxyControlSyncService()
 
             let settingsCoordinator = SettingsCoordinator(
                 settingsRepository: settingsRepository,
@@ -98,19 +68,13 @@ final class AppContainer {
                 workspaceMetadataService: workspaceMetadataService,
                 chatGPTOAuthLoginService: chatGPTOAuthLoginService,
                 codexCLIService: codexCLIService,
-                editorAppService: editorAppService,
-                opencodeAuthSyncService: opencodeSyncService
-            )
-            let remoteAccountsMutationSyncService = RemoteAccountsMutationSyncService(
-                settingsCoordinator: settingsCoordinator,
-                proxyCoordinator: proxyCoordinator
+                editorAppService: editorAppService
             )
             let trayModel = TrayMenuModel(
                 accountsCoordinator: accountsCoordinator,
                 settingsCoordinator: settingsCoordinator,
                 cloudSyncService: cloudSyncService,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
-                remoteAccountsMutationSyncService: remoteAccountsMutationSyncService,
                 backgroundRefreshPolicy: .forPlatform(PlatformCapabilities.currentPlatform),
                 initialAccounts: initialAccounts
             )
@@ -134,7 +98,6 @@ final class AppContainer {
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
                 proxyCoordinator: proxyCoordinator,
-                proxyControlCloudSyncService: proxyControlCloudSyncService,
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
@@ -158,7 +121,6 @@ final class AppContainer {
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
         proxyCoordinator: ProxyCoordinator,
-        proxyControlCloudSyncService: CloudKitProxyControlSyncService,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
@@ -166,7 +128,6 @@ final class AppContainer {
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
         self.proxyCoordinator = proxyCoordinator
-        self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel

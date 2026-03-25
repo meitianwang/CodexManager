@@ -23,9 +23,6 @@ struct CodexManagerApp: App {
         _trayModel = StateObject(wrappedValue: container.trayModel)
         Task { @MainActor in
             container.trayModel.startBackgroundRefresh()
-            #if os(macOS)
-            await container.proxyControlBridge.start()
-            #endif
         }
     }
 
@@ -342,10 +339,6 @@ private func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
         return true
     }
 
-    if notification.subscriptionID == CloudKitProxyControlSyncService.pushSubscriptionID {
-        NotificationCenter.default.post(name: .codexManagerProxyControlPushDidArrive, object: nil)
-        return true
-    }
 
     return false
 }

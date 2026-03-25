@@ -12,12 +12,14 @@ struct RootScene: View {
     @StateObject private var accountsModel: AccountsPageModel
     @StateObject private var settingsModel: SettingsPageModel
     @ObservedObject private var trayModel: TrayMenuModel
+    private let proxyModel: ProxyPageModel
     private let container: AppContainer
 
     init(container: AppContainer, trayModel: TrayMenuModel) {
         self.container = container
         _accountsModel = StateObject(wrappedValue: container.accountsModel)
         _settingsModel = StateObject(wrappedValue: container.settingsModel)
+        self.proxyModel = container.proxyModel
         self.trayModel = trayModel
     }
 
@@ -29,6 +31,8 @@ struct RootScene: View {
         switch selectedTab {
         case .accounts:
             return accountsModel.notice
+        case .proxy:
+            return proxyModel.notice
         case .settings:
             return settingsModel.notice
         }
@@ -139,6 +143,8 @@ struct RootScene: View {
                     settingsModel.setLocale(locale.identifier)
                 }
             )
+        case .proxy:
+            ProxyPageView(model: proxyModel)
         case .settings:
             SettingsPageView(model: settingsModel)
         }
@@ -234,6 +240,7 @@ private extension AppTab {
     var iconName: String {
         switch self {
         case .accounts: return "person.2.fill"
+        case .proxy: return "arrow.triangle.swap"
         case .settings: return "gearshape.fill"
         }
     }
@@ -241,6 +248,7 @@ private extension AppTab {
     var titleTranslationKey: String {
         switch self {
         case .accounts: return "tab.accounts"
+        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }
@@ -248,6 +256,7 @@ private extension AppTab {
     var titleKey: LocalizedStringKey {
         switch self {
         case .accounts: return "tab.accounts"
+        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }

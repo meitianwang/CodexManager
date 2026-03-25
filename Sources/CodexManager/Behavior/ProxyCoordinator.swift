@@ -1,25 +1,14 @@
 import Foundation
-import Combine
 
 final class ProxyCoordinator: @unchecked Sendable {
     private let proxyService: ProxyRuntimeService
-    private let cloudflaredService: CloudflaredServiceProtocol
-    private let remoteService: RemoteProxyServiceProtocol
 
-    init(
-        proxyService: ProxyRuntimeService,
-        cloudflaredService: CloudflaredServiceProtocol,
-        remoteService: RemoteProxyServiceProtocol
-    ) {
+    init(proxyService: ProxyRuntimeService) {
         self.proxyService = proxyService
-        self.cloudflaredService = cloudflaredService
-        self.remoteService = remoteService
     }
 
-    func loadStatus() async -> (ApiProxyStatus, CloudflaredStatus) {
-        async let proxy = proxyService.status()
-        async let cloudflared = cloudflaredService.status()
-        return await (proxy, cloudflared)
+    func loadStatus() async -> ApiProxyStatus {
+        await proxyService.status()
     }
 
     func startProxy(preferredPort: Int?) async throws -> ApiProxyStatus {
@@ -33,75 +22,5 @@ final class ProxyCoordinator: @unchecked Sendable {
 
     func refreshAPIKey() async throws -> ApiProxyStatus {
         try await proxyService.refreshAPIKey()
-    }
-
-    func installCloudflared() async throws -> CloudflaredStatus {
-        try await cloudflaredService.install()
-    }
-
-    func startCloudflared(input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus {
-        try await cloudflaredService.start(input)
-    }
-
-    func stopCloudflared() async -> CloudflaredStatus {
-        await cloudflaredService.stop()
-    }
-
-    func refreshCloudflared() async -> CloudflaredStatus {
-        await cloudflaredService.status()
-    }
-
-    func remoteStatus(server: RemoteServerConfig) async -> RemoteProxyStatus {
-        await remoteService.status(server: server)
-    }
-
-    func discoverRemote(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
-        try await remoteService.discover(server: server)
-    }
-
-    func remoteStatuses(for servers: [RemoteServerConfig]) async -> [String: RemoteProxyStatus] {
-        await withTaskGroup(of: (String, RemoteProxyStatus).self, returning: [String: RemoteProxyStatus].self) { group in
-            for server in servers {
-                group.addTask { [remoteService] in
-                    (server.id, await remoteService.status(server: server))
-                }
-            }
-
-            var merged: [String: RemoteProxyStatus] = [:]
-            for await (serverID, status) in group {
-                merged[serverID] = status
-            }
-            return merged
-        }
-    }
-
-    func deployRemote(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        try await remoteService.deploy(server: server)
-    }
-
-    func syncRemoteAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        try await remoteService.syncAccounts(server: server)
-    }
-
-    func startRemote(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        try await remoteService.start(server: server)
-    }
-
-    func stopRemote(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        try await remoteService.stop(server: server)
-    }
-
-    func readRemoteLogs(server: RemoteServerConfig, lines: Int) async throws -> String {
-        try await remoteService.readLogs(server: server, lines: lines)
-    }
-
-    func uninstallRemote(
-        server: RemoteServerConfig,
-        removeRemoteDirectory: Bool = false
-    ) async throws -> RemoteProxyStatus {
-        try await remoteService.uninstall(
-            server: server,
-            removeRemoteDirectory: removeRemoteDirectory
-        )
     }
 }

@@ -75,12 +75,7 @@ extension TrayMenuModel {
     func syncLocalAccountsMutationNow() async {
         do {
             try await pushCloudAccountsIfNeeded(failOnError: false)
-            if let remoteAccountsMutationSyncService {
-                let report = await remoteAccountsMutationSyncService.syncConfiguredRemoteAccounts()
-                notice = report.failures.isEmpty ? nil : report.failures.joined(separator: " | ")
-            } else {
-                notice = nil
-            }
+            notice = nil
         } catch {
             notice = error.localizedDescription
         }

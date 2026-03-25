@@ -25,13 +25,6 @@ extension AccountsPageModel {
             segments.append(L10n.tr("accounts.notice.switch_done"))
         }
 
-        if let syncError = execution.opencodeSyncError, !syncError.isEmpty {
-            style = .error
-            segments.append(L10n.tr("accounts.notice.sync_failed_format", syncError))
-        } else if execution.opencodeSynced {
-            segments.append(L10n.tr("accounts.notice.sync_done"))
-        }
-
         if let restartError = execution.editorRestartError, !restartError.isEmpty {
             style = .error
             segments.append(L10n.tr("accounts.notice.editor_restart_failed_format", restartError))
