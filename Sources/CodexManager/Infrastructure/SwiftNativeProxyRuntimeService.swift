@@ -157,6 +157,10 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
             return await handleChatCompletionsRequest(body: request.body, downstreamHeaders: request.headers)
         }
 
+        if request.path == "/v1/messages" && request.method == "POST" {
+            return await handleAnthropicMessagesRequest(body: request.body, downstreamHeaders: request.headers)
+        }
+
         return jsonError(
             statusCode: 404,
             message: L10n.tr("error.proxy_runtime.unsupported_route")
@@ -253,6 +257,69 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         } catch {
             return jsonError(statusCode: 502, message: error.localizedDescription)
         }
+    }
+
+    // MARK: - Anthropic Messages handler
+    // Adapted from CLIProxyAPI sdk/api/handlers/claude/code_handlers.go
+
+    private func handleAnthropicMessagesRequest(body: Data, downstreamHeaders: [String: String]) async -> HTTPResponse {
+        let object: [String: Any]
+        do {
+            object = try parseJSONObject(from: body)
+        } catch {
+            return anthropicError(statusCode: 400, message: error.localizedDescription)
+        }
+
+        let payload: [String: Any]
+        let downstreamStream: Bool
+        let requestedModel: String
+
+        do {
+            requestedModel = (object["model"] as? String) ?? "claude-sonnet-4-20250514"
+            let normalized = try convertAnthropicRequestToResponses(object)
+            payload = normalized.payload
+            downstreamStream = normalized.downstreamStream
+        } catch {
+            return anthropicError(statusCode: 400, message: error.localizedDescription)
+        }
+
+        let upstream: UpstreamResponse
+        do {
+            upstream = try await sendOverCandidates(payload: payload, downstreamHeaders: downstreamHeaders)
+        } catch {
+            return anthropicError(statusCode: 502, message: error.localizedDescription)
+        }
+
+        if downstreamStream {
+            do {
+                let sse = try convertResponsesSSEToAnthropicSSE(upstream.body, fallbackModel: requestedModel)
+                return HTTPResponse(
+                    statusCode: 200,
+                    headers: ["Content-Type": "text/event-stream; charset=utf-8"],
+                    body: sse
+                )
+            } catch {
+                return anthropicError(statusCode: 502, message: error.localizedDescription)
+            }
+        }
+
+        do {
+            let completed = try extractCompletedResponse(fromSSE: upstream.body)
+            let anthropicResponse = convertCompletedResponseToAnthropicMessage(completed, fallbackModel: requestedModel)
+            return HTTPResponse.json(statusCode: 200, object: anthropicResponse)
+        } catch {
+            return anthropicError(statusCode: 502, message: error.localizedDescription)
+        }
+    }
+
+    private func anthropicError(statusCode: Int, message: String) -> HTTPResponse {
+        HTTPResponse.json(statusCode: statusCode, object: [
+            "type": "error",
+            "error": [
+                "type": statusCode == 400 ? "invalid_request_error" : "api_error",
+                "message": message
+            ]
+        ])
     }
 
     private func sendOverCandidates(payload: [String: Any], downstreamHeaders: [String: String]) async throws -> UpstreamResponse {

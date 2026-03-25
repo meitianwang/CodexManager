@@ -74,6 +74,7 @@
 		68BBF8576B043AD617733323 /* CodexManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CD175E724ED008FEB271D6 /* CodexManagerApp.swift */; };
 		69C9F27DF826AB35EEA56E56 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = F088729CE9469AC20B5706FD /* AccountsPageModel+State.swift */; };
 		6A5E43CB54B6D7F8909615CF /* OpenAIChatGPTOAuthLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C0681C1E45D064BB2AD670 /* OpenAIChatGPTOAuthLoginService.swift */; };
+		6D20D7A8A392065E6D7B0451 /* SwiftNativeProxyRuntimeService+AnthropicTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C728326F9FBEF359747E19 /* SwiftNativeProxyRuntimeService+AnthropicTranslation.swift */; };
 		6DF6F71EDA9B8896E0A7657D /* LocalizationConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00607C16FDDF14B0992FD9B4 /* LocalizationConsistencyTests.swift */; };
 		6EFF94DACFFDE3691F9A9E69 /* SettingsControlPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656CF2B50F6C9A720C34AF4D /* SettingsControlPresentation.swift */; };
 		6FEB12DADAABFBA139C09865 /* CodexManager.icon in Resources */ = {isa = PBXBuildFile; fileRef = BBD4D93580E7619E69A9EBB3 /* CodexManager.icon */; };
@@ -305,6 +306,7 @@
 		F088729CE9469AC20B5706FD /* AccountsPageModel+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+State.swift"; sourceTree = "<group>"; };
 		F1597DF4AA63F198CA24B250 /* ShellCommandRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellCommandRunner.swift; sourceTree = "<group>"; };
 		F187E05644B2450BA89EC980 /* ProxyRuntimeLimits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRuntimeLimits.swift; sourceTree = "<group>"; };
+		F2C728326F9FBEF359747E19 /* SwiftNativeProxyRuntimeService+AnthropicTranslation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "SwiftNativeProxyRuntimeService+AnthropicTranslation.swift"; sourceTree = "<group>"; };
 		F447DF7FB370EB048450CC32 /* AccountsSnapshotFreshnessPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSnapshotFreshnessPolicyTests.swift; sourceTree = "<group>"; };
 		F4CE3E33A201F9199E62C0F6 /* AccountsPageModel+AccountMutations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+AccountMutations.swift"; sourceTree = "<group>"; };
 		F53F4792F5E1BA0F94FDFFCD /* PlatformCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformCapabilities.swift; sourceTree = "<group>"; };
@@ -357,6 +359,7 @@
 				B8949E46DEDE8D1C0FA50659 /* SwiftNativeProxyRuntimeService+RetryFailures.swift */,
 				C6D1A6424BEC5E75D0F7DA4A /* SwiftNativeProxyRuntimeService+RuntimeSupport.swift */,
 				B60F2E652AEC5D7005FAE1CF /* SystemDateProvider.swift */,
+				F2C728326F9FBEF359747E19 /* SwiftNativeProxyRuntimeService+AnthropicTranslation.swift */,
 			);
 			path = Infrastructure;
 			sourceTree = "<group>";
@@ -886,6 +889,7 @@
 				1DB1750FB456B163EE356BDA /* ViewState.swift in Sources */,
 				FA5B58293AE8B966C6100ABE /* ProxyDashboardViews.swift in Sources */,
 				FF8C28322F3188F4182381B8 /* ProxyPageModel+Dashboard.swift in Sources */,
+				6D20D7A8A392065E6D7B0451 /* SwiftNativeProxyRuntimeService+AnthropicTranslation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

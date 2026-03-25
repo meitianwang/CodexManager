@@ -113,12 +113,16 @@ extension ProxyPageModel {
             }
         }
 
-        let baseURL = proxyStatus.baseURL ?? "http://127.0.0.1:\(preferredPortText)"
+        // Claude Code uses ANTHROPIC_BASE_URL + "/v1/messages", so give it the root URL
+        let fullBaseURL = proxyStatus.baseURL ?? "http://127.0.0.1:\(preferredPortText)/v1"
+        let anthropicBaseURL = fullBaseURL.hasSuffix("/v1")
+            ? String(fullBaseURL.dropLast(3))
+            : fullBaseURL
         let apiKey = proxyStatus.apiKey ?? ""
 
         var envDict: [String: String] = [
             "ANTHROPIC_AUTH_TOKEN": apiKey,
-            "ANTHROPIC_BASE_URL": baseURL,
+            "ANTHROPIC_BASE_URL": anthropicBaseURL,
             "API_TIMEOUT_MS": "3000000",
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
         ]
