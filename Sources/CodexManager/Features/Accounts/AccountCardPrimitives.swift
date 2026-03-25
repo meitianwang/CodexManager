@@ -38,7 +38,7 @@ struct AccountCardPalette {
         case .teal:
             toneColor = .teal
         }
-        surfaceTint = isCurrent ? .teal.opacity(0.14) : nil
+        surfaceTint = isCurrent ? .teal.opacity(0.08) : nil
     }
 }
 
@@ -73,13 +73,13 @@ struct AccountCardHeaderSection: View {
                 HStack(spacing: 6) {
                     AccountTagView(
                         text: presentation.planLabel,
-                        backgroundColor: palette.toneColor.opacity(0.18),
+                        backgroundColor: palette.toneColor.opacity(0.14),
                         foregroundColor: palette.toneColor
                     )
                     if let teamNameTag = presentation.teamNameTag {
                         AccountTagView(
                             text: teamNameTag,
-                            backgroundColor: palette.toneColor.opacity(0.18),
+                            backgroundColor: palette.toneColor.opacity(0.14),
                             foregroundColor: palette.toneColor,
                             allowsCompression: true
                         )

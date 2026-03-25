@@ -9,7 +9,7 @@ import AppKit
 struct ProxyModelListSection: View {
     @ObservedObject var model: ProxyPageModel
 
-    private let teal = Color(red: 0.16, green: 0.71, blue: 0.55)
+    private let teal = Color.teal
     @State private var hoveredModel: String?
 
     var body: some View {
@@ -116,7 +116,7 @@ struct ProxyModelListSection: View {
 struct ProxyCurlExampleSection: View {
     @ObservedObject var model: ProxyPageModel
 
-    private let teal = Color(red: 0.16, green: 0.71, blue: 0.55)
+    private let teal = Color.teal
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -225,7 +225,7 @@ struct ProxyCurlExampleSection: View {
 struct ProxyClaudeConfigSection: View {
     @ObservedObject var model: ProxyPageModel
 
-    private let teal = Color(red: 0.16, green: 0.71, blue: 0.55)
+    private let teal = Color.teal
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

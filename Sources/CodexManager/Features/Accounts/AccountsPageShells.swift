@@ -95,41 +95,31 @@ private struct AccountsMacPageShell: View {
     let onRefreshAccountUsage: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
-    private var pageContentWidth: CGFloat {
-        LayoutRules.accountsPageContentWidth(isCompactWidth: false) ?? LayoutRules.accountsPageTargetWidth
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-            AccountsActionBarContainer(
-                model: model,
-                onTriggerAction: onTriggerAction,
-                onToggleCollapse: onToggleCollapse
-            )
-            .padding(.horizontal, LayoutRules.pagePadding)
-            .frame(width: pageContentWidth, alignment: .leading)
+        GeometryReader { proxy in
+            let contentWidth = max(0, proxy.size.width - LayoutRules.macPageHorizontalPadding * 2)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    AccountsPageContentSection(
-                        model: model,
-                        availableViewportSize: CGSize(
-                            width: pageContentWidth,
-                            height: LayoutRules.defaultPanelHeight
-                        ),
-                        areCardsPresented: areCardsPresented,
-                        onSwitchAccount: onSwitchAccount,
-                        onRefreshAccountUsage: onRefreshAccountUsage,
-                        onDeleteAccount: onDeleteAccount
-                    )
-                }
-                .padding(.bottom, 12)
-                .frame(width: pageContentWidth, alignment: .leading)
+            MacPageScrollContainer {
+                AccountsActionBarContainer(
+                    model: model,
+                    onTriggerAction: onTriggerAction,
+                    onToggleCollapse: onToggleCollapse
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                AccountsPageContentSection(
+                    model: model,
+                    availableViewportSize: CGSize(
+                        width: contentWidth,
+                        height: max(proxy.size.height, LayoutRules.defaultPanelHeight)
+                    ),
+                    areCardsPresented: areCardsPresented,
+                    onSwitchAccount: onSwitchAccount,
+                    onRefreshAccountUsage: onRefreshAccountUsage,
+                    onDeleteAccount: onDeleteAccount
+                )
             }
-            .scrollIndicators(.hidden)
         }
-        .frame(width: pageContentWidth, alignment: .topLeading)
-        .padding(.top, LayoutRules.pagePadding)
     }
 }
 

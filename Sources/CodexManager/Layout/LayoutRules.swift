@@ -6,12 +6,14 @@ import UIKit
 /// Centralized layout inputs to avoid duplicated sizing logic across pages.
 enum LayoutRules {
     static let pagePadding = CGFloat(16)
+    static let macPageHorizontalPadding = CGFloat(32)
+    static let macPageTopPadding = CGFloat(16)
+    static let macPageBottomPadding = CGFloat(18)
     static let sectionSpacing = CGFloat(16)
     static let cardRadius = CGFloat(14)
     static let liquidProgressHeight = CGFloat(12)
     static let liquidProgressInset = CGFloat(2)
     static let listRowSpacing = CGFloat(10)
-    static let tabSwitcherMaxWidth = CGFloat(260)
     static let minimumPanelHeight = CGFloat(520)
     static let defaultPanelHeight = CGFloat(620)
     static let accountsRowSpacing = CGFloat(10)
@@ -43,16 +45,7 @@ enum LayoutRules {
     static let toolbarRefreshIconOpticalScale = CGFloat(0.82)
     static let proxyDetailCardSpacing = CGFloat(12)
     static let proxyHeroPortFieldWidth = CGFloat(108)
-    static let proxyRemoteFieldMinWidth = CGFloat(160)
-    static let proxyRemoteActionMinWidth = CGFloat(118)
-    static let proxyRemoteActionGridMinWidth = CGFloat(92)
-    static let proxyRemoteMetricMinWidth = CGFloat(108)
-    static let proxyRemoteMetricHeight = CGFloat(68)
-    static let proxyRemoteDetailMinWidth = CGFloat(220)
-    static let proxyRemoteLogsHeight = CGFloat(120)
-    static let proxyPublicModeMinWidth = CGFloat(240)
-    static let proxyPublicFieldMinWidth = CGFloat(220)
-    static let proxyPublicStatusCardMinWidth = CGFloat(170)
+    static let settingsPickerMinWidth = CGFloat(180)
 
     static var accountsTwoColumnContentWidth: CGFloat {
         accountsCardWidth * CGFloat(accountsExpandedColumns) + accountsRowSpacing
@@ -84,19 +77,6 @@ enum LayoutRules {
 
     static func iOSAccountsContentBottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
         safeAreaBottom + iOSAccountsScrollBottomPadding
-    }
-
-    static func accountsGridColumns(isOverviewMode: Bool, isCompactWidth: Bool) -> [GridItem] {
-        accountsGridColumns(
-            context: AccountsGridContext(
-                platform: isCompactWidth ? .iPhone : .macOS,
-                isOverviewMode: isOverviewMode,
-                viewportSize: CGSize(
-                    width: isCompactWidth ? 390 : accountsPageTargetWidth,
-                    height: isCompactWidth ? 844 : defaultPanelHeight
-                )
-            )
-        )
     }
 
     struct AccountsGridContext: Equatable {
@@ -155,14 +135,6 @@ enum LayoutRules {
         )
     }
     #endif
-
-    static func accountsCardFrameWidth(isOverviewMode: Bool, isCompactWidth: Bool) -> CGFloat? {
-        nil
-    }
-
-    static func accountsPageContentWidth(isCompactWidth: Bool) -> CGFloat? {
-        isCompactWidth ? nil : accountsPageTargetWidth
-    }
 
     private static func accountsGridTargetColumnCount(context: AccountsGridContext) -> Int {
         switch context.platform {

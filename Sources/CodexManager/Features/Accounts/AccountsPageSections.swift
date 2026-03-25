@@ -86,7 +86,6 @@ private struct AccountsGridSection: View {
             AccountsAnimationRules.contentReorder,
             value: cards.map(\.id)
         )
-        .padding(.horizontal, LayoutRules.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

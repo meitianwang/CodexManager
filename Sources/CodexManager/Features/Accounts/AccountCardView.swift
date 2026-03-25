@@ -103,7 +103,7 @@ struct AccountCardView: View {
         .accountCardSurface(cornerRadius: 12, tint: palette.surfaceTint)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(account.isCurrent ? palette.toneColor.opacity(0.45) : .clear, lineWidth: 1)
+                .strokeBorder(account.isCurrent ? palette.toneColor.opacity(0.2) : .clear, lineWidth: 1)
         )
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(

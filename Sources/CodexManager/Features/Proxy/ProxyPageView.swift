@@ -4,20 +4,23 @@ struct ProxyPageView: View {
     @ObservedObject var model: ProxyPageModel
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: LayoutRules.sectionSpacing) {
-                ApiProxySectionView(model: model)
+        MacPageScrollContainer {
+            ApiProxySectionView(model: model)
 
-                ProxyClaudeConfigSection(model: model)
+            ProxyClaudeConfigSection(model: model)
 
+            ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: LayoutRules.sectionSpacing) {
                     ProxyModelListSection(model: model)
                     ProxyCurlExampleSection(model: model)
                 }
+
+                VStack(spacing: LayoutRules.sectionSpacing) {
+                    ProxyModelListSection(model: model)
+                    ProxyCurlExampleSection(model: model)
+                }
             }
-            .padding(LayoutRules.pagePadding)
         }
-        .scrollIndicators(.hidden)
         .task {
             await model.loadIfNeeded()
         }

@@ -84,10 +84,21 @@ struct ProxyActionStrip<Intent: Hashable>: View {
     let onAction: @MainActor (Intent) async -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(buttons) { button in
-                actionButton(button)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                actionButtons
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                actionButtons
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        ForEach(buttons) { button in
+            actionButton(button)
         }
     }
 

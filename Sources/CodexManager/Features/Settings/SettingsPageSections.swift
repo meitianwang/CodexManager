@@ -17,14 +17,10 @@ private struct MacSettingsPageContent: View {
     @ObservedObject var model: SettingsPageModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                SettingsGeneralSection(model: model)
-                SettingsLanguageSection(model: model)
-                SettingsSwitchBehaviorSection(model: model)
-            }
-            .formStyle(.grouped)
-            .scrollIndicators(.hidden)
+        MacPageScrollContainer {
+            SettingsGeneralSection(model: model)
+            SettingsLanguageSection(model: model)
+            SettingsSwitchBehaviorSection(model: model)
 
             SettingsQuitFooter(onQuit: model.quitApp)
         }
@@ -38,7 +34,7 @@ private struct SettingsGeneralSection: View {
     @ObservedObject var model: SettingsPageModel
 
     var body: some View {
-        Section("settings.section.general") {
+        SectionCard(title: L10n.tr("settings.section.general")) {
             SettingsToggleRows(
                 descriptors: model.generalSectionPresentation.toggles,
                 onChange: model.updateToggle
@@ -51,7 +47,7 @@ private struct SettingsSwitchBehaviorSection: View {
     @ObservedObject var model: SettingsPageModel
 
     var body: some View {
-        Section("settings.section.switch_behavior") {
+        SectionCard(title: L10n.tr("settings.section.switch_behavior")) {
             SettingsToggleRows(
                 descriptors: model.switchBehaviorSectionPresentation.toggles,
                 onChange: model.updateToggle
@@ -79,7 +75,6 @@ private struct SettingsQuitFooter: View {
             }
             .buttonStyle(.frostedCapsule(prominent: true, tint: .red))
         }
-        .padding(.horizontal, LayoutRules.pagePadding)
         .padding(.top, 6)
         .padding(.bottom, 10)
     }
@@ -105,11 +100,20 @@ private struct SettingsLanguageSection: View {
     @ObservedObject var model: SettingsPageModel
 
     var body: some View {
+        #if os(macOS)
+        SectionCard(title: L10n.tr("settings.section.language")) {
+            SettingsPickerRow(
+                descriptor: model.languageSectionPresentation.picker,
+                onSelect: model.updateLocale
+            )
+        }
+        #else
         Section("settings.section.language") {
             SettingsPickerRow(
                 descriptor: model.languageSectionPresentation.picker,
                 onSelect: model.updateLocale
             )
         }
+        #endif
     }
 }

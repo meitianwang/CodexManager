@@ -3,6 +3,30 @@ import SwiftUI
 import AppKit
 #endif
 
+#if os(macOS)
+struct MacPageScrollContainer<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
+                content
+            }
+            .padding(.horizontal, LayoutRules.macPageHorizontalPadding)
+            .padding(.top, LayoutRules.macPageTopPadding)
+            .padding(.bottom, LayoutRules.macPageBottomPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+#endif
+
 struct SectionCard<Content: View, HeaderTrailing: View>: View {
     let title: String
     @ViewBuilder let headerTrailing: HeaderTrailing

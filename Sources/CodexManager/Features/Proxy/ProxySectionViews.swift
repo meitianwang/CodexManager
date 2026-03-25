@@ -26,18 +26,9 @@ struct ApiProxySectionView: View {
         VStack(spacing: 12) {
             expandedSummaryPills
 
-            HStack(spacing: 10) {
-                TextField(
-                    "8787",
-                    text: model.preferredPortBinding
-                )
-                .frostedCapsuleInput()
-                .frame(width: LayoutRules.proxyHeroPortFieldWidth)
-
-                ProxyActionStrip(
-                    buttons: model.apiProxyActionButtons,
-                    onAction: model.handleAPIProxyAction
-                )
+            ViewThatFits(in: .horizontal) {
+                proxyControlRow
+                proxyControlColumn
             }
 
             HStack {
@@ -50,6 +41,37 @@ struct ApiProxySectionView: View {
                 .controlSize(.small)
             }
         }
+    }
+
+    private var proxyControlRow: some View {
+        HStack(spacing: 10) {
+            portField
+
+            ProxyActionStrip(
+                buttons: model.apiProxyActionButtons,
+                onAction: model.handleAPIProxyAction
+            )
+        }
+    }
+
+    private var proxyControlColumn: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            portField
+
+            ProxyActionStrip(
+                buttons: model.apiProxyActionButtons,
+                onAction: model.handleAPIProxyAction
+            )
+        }
+    }
+
+    private var portField: some View {
+        TextField(
+            "8787",
+            text: model.preferredPortBinding
+        )
+        .frostedCapsuleInput()
+        .frame(width: LayoutRules.proxyHeroPortFieldWidth)
     }
 
     private var expandedSummaryPills: some View {

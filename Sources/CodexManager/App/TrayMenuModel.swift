@@ -4,12 +4,7 @@ import Combine
 extension Notification.Name {
     static let codexManagerAccountsSnapshotPushDidArrive = Notification.Name("codexmanager.accounts-snapshot.push")
     static let codexManagerCurrentAccountSelectionPushDidArrive = Notification.Name("codexmanager.current-account-selection.push")
-    static let codexManagerProxyControlPushDidArrive = Notification.Name("codexmanager.proxy-control.push")
     static let codexManagerLocalProxySnapshotDidUpdate = Notification.Name("codexmanager.proxy.snapshot.local-update")
-}
-
-enum ProxyControlNotificationPayloadKey {
-    static let snapshot = "snapshot"
 }
 
 @MainActor

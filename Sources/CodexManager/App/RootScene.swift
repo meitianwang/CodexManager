@@ -127,7 +127,7 @@ struct RootScene: View {
             Divider()
 
             activePage
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         #endif
     }

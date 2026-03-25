@@ -4,14 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+ARTIFACTS_ROOT="${ARTIFACTS_ROOT:-$ROOT_DIR/artifacts/macos}"
+BUILD_ROOT="${BUILD_ROOT:-$ROOT_DIR/build/package}"
+
 PROJECT_PATH="${PROJECT_PATH:-CodexManager.xcodeproj}"
 SCHEME="${SCHEME:-CodexManager}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-KLU8GF65GP}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Ning Huang (KLU8GF65GP)}"
-WORK_ROOT="${WORK_ROOT:-}"
+WORK_ROOT="${WORK_ROOT:-$BUILD_ROOT/release}"
 KEEP_WORK_ROOT="${KEEP_WORK_ROOT:-0}"
-RELEASE_ROOT="${RELEASE_ROOT:-}"
+RELEASE_ROOT="${RELEASE_ROOT:-$ARTIFACTS_ROOT/release}"
 PRODUCT_BUNDLE_IDENTIFIER="${PRODUCT_BUNDLE_IDENTIFIER:-com.nik.mei.codexmanager}"
 APP_ENTITLEMENTS_PATH="${APP_ENTITLEMENTS_PATH:-$ROOT_DIR/CodexManager.release.entitlements}"
 PLUGIN_ENTITLEMENTS_PATH="${PLUGIN_ENTITLEMENTS_PATH:-$ROOT_DIR/CodexManagerWidgetsMac.entitlements}"
@@ -248,14 +251,6 @@ Notes:
 - Notarization backend: ${NOTARIZATION_BACKEND}.
 EOF
 }
-
-if [[ -z "$WORK_ROOT" ]]; then
-  WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/codexmanager-release.XXXXXX")"
-fi
-
-if [[ -z "$RELEASE_ROOT" ]]; then
-  RELEASE_ROOT="$WORK_ROOT/release"
-fi
 
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$WORK_ROOT/DerivedData}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$WORK_ROOT/$SCHEME.xcarchive}"

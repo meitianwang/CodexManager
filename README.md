@@ -25,6 +25,20 @@ A native macOS/iOS application for managing Codex/ChatGPT accounts with usage-ba
 swift build
 ```
 
+### Package for macOS
+
+Local preview package:
+
+```bash
+./scripts/package_macos.sh local
+```
+
+Signed release package:
+
+```bash
+./scripts/package_macos.sh release
+```
+
 ### Generate Xcode Project (optional)
 
 ```bash

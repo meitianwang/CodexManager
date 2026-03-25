@@ -143,17 +143,17 @@ struct ProxyCopyableValueCard<Trailing: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(titleDisplayMode.displayTitle(for: title))
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                trailing
-                Button("common.copy") {
-                    PlatformClipboard.copy(canCopy ? value : nil)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    titleLabel
+                    Spacer(minLength: 0)
+                    headerActions
                 }
-                .liquidGlassActionButtonStyle()
-                .disabled(!canCopy)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    titleLabel
+                    headerActions
+                }
             }
             Text(value)
                 .font(.caption.monospaced())
@@ -165,6 +165,25 @@ struct ProxyCopyableValueCard<Trailing: View>: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(padding)
         .cardSurface(cornerRadius: cornerRadius)
+    }
+
+    private var titleLabel: some View {
+        Text(titleDisplayMode.displayTitle(for: title))
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+
+    private var headerActions: some View {
+        HStack(spacing: 8) {
+            trailing
+            Button("common.copy") {
+                PlatformClipboard.copy(canCopy ? value : nil)
+            }
+            .liquidGlassActionButtonStyle()
+            .disabled(!canCopy)
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -186,16 +205,16 @@ struct ProxyInfoCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(titleDisplayMode.displayTitle(for: title))
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if let onCopy {
-                    Button("common.copy", action: onCopy)
-                        .liquidGlassActionButtonStyle()
-                        .disabled(!canCopy)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    titleLabel
+                    Spacer(minLength: 0)
+                    copyButton
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    titleLabel
+                    copyButton
                 }
             }
             headlineView
@@ -209,6 +228,23 @@ struct ProxyInfoCard: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(padding)
         .cardSurface(cornerRadius: cornerRadius)
+    }
+
+    private var titleLabel: some View {
+        Text(titleDisplayMode.displayTitle(for: title))
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var copyButton: some View {
+        if let onCopy {
+            Button("common.copy", action: onCopy)
+                .liquidGlassActionButtonStyle()
+                .disabled(!canCopy)
+                .fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     @ViewBuilder
