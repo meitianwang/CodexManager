@@ -26,8 +26,6 @@ actor SettingsCoordinator {
         if let value = patch.autoSmartSwitch { settings.autoSmartSwitch = value }
         if let value = patch.restartEditorsOnSwitch { settings.restartEditorsOnSwitch = value }
         if let value = patch.restartEditorTargets { settings.restartEditorTargets = value }
-        if let value = patch.autoStartApiProxy { settings.autoStartApiProxy = value }
-        if let value = patch.proxyConfiguration { settings.proxyConfiguration = value.normalized() }
         if let value = patch.locale { settings.locale = AppLocale.resolve(value).identifier }
 
         try settingsRepository.saveSettings(settings)

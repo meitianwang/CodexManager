@@ -12,13 +12,7 @@ final class AppContainer {
 
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
-    private let proxyCoordinator: ProxyCoordinator
     private var accountsWidgetSnapshotCancellable: AnyCancellable?
-
-    lazy var proxyModel: ProxyPageModel = ProxyPageModel(
-        coordinator: proxyCoordinator,
-        settingsCoordinator: settingsCoordinator
-    )
 
     static func liveOrCrash() -> AppContainer {
         do {
@@ -39,15 +33,6 @@ final class AppContainer {
                 storeRepository: storeRepository,
                 authRepository: authRepository
             )
-            let proxyCoordinator = ProxyCoordinator(
-                proxyService: SwiftNativeProxyRuntimeService(
-                    paths: paths,
-                    storeRepository: storeRepository,
-                    settingsRepository: settingsRepository,
-                    authRepository: authRepository
-                )
-            )
-
             let settingsCoordinator = SettingsCoordinator(
                 settingsRepository: settingsRepository,
                 launchAtStartupService: launchAtStartupService
@@ -97,7 +82,6 @@ final class AppContainer {
             return AppContainer(
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
-                proxyCoordinator: proxyCoordinator,
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
@@ -120,14 +104,12 @@ final class AppContainer {
     private init(
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
-        proxyCoordinator: ProxyCoordinator,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
     ) {
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
-        self.proxyCoordinator = proxyCoordinator
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel

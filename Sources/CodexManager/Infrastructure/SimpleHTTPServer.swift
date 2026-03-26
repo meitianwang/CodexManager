@@ -36,6 +36,17 @@ struct HTTPResponse {
 final class SimpleHTTPServer: @unchecked Sendable {
     typealias RequestHandler = @Sendable (HTTPRequest) async -> HTTPResponse
 
+    private static let maxInboundRequestBytes = 8 * 1024 * 1024
+
+    private static func limitDescription(for bytes: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useKB]
+        formatter.countStyle = .binary
+        formatter.includesUnit = true
+        formatter.includesCount = true
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
+
     private let listener: NWListener
     private let queue: DispatchQueue
     private let handler: RequestHandler
@@ -100,7 +111,7 @@ final class SimpleHTTPServer: @unchecked Sendable {
                     statusCode: 413,
                     text: L10n.tr(
                         "error.http_server.request_too_large_format",
-                        ProxyRuntimeLimits.limitDescription(for: ProxyRuntimeLimits.maxInboundRequestBytes)
+                        Self.limitDescription(for: Self.maxInboundRequestBytes)
                     )
                 )
                 self.send(response: response, on: connection)
@@ -189,11 +200,11 @@ final class SimpleHTTPServer: @unchecked Sendable {
     }
 
     static func isPayloadOversized(buffer: Data) -> Bool {
-        if buffer.count > ProxyRuntimeLimits.maxInboundRequestBytes {
+        if buffer.count > Self.maxInboundRequestBytes {
             return true
         }
         if let contentLength = extractContentLength(from: buffer),
-           contentLength > ProxyRuntimeLimits.maxInboundRequestBytes {
+           contentLength > Self.maxInboundRequestBytes {
             return true
         }
         return false

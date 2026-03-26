@@ -3,7 +3,6 @@ import Foundation
 enum SettingsToggleIntent: String, Hashable {
     case launchAtStartup
     case launchAfterSwitch
-    case autoStartProxy
     case autoSmartSwitch
     case restartEditorsOnSwitch
 }
@@ -64,11 +63,6 @@ enum SettingsControlPresentation {
                     titleKey: "settings.launch_codex_after_switch",
                     isOn: settings.launchCodexAfterSwitch
                 ),
-                SettingsToggleDescriptor(
-                    intent: .autoStartProxy,
-                    titleKey: "settings.auto_start_api_proxy",
-                    isOn: settings.autoStartApiProxy
-                )
             ]
         )
     }

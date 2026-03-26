@@ -14,10 +14,6 @@ extension SettingsPageModel {
         updateToggle(.autoSmartSwitch, to: value)
     }
 
-    func setAutoStartProxy(_ value: Bool) {
-        updateToggle(.autoStartProxy, to: value)
-    }
-
     func setLocale(_ value: String) {
         updateLocale(AppLocale.resolve(value))
     }
@@ -41,8 +37,6 @@ extension SettingsPageModel {
             Task { await update(AppSettingsPatch(launchAtStartup: value)) }
         case .launchAfterSwitch:
             Task { await update(AppSettingsPatch(launchCodexAfterSwitch: value)) }
-        case .autoStartProxy:
-            Task { await update(AppSettingsPatch(autoStartApiProxy: value)) }
         case .autoSmartSwitch:
             Task { await update(AppSettingsPatch(autoSmartSwitch: value)) }
         case .restartEditorsOnSwitch:

@@ -53,15 +53,6 @@ extension AuthRepository {
     }
 }
 
-protocol ProxyRuntimeService: Sendable {
-    func status() async -> ApiProxyStatus
-    func start(preferredPort: Int?) async throws -> ApiProxyStatus
-    func stop() async -> ApiProxyStatus
-    func refreshAPIKey() async throws -> ApiProxyStatus
-    func syncAccountsStore() async throws
-}
-
-
 protocol CodexCLIServiceProtocol: Sendable {
     func launchApp(workspacePath: String?) throws -> Bool
 }

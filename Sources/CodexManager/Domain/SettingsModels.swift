@@ -6,8 +6,6 @@ struct AppSettings: Codable, Equatable {
     var autoSmartSwitch: Bool
     var restartEditorsOnSwitch: Bool
     var restartEditorTargets: [EditorAppID]
-    var autoStartApiProxy: Bool
-    var proxyConfiguration: ProxyConfiguration
     var locale: String
 
     enum CodingKeys: String, CodingKey {
@@ -16,8 +14,6 @@ struct AppSettings: Codable, Equatable {
         case autoSmartSwitch
         case restartEditorsOnSwitch
         case restartEditorTargets
-        case autoStartApiProxy
-        case proxyConfiguration
         case locale
     }
 
@@ -27,8 +23,6 @@ struct AppSettings: Codable, Equatable {
         autoSmartSwitch: Bool,
         restartEditorsOnSwitch: Bool,
         restartEditorTargets: [EditorAppID],
-        autoStartApiProxy: Bool,
-        proxyConfiguration: ProxyConfiguration = .defaultValue,
         locale: String
     ) {
         self.launchAtStartup = launchAtStartup
@@ -36,8 +30,6 @@ struct AppSettings: Codable, Equatable {
         self.autoSmartSwitch = autoSmartSwitch
         self.restartEditorsOnSwitch = restartEditorsOnSwitch
         self.restartEditorTargets = restartEditorTargets
-        self.autoStartApiProxy = autoStartApiProxy
-        self.proxyConfiguration = proxyConfiguration.normalized()
         self.locale = AppLocale.resolve(locale).identifier
     }
 
@@ -49,8 +41,6 @@ struct AppSettings: Codable, Equatable {
         autoSmartSwitch = try container.decodeIfPresent(Bool.self, forKey: .autoSmartSwitch) ?? defaults.autoSmartSwitch
         restartEditorsOnSwitch = try container.decodeIfPresent(Bool.self, forKey: .restartEditorsOnSwitch) ?? defaults.restartEditorsOnSwitch
         restartEditorTargets = try container.decodeIfPresent([EditorAppID].self, forKey: .restartEditorTargets) ?? defaults.restartEditorTargets
-        autoStartApiProxy = try container.decodeIfPresent(Bool.self, forKey: .autoStartApiProxy) ?? defaults.autoStartApiProxy
-        proxyConfiguration = try container.decodeIfPresent(ProxyConfiguration.self, forKey: .proxyConfiguration) ?? defaults.proxyConfiguration
         locale = AppLocale.resolve(try container.decodeIfPresent(String.self, forKey: .locale) ?? defaults.locale).identifier
     }
 
@@ -61,8 +51,6 @@ struct AppSettings: Codable, Equatable {
         try container.encode(autoSmartSwitch, forKey: .autoSmartSwitch)
         try container.encode(restartEditorsOnSwitch, forKey: .restartEditorsOnSwitch)
         try container.encode(restartEditorTargets, forKey: .restartEditorTargets)
-        try container.encode(autoStartApiProxy, forKey: .autoStartApiProxy)
-        try container.encode(proxyConfiguration, forKey: .proxyConfiguration)
         try container.encode(locale, forKey: .locale)
     }
 
@@ -73,8 +61,6 @@ struct AppSettings: Codable, Equatable {
             autoSmartSwitch: false,
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
-            autoStartApiProxy: false,
-            proxyConfiguration: .defaultValue,
             locale: AppLocale.systemDefault.identifier
         )
     }
@@ -86,7 +72,5 @@ struct AppSettingsPatch {
     var autoSmartSwitch: Bool? = nil
     var restartEditorsOnSwitch: Bool? = nil
     var restartEditorTargets: [EditorAppID]? = nil
-    var autoStartApiProxy: Bool? = nil
-    var proxyConfiguration: ProxyConfiguration? = nil
     var locale: String? = nil
 }
