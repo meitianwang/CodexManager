@@ -2,6 +2,7 @@ import Foundation
 
 enum AppTab: String, CaseIterable, Identifiable {
     case accounts
+    case proxy
     case settings
 
     var id: String { rawValue }

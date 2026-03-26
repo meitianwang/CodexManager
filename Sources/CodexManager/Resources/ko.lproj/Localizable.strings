@@ -1,4 +1,5 @@
 "tab.accounts" = "계정";
+"tab.proxy" = "프록시";
 "tab.settings" = "설정";
 
 "common.save" = "저장";
@@ -219,6 +220,25 @@
 "error.remote.unavailable_missing_proxyd_source" = "이 빌드에는 src-tauri/proxyd/Cargo.toml이 없어 원격 배포 기능을 사용할 수 없습니다.";
 "error.remote.ssh_command_failed_format" = "SSH 명령 실패: %@";
 "error.remote.scp_failed_format" = "SCP 실패: %@";
+
+"proxy.section.control" = "프록시 제어";
+"proxy.section.endpoints" = "엔드포인트";
+"proxy.section.usage" = "사용법";
+"proxy.status.running" = "실행 중";
+"proxy.status.stopped" = "중지됨";
+"proxy.port" = "포트";
+"proxy.copy_url" = "URL 복사";
+"proxy.notice.started" = "프록시가 시작되었습니다";
+"proxy.notice.stopped" = "프록시가 중지되었습니다";
+"proxy.notice.url_copied" = "프록시 URL이 복사되었습니다";
+"proxy.endpoint.health" = "상태 확인";
+"proxy.endpoint.models" = "모델 목록";
+"proxy.endpoint.chat_completions" = "채팅 완성";
+"proxy.endpoint.responses" = "Codex 응답";
+"proxy.usage.curl_example" = "cURL 예시:";
+"proxy.usage.config_hint" = "CLI 도구 환경 변수:";
+"proxy.unavailable_ios" = "프록시는 macOS에서만 사용 가능합니다";
+
 "error.proxy_runtime.invalid_port_format" = "잘못된 프록시 포트입니다: %@";
 "error.proxy_runtime.start_swift_proxy_failed_format" = "Swift 프록시 시작 실패: %@";
 "error.proxy_runtime.start_failed" = "프록시 시작 실패";

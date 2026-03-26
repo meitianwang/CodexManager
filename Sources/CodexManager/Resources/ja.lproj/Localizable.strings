@@ -1,4 +1,5 @@
 "tab.accounts" = "アカウント";
+"tab.proxy" = "プロキシ";
 "tab.settings" = "設定";
 
 "common.save" = "保存";
@@ -219,6 +220,25 @@
 "error.remote.unavailable_missing_proxyd_source" = "このビルドでは src-tauri/proxyd/Cargo.toml が見つからないため、リモートデプロイ機能は利用できません。";
 "error.remote.ssh_command_failed_format" = "SSH コマンドに失敗しました: %@";
 "error.remote.scp_failed_format" = "SCP に失敗しました: %@";
+
+"proxy.section.control" = "プロキシ制御";
+"proxy.section.endpoints" = "エンドポイント";
+"proxy.section.usage" = "使い方";
+"proxy.status.running" = "実行中";
+"proxy.status.stopped" = "停止中";
+"proxy.port" = "ポート";
+"proxy.copy_url" = "URLをコピー";
+"proxy.notice.started" = "プロキシを開始しました";
+"proxy.notice.stopped" = "プロキシを停止しました";
+"proxy.notice.url_copied" = "プロキシURLをコピーしました";
+"proxy.endpoint.health" = "ヘルスチェック";
+"proxy.endpoint.models" = "モデル一覧";
+"proxy.endpoint.chat_completions" = "チャット補完";
+"proxy.endpoint.responses" = "Codexレスポンス";
+"proxy.usage.curl_example" = "cURL例：";
+"proxy.usage.config_hint" = "CLIツール用環境変数：";
+"proxy.unavailable_ios" = "プロキシはmacOSでのみ利用可能です";
+
 "error.proxy_runtime.invalid_port_format" = "無効なプロキシポートです: %@";
 "error.proxy_runtime.start_swift_proxy_failed_format" = "Swift プロキシの起動に失敗しました: %@";
 "error.proxy_runtime.start_failed" = "プロキシの起動に失敗しました";

@@ -1,4 +1,5 @@
 "tab.accounts" = "Accounts";
+"tab.proxy" = "Proxy";
 "tab.settings" = "Instellingen";
 
 "common.save" = "Opslaan";
@@ -219,6 +220,25 @@
 "error.remote.unavailable_missing_proxyd_source" = "Remote deploy is unavailable in this build because src-tauri/proxyd/Cargo.toml was not found.";
 "error.remote.ssh_command_failed_format" = "SSH command failed: %@";
 "error.remote.scp_failed_format" = "SCP failed: %@";
+
+"proxy.section.control" = "Proxy-besturing";
+"proxy.section.endpoints" = "Eindpunten";
+"proxy.section.usage" = "Gebruik";
+"proxy.status.running" = "Actief";
+"proxy.status.stopped" = "Gestopt";
+"proxy.port" = "Poort";
+"proxy.copy_url" = "URL kopiëren";
+"proxy.notice.started" = "Proxy gestart";
+"proxy.notice.stopped" = "Proxy gestopt";
+"proxy.notice.url_copied" = "Proxy-URL gekopieerd";
+"proxy.endpoint.health" = "Gezondheidscontrole";
+"proxy.endpoint.models" = "Modellenlijst";
+"proxy.endpoint.chat_completions" = "Chatvoltooiing";
+"proxy.endpoint.responses" = "Codex-antwoorden";
+"proxy.usage.curl_example" = "cURL-voorbeeld:";
+"proxy.usage.config_hint" = "Omgevingsvariabelen voor CLI-tools:";
+"proxy.unavailable_ios" = "Proxy is alleen beschikbaar op macOS";
+
 "error.proxy_runtime.invalid_port_format" = "Invalid proxy port: %@";
 "error.proxy_runtime.start_swift_proxy_failed_format" = "Failed to start Swift proxy: %@";
 "error.proxy_runtime.start_failed" = "Proxy start failed";

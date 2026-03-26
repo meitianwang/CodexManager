@@ -9,6 +9,7 @@ final class AppContainer {
     let accountsModel: AccountsPageModel
     let settingsModel: SettingsPageModel
     let trayModel: TrayMenuModel
+    let proxyModel: ProxyPageModel?
 
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
@@ -79,20 +80,33 @@ final class AppContainer {
                 }
             )
 
+            let accountsModel = AccountsPageModel(
+                coordinator: accountsCoordinator,
+                manualRefreshService: trayModel,
+                localAccountsMutationSyncService: trayModel,
+                currentAccountSelectionSyncService: currentAccountSelectionSyncService,
+                cloudSyncAvailabilityService: cloudSyncAvailabilityService,
+                onLocalAccountsChanged: { accounts in
+                    trayModel.acceptLocalAccountsSnapshot(accounts)
+                },
+                initialAccounts: initialAccounts
+            )
+
+            var proxyModel: ProxyPageModel?
+            #if os(macOS)
+            let proxyCoordinator = ProxyCoordinator(
+                storeRepository: storeRepository,
+                authRepository: authRepository,
+                configPath: paths.codexConfigPath
+            )
+            proxyModel = ProxyPageModel(proxyCoordinator: proxyCoordinator)
+            #endif
+
             return AppContainer(
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
-                accountsModel: AccountsPageModel(
-                    coordinator: accountsCoordinator,
-                    manualRefreshService: trayModel,
-                    localAccountsMutationSyncService: trayModel,
-                    currentAccountSelectionSyncService: currentAccountSelectionSyncService,
-                    cloudSyncAvailabilityService: cloudSyncAvailabilityService,
-                    onLocalAccountsChanged: { accounts in
-                        trayModel.acceptLocalAccountsSnapshot(accounts)
-                    },
-                    initialAccounts: initialAccounts
-                ),
+                proxyModel: proxyModel,
+                accountsModel: accountsModel,
                 settingsModel: settingsModel,
                 trayModel: trayModel
             )
@@ -104,12 +118,14 @@ final class AppContainer {
     private init(
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
+        proxyModel: ProxyPageModel?,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
     ) {
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
+        self.proxyModel = proxyModel
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel

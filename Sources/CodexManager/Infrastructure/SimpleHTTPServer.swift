@@ -147,7 +147,7 @@ final class SimpleHTTPServer: @unchecked Sendable {
         })
     }
 
-    private static func parseRequest(from data: Data) -> HTTPRequest? {
+    static func parseRequest(from data: Data) -> HTTPRequest? {
         guard let headerRange = data.range(of: Data("\r\n\r\n".utf8)) else {
             return nil
         }

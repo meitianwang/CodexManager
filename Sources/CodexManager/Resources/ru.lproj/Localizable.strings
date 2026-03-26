@@ -1,4 +1,5 @@
 "tab.accounts" = "Аккаунты";
+"tab.proxy" = "Прокси";
 "tab.settings" = "Настройки";
 
 "common.save" = "Сохранить";
@@ -219,6 +220,25 @@
 "error.remote.unavailable_missing_proxyd_source" = "Remote deploy is unavailable in this build because src-tauri/proxyd/Cargo.toml was not found.";
 "error.remote.ssh_command_failed_format" = "SSH command failed: %@";
 "error.remote.scp_failed_format" = "SCP failed: %@";
+
+"proxy.section.control" = "Управление прокси";
+"proxy.section.endpoints" = "Конечные точки";
+"proxy.section.usage" = "Использование";
+"proxy.status.running" = "Работает";
+"proxy.status.stopped" = "Остановлен";
+"proxy.port" = "Порт";
+"proxy.copy_url" = "Копировать URL";
+"proxy.notice.started" = "Прокси запущен";
+"proxy.notice.stopped" = "Прокси остановлен";
+"proxy.notice.url_copied" = "URL прокси скопирован";
+"proxy.endpoint.health" = "Проверка состояния";
+"proxy.endpoint.models" = "Список моделей";
+"proxy.endpoint.chat_completions" = "Завершение чата";
+"proxy.endpoint.responses" = "Ответы Codex";
+"proxy.usage.curl_example" = "Пример cURL:";
+"proxy.usage.config_hint" = "Переменные окружения для инструментов CLI:";
+"proxy.unavailable_ios" = "Прокси доступен только на macOS";
+
 "error.proxy_runtime.invalid_port_format" = "Invalid proxy port: %@";
 "error.proxy_runtime.start_swift_proxy_failed_format" = "Failed to start Swift proxy: %@";
 "error.proxy_runtime.start_failed" = "Proxy start failed";
