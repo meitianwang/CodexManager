@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "プロキシ制御";
 "proxy.section.endpoints" = "エンドポイント";
+"proxy.section.models" = "利用可能なモデル";
 "proxy.section.usage" = "使い方";
 "proxy.status.running" = "実行中";
 "proxy.status.stopped" = "停止中";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "モデル一覧";
 "proxy.endpoint.chat_completions" = "チャット補完";
 "proxy.endpoint.responses" = "Codexレスポンス";
+"proxy.endpoint.messages" = "Anthropic メッセージ";
 "proxy.usage.curl_example" = "cURL例：";
 "proxy.usage.config_hint" = "CLIツール用環境変数：";
 "proxy.unavailable_ios" = "プロキシはmacOSでのみ利用可能です";

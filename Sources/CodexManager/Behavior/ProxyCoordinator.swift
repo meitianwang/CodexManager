@@ -6,6 +6,11 @@ private let proxyLogger = Logger(subsystem: "com.nik.mei.codexmanager", category
 actor ProxyCoordinator {
     static let defaultPort: UInt16 = 18317
 
+    private static let remoteModelsURLs = [
+        "https://models.router-for.me/models.json",
+        "https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json",
+    ]
+
     private let storeRepository: AccountsStoreRepository
     private let authRepository: AuthRepository
     private let configPath: URL
@@ -15,6 +20,8 @@ actor ProxyCoordinator {
     private var roundRobinIndex = 0
     /// Random API key generated at each start — clients must send `Authorization: Bearer <key>`.
     private(set) var currentAPIKey: String?
+    /// Dynamically fetched model IDs; nil until first fetch completes.
+    private(set) var fetchedModels: [String]?
 
     init(
         storeRepository: AccountsStoreRepository,
@@ -76,14 +83,15 @@ actor ProxyCoordinator {
             return .complete(corsResponse(HTTPResponse.json(statusCode: 200, object: ["status": "ok"])))
         }
 
-        // Authenticate all other requests
+        // Authenticate all other requests (supports both Bearer token and x-api-key)
         if let apiKey = currentAPIKey {
             let authHeader = request.headers["authorization"] ?? ""
-            let token = authHeader.hasPrefix("Bearer ") ? String(authHeader.dropFirst(7)) : ""
-            if token != apiKey {
+            let bearerToken = authHeader.hasPrefix("Bearer ") ? String(authHeader.dropFirst(7)) : ""
+            let xApiKey = request.headers["x-api-key"] ?? ""
+            if bearerToken != apiKey && xApiKey != apiKey {
                 return .complete(corsResponse(HTTPResponse.json(
                     statusCode: 401,
-                    object: Self.errorJSON("Invalid or missing API key. Use Authorization: Bearer <key>.")
+                    object: Self.errorJSON("Invalid or missing API key. Use Authorization: Bearer <key> or x-api-key header.")
                 )))
             }
         }
@@ -101,6 +109,9 @@ actor ProxyCoordinator {
         case ("POST", "/v1/responses"):
             return await handleResponses(request)
 
+        case ("POST", "/v1/messages"):
+            return await handleMessages(request)
+
         default:
             return .complete(corsResponse(HTTPResponse.json(
                 statusCode: 404,
@@ -112,19 +123,79 @@ actor ProxyCoordinator {
     // MARK: - /v1/models
 
     private func handleModels() -> HTTPResponse {
-        let models: [[String: Any]] = [
-            ["id": "gpt-5", "object": "model", "owned_by": "openai"],
-            ["id": "gpt-5-mini", "object": "model", "owned_by": "openai"],
-            ["id": "gpt-5-4", "object": "model", "owned_by": "openai"],
-            ["id": "o3", "object": "model", "owned_by": "openai"],
-            ["id": "o3-pro", "object": "model", "owned_by": "openai"],
-            ["id": "o4-mini", "object": "model", "owned_by": "openai"],
-            ["id": "codex-mini-latest", "object": "model", "owned_by": "openai"],
-        ]
+        let ids = fetchedModels ?? proxyAvailableModels
+        let models = ids.map { id in
+            ["id": id, "object": "model", "owned_by": "openai"] as [String: Any]
+        }
         return HTTPResponse.json(statusCode: 200, object: [
             "object": "list",
             "data": models
         ])
+    }
+
+    // MARK: - Remote Model Fetching
+
+    /// Fetches available models from remote JSON, filtered by account plan types.
+    func refreshModels() async {
+        let planKeys = resolvePlanKeys()
+        guard !planKeys.isEmpty else {
+            proxyLogger.info("No accounts available, skipping model refresh")
+            return
+        }
+
+        for url in Self.remoteModelsURLs {
+            do {
+                let models = try await Self.fetchModels(from: url, planKeys: planKeys)
+                if !models.isEmpty {
+                    fetchedModels = models
+                    proxyLogger.info("Fetched \(models.count) models from \(url, privacy: .public)")
+                    return
+                }
+            } catch {
+                proxyLogger.warning("Failed to fetch models from \(url, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        proxyLogger.info("All remote model URLs failed, using fallback list")
+    }
+
+    /// Maps account plan types to codex JSON keys and collects unique model IDs.
+    private func resolvePlanKeys() -> Set<String> {
+        guard let store = try? storeRepository.loadStore() else { return [] }
+        var keys = Set<String>()
+        for account in store.accounts {
+            let plan = (account.planType ?? account.usage?.planType ?? "team")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            switch plan {
+            case "free": keys.insert("codex-free")
+            case "plus": keys.insert("codex-plus")
+            case "pro": keys.insert("codex-pro")
+            default: keys.insert("codex-team")
+            }
+        }
+        return keys
+    }
+
+    private static func fetchModels(from urlString: String, planKeys: Set<String>) async throws -> [String] {
+        guard let url = URL(string: urlString) else { return [] }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        let session = URLSession(configuration: config)
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
+        guard let catalog = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+
+        var seen = Set<String>()
+        var result: [String] = []
+        for key in planKeys {
+            guard let entries = catalog[key] as? [[String: Any]] else { continue }
+            for entry in entries {
+                if let id = entry["id"] as? String, seen.insert(id).inserted {
+                    result.append(id)
+                }
+            }
+        }
+        return result
     }
 
     // MARK: - /v1/chat/completions
@@ -195,13 +266,33 @@ actor ProxyCoordinator {
         var body = json
         body["stream"] = true // always stream from upstream
         body["store"] = false
+        body["parallel_tool_calls"] = true
+        body["include"] = ["reasoning.encrypted_content"]
         if body["instructions"] == nil {
             body["instructions"] = ""
         }
+        if body["reasoning"] == nil {
+            body["reasoning"] = ["effort": "medium", "summary": "auto"]
+        }
+        // Convert system role to developer
+        if var inputArray = body["input"] as? [[String: Any]] {
+            for i in inputArray.indices {
+                if (inputArray[i]["role"] as? String) == "system" {
+                    inputArray[i]["role"] = "developer"
+                }
+            }
+            body["input"] = inputArray
+        }
         // Remove fields not accepted by codex backend
-        body.removeValue(forKey: "previous_response_id")
-        body.removeValue(forKey: "prompt_cache_retention")
-        body.removeValue(forKey: "safety_identifier")
+        for key in ["previous_response_id", "prompt_cache_retention", "safety_identifier",
+                     "max_output_tokens", "max_completion_tokens", "temperature",
+                     "top_p", "context_management", "truncation", "user"] {
+            body.removeValue(forKey: key)
+        }
+        // service_tier: only keep if "priority"
+        if (body["service_tier"] as? String) != "priority" {
+            body.removeValue(forKey: "service_tier")
+        }
 
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
             return .complete(corsResponse(HTTPResponse.json(
@@ -227,6 +318,46 @@ actor ProxyCoordinator {
                     headers: ["Content-Type": "application/json; charset=utf-8"],
                     body: data
                 )))
+            }
+        }
+    }
+
+    // MARK: - /v1/messages (Anthropic)
+
+    private func handleMessages(_ request: HTTPRequest) async -> ProxyHTTPResponse {
+        guard let json = parseJSONBody(request.body) else {
+            return .complete(corsResponse(
+                AnthropicToCodexTranslator.anthropicErrorResponse(statusCode: 400, message: L10n.tr("error.proxy_runtime.request_body_must_be_object"))
+            ))
+        }
+
+        guard let (codexBody, model, isStream) = AnthropicToCodexTranslator.translateRequest(json) else {
+            return .complete(corsResponse(
+                AnthropicToCodexTranslator.anthropicErrorResponse(statusCode: 400, message: L10n.tr("error.proxy_runtime.missing_model"))
+            ))
+        }
+
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: codexBody) else {
+            return .complete(corsResponse(
+                AnthropicToCodexTranslator.anthropicErrorResponse(statusCode: 400, message: L10n.tr("error.proxy_runtime.invalid_upstream_payload"))
+            ))
+        }
+
+        return await executeWithRetry(bodyData: bodyData, model: model, isStream: isStream) { result in
+            switch result {
+            case .streaming(let lines):
+                if isStream {
+                    let translated = AnthropicToCodexTranslator.translateStreamingResponse(model: model, lines: lines)
+                    return .streaming(statusCode: 200, headers: Self.corsHeaders(), body: translated)
+                } else {
+                    let response = await AnthropicToCodexTranslator.collectAndTranslateResponse(model: model, lines: lines)
+                    return .complete(self.corsResponse(response))
+                }
+            case .complete(let data):
+                // Shouldn't happen since we always stream from upstream, but handle gracefully
+                let text = String(data: data, encoding: .utf8) ?? ""
+                let fallback = AnthropicToCodexTranslator.anthropicErrorResponse(statusCode: 502, message: "Unexpected non-stream response: \(text.prefix(200))")
+                return .complete(self.corsResponse(fallback))
             }
         }
     }
@@ -408,310 +539,8 @@ actor ProxyCoordinator {
         [
             "Access-Control-Allow-Origin": "http://localhost",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key, anthropic-version",
             "Access-Control-Max-Age": "86400"
         ]
-    }
-}
-
-// MARK: - Chat Completions ↔ Codex Responses Translation
-
-enum ChatToCodexTranslator {
-    /// 50 MB — matches CodexUpstreamClient.maxResponseBytes.
-    private static let maxAccumulatedTextBytes = 50 * 1024 * 1024
-
-    // MARK: Request: OpenAI Chat → Codex Responses
-
-    static func translateRequest(model: String, messages: [[String: Any]], originalJSON: [String: Any]) -> [String: Any] {
-        var codexBody: [String: Any] = [
-            "model": model,
-            "stream": true,
-            "store": false
-        ]
-
-        var instructions = ""
-        var input: [[String: Any]] = []
-
-        for message in messages {
-            guard let role = message["role"] as? String else { continue }
-            let content = extractContent(from: message)
-
-            if role == "system" || role == "developer" {
-                if !instructions.isEmpty { instructions += "\n" }
-                instructions += content
-                continue
-            }
-
-            let contentType = role == "assistant" ? "output_text" : "input_text"
-            input.append([
-                "type": "message",
-                "role": role,
-                "content": [["type": contentType, "text": content]]
-            ])
-        }
-
-        codexBody["instructions"] = instructions
-        codexBody["input"] = input
-
-        // Forward tools if present
-        if let tools = originalJSON["tools"] as? [[String: Any]] {
-            codexBody["tools"] = tools.compactMap { tool -> [String: Any]? in
-                guard let function = tool["function"] as? [String: Any],
-                      let name = function["name"] as? String else { return nil }
-                var codexTool: [String: Any] = [
-                    "type": "function",
-                    "name": name
-                ]
-                if let desc = function["description"] as? String {
-                    codexTool["description"] = desc
-                }
-                if let params = function["parameters"] {
-                    codexTool["parameters"] = params
-                }
-                return codexTool
-            }
-        }
-
-        // Forward optional parameters
-        if let maxTokens = originalJSON["max_tokens"] as? Int {
-            codexBody["max_output_tokens"] = maxTokens
-        }
-        if let temperature = originalJSON["temperature"] {
-            codexBody["temperature"] = temperature
-        }
-        if let topP = originalJSON["top_p"] {
-            codexBody["top_p"] = topP
-        }
-
-        return codexBody
-    }
-
-    private static func extractContent(from message: [String: Any]) -> String {
-        if let text = message["content"] as? String {
-            return text
-        }
-        if let parts = message["content"] as? [[String: Any]] {
-            return parts.compactMap { part -> String? in
-                if part["type"] as? String == "text" {
-                    return part["text"] as? String
-                }
-                return nil
-            }.joined(separator: "\n")
-        }
-        return ""
-    }
-
-    // MARK: Response: Codex SSE → Chat Completion Chunks (streaming)
-
-    static func translateStreamingResponse(model: String, lines: AsyncStream<Data>) -> AsyncStream<Data> {
-        let requestID = "chatcmpl-\(UUID().uuidString.prefix(12))"
-        let dataPrefix = Data("data: ".utf8)
-
-        return AsyncStream { continuation in
-            let task = Task {
-                var sentRole = false
-
-                for await line in lines {
-                    guard line.starts(with: dataPrefix) else {
-                        // Forward empty lines for SSE framing
-                        if line == Data("\n".utf8) || line == Data("\r\n".utf8) {
-                            continuation.yield(line)
-                        }
-                        continue
-                    }
-
-                    let payload = Data(line.dropFirst(dataPrefix.count))
-                    guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                          !text.isEmpty,
-                          let event = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-                          let eventType = event["type"] as? String else {
-                        continue
-                    }
-
-                    switch eventType {
-                    case "response.output_text.delta":
-                        if !sentRole {
-                            let roleChunk = makeStreamChunk(id: requestID, model: model, delta: ["role": "assistant"])
-                            continuation.yield(formatSSELine(roleChunk))
-                            sentRole = true
-                        }
-                        if let delta = event["delta"] as? String {
-                            let chunk = makeStreamChunk(id: requestID, model: model, delta: ["content": delta])
-                            continuation.yield(formatSSELine(chunk))
-                        }
-
-                    case "response.completed":
-                        let finalChunk = makeStreamChunk(
-                            id: requestID,
-                            model: model,
-                            delta: [:],
-                            finishReason: "stop"
-                        )
-                        continuation.yield(formatSSELine(finalChunk))
-                        continuation.yield(Data("data: [DONE]\n\n".utf8))
-
-                    default:
-                        break
-                    }
-                }
-
-                continuation.finish()
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-
-    // MARK: Response: Codex SSE → Chat Completion (non-streaming)
-
-    static func collectAndTranslateResponse(model: String, lines: AsyncStream<Data>) async -> HTTPResponse {
-        let dataPrefix = Data("data: ".utf8)
-        var fullText = ""
-        var usage: [String: Any]?
-        var truncated = false
-
-        for await line in lines {
-            guard line.starts(with: dataPrefix) else { continue }
-            let payload = Data(line.dropFirst(dataPrefix.count))
-            guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !text.isEmpty,
-                  let event = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-                  let eventType = event["type"] as? String else {
-                continue
-            }
-
-            switch eventType {
-            case "response.output_text.delta":
-                if !truncated, let delta = event["delta"] as? String {
-                    fullText += delta
-                    if fullText.utf8.count > maxAccumulatedTextBytes {
-                        truncated = true
-                    }
-                }
-            case "response.completed":
-                if let response = event["response"] as? [String: Any],
-                   let u = response["usage"] as? [String: Any] {
-                    usage = u
-                }
-            default:
-                break
-            }
-        }
-
-        let requestID = "chatcmpl-\(UUID().uuidString.prefix(12))"
-        var result: [String: Any] = [
-            "id": requestID,
-            "object": "chat.completion",
-            "model": model,
-            "choices": [[
-                "index": 0,
-                "message": [
-                    "role": "assistant",
-                    "content": fullText
-                ],
-                "finish_reason": "stop"
-            ]]
-        ]
-        if let usage {
-            result["usage"] = usage
-        }
-
-        let data = (try? JSONSerialization.data(withJSONObject: result)) ?? Data("{}".utf8)
-        return HTTPResponse(
-            statusCode: 200,
-            headers: ["Content-Type": "application/json; charset=utf-8"],
-            body: data
-        )
-    }
-
-    // MARK: Response: Codex complete → Chat Completion
-
-    static func translateCompleteResponse(model: String, data: Data) -> HTTPResponse {
-        // Parse the SSE data to extract completed response
-        let lines = data.split(separator: UInt8(ascii: "\n"))
-        let dataPrefix = Data("data: ".utf8)
-        var fullText = ""
-        var usage: [String: Any]?
-        var truncated = false
-
-        for line in lines {
-            let lineData = Data(line)
-            guard lineData.starts(with: dataPrefix) else { continue }
-            let payload = Data(lineData.dropFirst(dataPrefix.count))
-            guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !text.isEmpty,
-                  let event = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-                  let eventType = event["type"] as? String else {
-                continue
-            }
-
-            if !truncated, eventType == "response.output_text.delta",
-               let delta = event["delta"] as? String {
-                fullText += delta
-                if fullText.utf8.count > maxAccumulatedTextBytes {
-                    truncated = true
-                }
-            }
-            if eventType == "response.completed",
-               let response = event["response"] as? [String: Any],
-               let u = response["usage"] as? [String: Any] {
-                usage = u
-            }
-        }
-
-        let requestID = "chatcmpl-\(UUID().uuidString.prefix(12))"
-        var result: [String: Any] = [
-            "id": requestID,
-            "object": "chat.completion",
-            "model": model,
-            "choices": [[
-                "index": 0,
-                "message": ["role": "assistant", "content": fullText],
-                "finish_reason": "stop"
-            ]]
-        ]
-        if let usage { result["usage"] = usage }
-
-        let responseData = (try? JSONSerialization.data(withJSONObject: result)) ?? Data("{}".utf8)
-        return HTTPResponse(
-            statusCode: 200,
-            headers: ["Content-Type": "application/json; charset=utf-8"],
-            body: responseData
-        )
-    }
-
-    // MARK: - SSE Helpers
-
-    private static func makeStreamChunk(
-        id: String,
-        model: String,
-        delta: [String: Any],
-        finishReason: String? = nil
-    ) -> [String: Any] {
-        var choice: [String: Any] = [
-            "index": 0,
-            "delta": delta
-        ]
-        if let finishReason {
-            choice["finish_reason"] = finishReason
-        } else {
-            choice["finish_reason"] = NSNull()
-        }
-
-        return [
-            "id": id,
-            "object": "chat.completion.chunk",
-            "model": model,
-            "choices": [choice]
-        ]
-    }
-
-    private static func formatSSELine(_ object: [String: Any]) -> Data {
-        guard let json = try? JSONSerialization.data(withJSONObject: object) else {
-            return Data()
-        }
-        var line = Data("data: ".utf8)
-        line.append(json)
-        line.append(Data("\n\n".utf8))
-        return line
     }
 }

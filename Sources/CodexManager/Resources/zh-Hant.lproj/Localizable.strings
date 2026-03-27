@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "代理控制";
 "proxy.section.endpoints" = "端點";
+"proxy.section.models" = "可用模型";
 "proxy.section.usage" = "使用方法";
 "proxy.status.running" = "運行中";
 "proxy.status.stopped" = "已停止";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "模型列表";
 "proxy.endpoint.chat_completions" = "對話補全";
 "proxy.endpoint.responses" = "Codex 回應";
+"proxy.endpoint.messages" = "Anthropic 訊息";
 "proxy.usage.curl_example" = "cURL 範例：";
 "proxy.usage.config_hint" = "CLI 工具環境變數：";
 "proxy.unavailable_ios" = "代理僅在 macOS 上可用";

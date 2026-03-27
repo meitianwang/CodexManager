@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "Управление прокси";
 "proxy.section.endpoints" = "Конечные точки";
+"proxy.section.models" = "Доступные модели";
 "proxy.section.usage" = "Использование";
 "proxy.status.running" = "Работает";
 "proxy.status.stopped" = "Остановлен";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "Список моделей";
 "proxy.endpoint.chat_completions" = "Завершение чата";
 "proxy.endpoint.responses" = "Ответы Codex";
+"proxy.endpoint.messages" = "Сообщения Anthropic";
 "proxy.usage.curl_example" = "Пример cURL:";
 "proxy.usage.config_hint" = "Переменные окружения для инструментов CLI:";
 "proxy.unavailable_ios" = "Прокси доступен только на macOS";

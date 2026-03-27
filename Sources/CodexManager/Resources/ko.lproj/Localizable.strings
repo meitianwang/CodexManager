@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "프록시 제어";
 "proxy.section.endpoints" = "엔드포인트";
+"proxy.section.models" = "사용 가능한 모델";
 "proxy.section.usage" = "사용법";
 "proxy.status.running" = "실행 중";
 "proxy.status.stopped" = "중지됨";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "모델 목록";
 "proxy.endpoint.chat_completions" = "채팅 완성";
 "proxy.endpoint.responses" = "Codex 응답";
+"proxy.endpoint.messages" = "Anthropic 메시지";
 "proxy.usage.curl_example" = "cURL 예시:";
 "proxy.usage.config_hint" = "CLI 도구 환경 변수:";
 "proxy.unavailable_ios" = "프록시는 macOS에서만 사용 가능합니다";

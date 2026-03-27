@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "Proxy-besturing";
 "proxy.section.endpoints" = "Eindpunten";
+"proxy.section.models" = "Beschikbare modellen";
 "proxy.section.usage" = "Gebruik";
 "proxy.status.running" = "Actief";
 "proxy.status.stopped" = "Gestopt";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "Modellenlijst";
 "proxy.endpoint.chat_completions" = "Chatvoltooiing";
 "proxy.endpoint.responses" = "Codex-antwoorden";
+"proxy.endpoint.messages" = "Anthropic-berichten";
 "proxy.usage.curl_example" = "cURL-voorbeeld:";
 "proxy.usage.config_hint" = "Omgevingsvariabelen voor CLI-tools:";
 "proxy.unavailable_ios" = "Proxy is alleen beschikbaar op macOS";

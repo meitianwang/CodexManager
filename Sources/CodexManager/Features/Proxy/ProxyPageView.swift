@@ -19,6 +19,7 @@ private struct ProxyPageContent: View {
         MacPageScrollContainer {
             ProxyControlSection(model: model)
             ProxyEndpointsSection(model: model)
+            ProxyModelsSection(model: model)
             ProxyUsageSection(model: model)
         }
     }
@@ -88,95 +89,180 @@ private struct ProxyEndpointsSection: View {
 
     var body: some View {
         SectionCard(title: L10n.tr("proxy.section.endpoints")) {
-            VStack(alignment: .leading, spacing: 10) {
-                ProxyEndpointRow(
-                    method: "GET",
-                    path: "/health",
-                    description: L10n.tr("proxy.endpoint.health")
-                )
-                ProxyEndpointRow(
-                    method: "GET",
-                    path: "/v1/models",
-                    description: L10n.tr("proxy.endpoint.models")
-                )
-                ProxyEndpointRow(
-                    method: "POST",
-                    path: "/v1/chat/completions",
-                    description: L10n.tr("proxy.endpoint.chat_completions")
-                )
-                ProxyEndpointRow(
-                    method: "POST",
-                    path: "/v1/responses",
-                    description: L10n.tr("proxy.endpoint.responses")
-                )
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(ProxyEndpoint.allCases) { endpoint in
+                    ProxyEndpointRow(
+                        endpoint: endpoint,
+                        isSelected: model.selectedEndpoint == endpoint
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.selectedEndpoint = endpoint }
+                }
             }
         }
     }
 }
 
 private struct ProxyEndpointRow: View {
-    let method: String
-    let path: String
-    let description: String
+    let endpoint: ProxyEndpoint
+    let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(method)
+            Text(endpoint.method)
                 .font(.system(.caption, design: .monospaced, weight: .bold))
-                .foregroundStyle(method == "GET" ? Color.blue : Color.orange)
+                .foregroundStyle(endpoint.method == "GET" ? Color.blue : Color.orange)
                 .frame(width: 40, alignment: .leading)
-            Text(path)
+            Text(endpoint.rawValue)
                 .font(.system(.body, design: .monospaced))
             Spacer()
-            Text(description)
+            Text(L10n.tr(endpoint.descriptionKey))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+        )
+    }
+}
+
+private struct ProxyModelsSection: View {
+    @ObservedObject var model: ProxyPageModel
+
+    var body: some View {
+        SectionCard(title: L10n.tr("proxy.section.models")) {
+            FlowLayout(spacing: 8) {
+                ForEach(model.availableModels, id: \.self) { modelName in
+                    Text(modelName)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(model.selectedModel == modelName
+                                      ? Color.accentColor.opacity(0.12)
+                                      : Color.secondary.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(model.selectedModel == modelName
+                                              ? Color.accentColor.opacity(0.4)
+                                              : Color.clear, lineWidth: 1)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.selectedModel = modelName }
+                }
+            }
         }
     }
 }
 
+
 private struct ProxyUsageSection: View {
     @ObservedObject var model: ProxyPageModel
+
+    private var apiKeyDisplay: String {
+        model.isRunning ? model.apiKey : "sk-local-..."
+    }
+
+    private var curlText: String {
+        let base = model.proxyURL
+        let key = apiKeyDisplay
+        let selectedModel = model.selectedModel
+
+        switch model.selectedEndpoint {
+        case .chatCompletions:
+            return """
+            curl \(base)/v1/chat/completions \\
+              -H "Content-Type: application/json" \\
+              -H "Authorization: Bearer \(key)" \\
+              -d '{"model":"\(selectedModel)","messages":[{"role":"user","content":"Hello"}]}'
+            """
+        case .responses:
+            return """
+            curl \(base)/v1/responses \\
+              -H "Content-Type: application/json" \\
+              -H "Authorization: Bearer \(key)" \\
+              -d '{"model":"\(selectedModel)","instructions":"You are a helpful assistant.","input":"Hello"}'
+            """
+        case .messages:
+            return """
+            curl \(base)/v1/messages \\
+              -H "Content-Type: application/json" \\
+              -H "x-api-key: \(key)" \\
+              -H "anthropic-version: 2023-06-01" \\
+              -d '{"model":"\(selectedModel)","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'
+            """
+        }
+    }
+
+    private var configText: String {
+        let key = apiKeyDisplay
+        switch model.selectedEndpoint {
+        case .chatCompletions, .responses:
+            return """
+            OPENAI_BASE_URL=\(model.proxyURL)/v1
+            OPENAI_API_KEY=\(key)
+            """
+        case .messages:
+            return """
+            ANTHROPIC_BASE_URL=\(model.proxyURL)
+            ANTHROPIC_API_KEY=\(key)
+            """
+        }
+    }
 
     var body: some View {
         SectionCard(title: L10n.tr("proxy.section.usage")) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.tr("proxy.usage.curl_example"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ProxyCopyableCodeBlock(
+                    label: L10n.tr("proxy.usage.curl_example"),
+                    text: curlText
+                )
 
-                let apiKeyDisplay = model.isRunning ? model.apiKey : "sk-local-..."
-                let curlText = """
-                curl \(model.proxyURL)/v1/chat/completions \\
-                  -H "Content-Type: application/json" \\
-                  -H "Authorization: Bearer \(apiKeyDisplay)" \\
-                  -d '{"model":"gpt-5","messages":[{"role":"user","content":"Hello"}]}'
-                """
-
-                Text(curlText)
-                    .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frostedRoundedSurface(cornerRadius: 8)
-
-                Text(L10n.tr("proxy.usage.config_hint"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-
-                let configText = """
-                OPENAI_BASE_URL=\(model.proxyURL)/v1
-                OPENAI_API_KEY=\(apiKeyDisplay)
-                """
-
-                Text(configText)
-                    .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frostedRoundedSurface(cornerRadius: 8)
+                ProxyCopyableCodeBlock(
+                    label: L10n.tr("proxy.usage.config_hint"),
+                    text: configText
+                )
             }
+        }
+    }
+}
+
+private struct ProxyCopyableCodeBlock: View {
+    let label: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                #if canImport(AppKit)
+                Button {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(text, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                #endif
+            }
+
+            Text(text)
+                .font(.system(.caption2, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frostedRoundedSurface(cornerRadius: 8)
         }
     }
 }

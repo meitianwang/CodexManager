@@ -223,6 +223,7 @@
 
 "proxy.section.control" = "Controllo proxy";
 "proxy.section.endpoints" = "Endpoint";
+"proxy.section.models" = "Modelli disponibili";
 "proxy.section.usage" = "Utilizzo";
 "proxy.status.running" = "In esecuzione";
 "proxy.status.stopped" = "Fermato";
@@ -235,6 +236,7 @@
 "proxy.endpoint.models" = "Elenco modelli";
 "proxy.endpoint.chat_completions" = "Completamento chat";
 "proxy.endpoint.responses" = "Risposte Codex";
+"proxy.endpoint.messages" = "Messaggi Anthropic";
 "proxy.usage.curl_example" = "Esempio cURL:";
 "proxy.usage.config_hint" = "Variabili d'ambiente per strumenti CLI:";
 "proxy.unavailable_ios" = "Il proxy è disponibile solo su macOS";

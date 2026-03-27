@@ -34,6 +34,9 @@
 		281119537EB03AFC4B61D199 /* AccountDisplayNameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73EA74AFF73939C07780397 /* AccountDisplayNameFormatter.swift */; };
 		2938D731C9206FFBCA43AB99 /* SimpleHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA5A4FC8B924F1931B63606A /* SimpleHTTPServer.swift */; };
 		2CCDB648CFCEC506BBCABB11 /* ProxyCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA253343EE6E3EA6A38726FC /* ProxyCoordinator.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* AnthropicToCodexTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E7F8091A2B3C4D5E6F7081 /* AnthropicToCodexTranslator.swift */; };
+		B2C3D4E5F607182930A1B2C3 /* ChatToCodexTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F8091A2B3C4D5E6F708192 /* ChatToCodexTranslator.swift */; };
+		C3D4E5F60718293A4B5C6D7E /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8091A2B3C4D5E6F70819283 /* FlowLayout.swift */; };
 		30357C0D9368AEE58D60F572 /* CodexUpstreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC606F2A7A44AA3451167EF5 /* CodexUpstreamClient.swift */; };
 		30B0608F1CE1296290B933A6 /* TrayMenuModel+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6301045E31FEB02C5468BDF3 /* TrayMenuModel+Refresh.swift */; };
 		32CFEB9F1C64064561DB1C60 /* SettingsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8649479C5F87CDCDD183C84D /* SettingsModels.swift */; };
@@ -236,6 +239,9 @@
 		CFB7A8EF6E424E67AEB5B72E /* SettingsPageSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageSections.swift; sourceTree = "<group>"; };
 		D095A286FD041C124B1903AD /* SettingsPageModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageModelTests.swift; sourceTree = "<group>"; };
 		D9A9313F7821A1D1419793EA /* AccountsWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsWidgetSnapshotStore.swift; sourceTree = "<group>"; };
+		D6E7F8091A2B3C4D5E6F7081 /* AnthropicToCodexTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicToCodexTranslator.swift; sourceTree = "<group>"; };
+		E7F8091A2B3C4D5E6F708192 /* ChatToCodexTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatToCodexTranslator.swift; sourceTree = "<group>"; };
+		F8091A2B3C4D5E6F70819283 /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		DA253343EE6E3EA6A38726FC /* ProxyCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCoordinator.swift; sourceTree = "<group>"; };
 		DD67701A393E2E46430F23DB /* DefaultWorkspaceMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultWorkspaceMetadataService.swift; sourceTree = "<group>"; };
 		E2572B4E51B7E1F853B6D75E /* AccountsPagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPagePresentation.swift; sourceTree = "<group>"; };
@@ -413,6 +419,8 @@
 				59238EE8DF7A24987E0A5EEE /* AccountsCoordinator.swift */,
 				0DB5BE714758B175E8296B7C /* AccountsCoordinator+Maintenance.swift */,
 				3075C5E9AFADA9C97FEA8D39 /* AccountsSnapshotFreshnessPolicy.swift */,
+				D6E7F8091A2B3C4D5E6F7081 /* AnthropicToCodexTranslator.swift */,
+				E7F8091A2B3C4D5E6F708192 /* ChatToCodexTranslator.swift */,
 				DA253343EE6E3EA6A38726FC /* ProxyCoordinator.swift */,
 				9947929E1C208FFA8979F3A5 /* SettingsCoordinator.swift */,
 				73BE02A1E45E9E27B3F67687 /* UsageWindowSelector.swift */,
@@ -470,6 +478,7 @@
 		E0CFFF7F781D18860D5F7B08 /* Proxy */ = {
 			isa = PBXGroup;
 			children = (
+				F8091A2B3C4D5E6F70819283 /* FlowLayout.swift */,
 				7772ADA27FDD1D880B0143E2 /* ProxyPageModel.swift */,
 				4E0233300550E9F75979E959 /* ProxyPageView.swift */,
 			);
@@ -714,6 +723,9 @@
 				890B3BB6880F36000AEC572D /* PlatformCapabilities.swift in Sources */,
 				8E0A103AE5D8F2EFDE11154C /* PlatformClipboard.swift in Sources */,
 				74F9DBD3F98B326638C7C7D8 /* Protocols.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* AnthropicToCodexTranslator.swift in Sources */,
+				B2C3D4E5F607182930A1B2C3 /* ChatToCodexTranslator.swift in Sources */,
+				C3D4E5F60718293A4B5C6D7E /* FlowLayout.swift in Sources */,
 				2CCDB648CFCEC506BBCABB11 /* ProxyCoordinator.swift in Sources */,
 				E6CE29BF597091405FBD2BD2 /* ProxyHTTPServer.swift in Sources */,
 				13554DF17E29B79912B35842 /* ProxyPageModel.swift in Sources */,
