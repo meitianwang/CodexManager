@@ -41,6 +41,8 @@ extension SettingsPageModel {
             Task { await update(AppSettingsPatch(autoSmartSwitch: value)) }
         case .restartEditorsOnSwitch:
             applyRestartEditorsOnSwitch(value)
+        case .autoStartProxy:
+            Task { await update(AppSettingsPatch(autoStartProxy: value)) }
         }
     }
 

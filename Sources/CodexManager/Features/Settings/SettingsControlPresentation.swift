@@ -5,6 +5,7 @@ enum SettingsToggleIntent: String, Hashable {
     case launchAfterSwitch
     case autoSmartSwitch
     case restartEditorsOnSwitch
+    case autoStartProxy
 }
 
 struct SettingsToggleDescriptor<Intent: Hashable>: Identifiable, Equatable {
@@ -62,6 +63,11 @@ enum SettingsControlPresentation {
                     intent: .launchAfterSwitch,
                     titleKey: "settings.launch_codex_after_switch",
                     isOn: settings.launchCodexAfterSwitch
+                ),
+                SettingsToggleDescriptor(
+                    intent: .autoStartProxy,
+                    titleKey: "settings.auto_start_proxy",
+                    isOn: settings.autoStartProxy
                 ),
             ]
         )

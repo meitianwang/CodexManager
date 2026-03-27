@@ -230,6 +230,7 @@
 "proxy.port" = "Port";
 "proxy.copy_url" = "URL kopieren";
 "proxy.api_key.regenerate" = "Regenerate API Key";
+"settings.auto_start_proxy" = "Auto-start API proxy on launch";
 "proxy.notice.started" = "Proxy gestartet";
 "proxy.notice.stopped" = "Proxy gestoppt";
 "proxy.notice.url_copied" = "Proxy-URL kopiert";

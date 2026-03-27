@@ -29,6 +29,7 @@ actor SettingsCoordinator {
         if let value = patch.locale { settings.locale = AppLocale.resolve(value).identifier }
         if let value = patch.proxyPort { settings.proxyPort = value }
         if let value = patch.proxyApiKey { settings.proxyApiKey = value }
+        if let value = patch.autoStartProxy { settings.autoStartProxy = value }
 
         try settingsRepository.saveSettings(settings)
 

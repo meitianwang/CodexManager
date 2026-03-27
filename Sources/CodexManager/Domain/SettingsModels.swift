@@ -9,6 +9,7 @@ struct AppSettings: Codable, Equatable {
     var locale: String
     var proxyPort: UInt16
     var proxyApiKey: String
+    var autoStartProxy: Bool
 
     enum CodingKeys: String, CodingKey {
         case launchAtStartup
@@ -19,6 +20,7 @@ struct AppSettings: Codable, Equatable {
         case locale
         case proxyPort
         case proxyApiKey
+        case autoStartProxy
     }
 
     init(
@@ -29,7 +31,8 @@ struct AppSettings: Codable, Equatable {
         restartEditorTargets: [EditorAppID],
         locale: String,
         proxyPort: UInt16 = 18317,
-        proxyApiKey: String = ""
+        proxyApiKey: String = "",
+        autoStartProxy: Bool = false
     ) {
         self.launchAtStartup = launchAtStartup
         self.launchCodexAfterSwitch = launchCodexAfterSwitch
@@ -39,6 +42,7 @@ struct AppSettings: Codable, Equatable {
         self.locale = AppLocale.resolve(locale).identifier
         self.proxyPort = proxyPort
         self.proxyApiKey = proxyApiKey
+        self.autoStartProxy = autoStartProxy
     }
 
     init(from decoder: Decoder) throws {
@@ -52,6 +56,7 @@ struct AppSettings: Codable, Equatable {
         locale = AppLocale.resolve(try container.decodeIfPresent(String.self, forKey: .locale) ?? defaults.locale).identifier
         proxyPort = try container.decodeIfPresent(UInt16.self, forKey: .proxyPort) ?? defaults.proxyPort
         proxyApiKey = try container.decodeIfPresent(String.self, forKey: .proxyApiKey) ?? defaults.proxyApiKey
+        autoStartProxy = try container.decodeIfPresent(Bool.self, forKey: .autoStartProxy) ?? defaults.autoStartProxy
     }
 
     func encode(to encoder: Encoder) throws {
@@ -64,6 +69,7 @@ struct AppSettings: Codable, Equatable {
         try container.encode(locale, forKey: .locale)
         try container.encode(proxyPort, forKey: .proxyPort)
         try container.encode(proxyApiKey, forKey: .proxyApiKey)
+        try container.encode(autoStartProxy, forKey: .autoStartProxy)
     }
 
     static var defaultValue: AppSettings {
@@ -92,4 +98,5 @@ struct AppSettingsPatch {
     var locale: String? = nil
     var proxyPort: UInt16? = nil
     var proxyApiKey: String? = nil
+    var autoStartProxy: Bool? = nil
 }

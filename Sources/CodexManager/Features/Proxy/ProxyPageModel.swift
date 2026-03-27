@@ -78,6 +78,9 @@ final class ProxyPageModel: ObservableObject {
             if settings.proxyApiKey.isEmpty {
                 saveSettings()
             }
+            if settings.autoStartProxy {
+                await startProxy()
+            }
         }
     }
 
