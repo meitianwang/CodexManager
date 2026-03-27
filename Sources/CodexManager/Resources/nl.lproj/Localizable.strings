@@ -231,6 +231,7 @@
 "proxy.copy_url" = "URL kopiëren";
 "proxy.api_key.regenerate" = "Regenerate API Key";
 "settings.auto_start_proxy" = "Auto-start API proxy on launch";
+"settings.star_on_github" = "GitHub Star";
 "proxy.notice.started" = "Proxy gestart";
 "proxy.notice.stopped" = "Proxy gestopt";
 "proxy.notice.url_copied" = "Proxy-URL gekopieerd";

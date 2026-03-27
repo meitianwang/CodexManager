@@ -64,8 +64,18 @@ private struct SettingsSwitchBehaviorSection: View {
 private struct SettingsQuitFooter: View {
     let onQuit: () -> Void
 
+    private static let repoURL = URL(string: "https://github.com/meitianwang/CodexManager")!
+
     var body: some View {
         HStack(spacing: LayoutRules.listRowSpacing) {
+            Link(destination: Self.repoURL) {
+                HStack(spacing: 6) {
+                    Image(systemName: "star")
+                    Text(L10n.tr("settings.star_on_github"))
+                }
+            }
+            .buttonStyle(.frostedCapsule(prominent: false))
+
             Spacer(minLength: 0)
 
             Button(role: .destructive) {

@@ -231,6 +231,7 @@
 "proxy.copy_url" = "複製網址";
 "proxy.api_key.regenerate" = "Regenerate API Key";
 "settings.auto_start_proxy" = "Auto-start API proxy on launch";
+"settings.star_on_github" = "GitHub Star";
 "proxy.notice.started" = "代理已啟動";
 "proxy.notice.stopped" = "代理已停止";
 "proxy.notice.url_copied" = "代理網址已複製";

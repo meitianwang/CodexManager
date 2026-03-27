@@ -231,6 +231,7 @@
 "proxy.copy_url" = "URL 복사";
 "proxy.api_key.regenerate" = "Regenerate API Key";
 "settings.auto_start_proxy" = "Auto-start API proxy on launch";
+"settings.star_on_github" = "GitHub Star";
 "proxy.notice.started" = "프록시가 시작되었습니다";
 "proxy.notice.stopped" = "프록시가 중지되었습니다";
 "proxy.notice.url_copied" = "프록시 URL이 복사되었습니다";
