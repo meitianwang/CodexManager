@@ -27,6 +27,8 @@ actor SettingsCoordinator {
         if let value = patch.restartEditorsOnSwitch { settings.restartEditorsOnSwitch = value }
         if let value = patch.restartEditorTargets { settings.restartEditorTargets = value }
         if let value = patch.locale { settings.locale = AppLocale.resolve(value).identifier }
+        if let value = patch.proxyPort { settings.proxyPort = value }
+        if let value = patch.proxyApiKey { settings.proxyApiKey = value }
 
         try settingsRepository.saveSettings(settings)
 

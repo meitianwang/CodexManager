@@ -32,6 +32,7 @@ let proxyAvailableModels = [
 @MainActor
 final class ProxyPageModel: ObservableObject {
     private let proxyCoordinator: ProxyCoordinator?
+    private let settingsCoordinator: SettingsCoordinator?
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
 
@@ -53,16 +54,47 @@ final class ProxyPageModel: ObservableObject {
         "http://localhost:\(port)"
     }
 
-    init(proxyCoordinator: ProxyCoordinator) {
+    init(proxyCoordinator: ProxyCoordinator, settingsCoordinator: SettingsCoordinator) {
         self.proxyCoordinator = proxyCoordinator
+        self.settingsCoordinator = settingsCoordinator
+        loadSavedSettings()
     }
 
     /// Placeholder for platforms where proxy is unavailable.
     fileprivate init() {
         self.proxyCoordinator = nil
+        self.settingsCoordinator = nil
     }
 
     static let placeholder = ProxyPageModel()
+
+    private func loadSavedSettings() {
+        Task {
+            guard let settingsCoordinator else { return }
+            guard let settings = try? await settingsCoordinator.currentSettings() else { return }
+            port = String(settings.proxyPort)
+            apiKey = settings.proxyApiKey.isEmpty ? AppSettings.generateApiKey() : settings.proxyApiKey
+            // Auto-save if we just generated a new key
+            if settings.proxyApiKey.isEmpty {
+                saveSettings()
+            }
+        }
+    }
+
+    private func saveSettings() {
+        Task {
+            guard let settingsCoordinator else { return }
+            _ = try? await settingsCoordinator.updateSettings(AppSettingsPatch(
+                proxyPort: UInt16(port),
+                proxyApiKey: apiKey
+            ))
+        }
+    }
+
+    func regenerateApiKey() {
+        apiKey = AppSettings.generateApiKey()
+        saveSettings()
+    }
 
     func toggleProxy() {
         Task {
@@ -85,9 +117,15 @@ final class ProxyPageModel: ObservableObject {
             return
         }
 
+        // Ensure we have a valid API key
+        if apiKey.isEmpty {
+            apiKey = AppSettings.generateApiKey()
+        }
+
+        saveSettings()
+
         do {
-            try await proxyCoordinator.start(port: portValue)
-            apiKey = await proxyCoordinator.currentAPIKey ?? ""
+            try await proxyCoordinator.start(port: portValue, apiKey: apiKey)
             isRunning = true
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.started"))
             refreshModels()
@@ -100,7 +138,6 @@ final class ProxyPageModel: ObservableObject {
         guard let proxyCoordinator else { return }
         await proxyCoordinator.stop()
         isRunning = false
-        apiKey = ""
         availableModels = proxyAvailableModels
         selectedModel = proxyAvailableModels[0]
         notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.stopped"))

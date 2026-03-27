@@ -35,10 +35,9 @@ actor ProxyCoordinator {
 
     // MARK: - Lifecycle
 
-    func start(port: UInt16) throws {
+    func start(port: UInt16, apiKey: String) throws {
         guard server == nil else { return }
 
-        let apiKey = Self.generateAPIKey()
         self.currentAPIKey = apiKey
 
         let handler: ProxyHTTPServer.RequestHandler = { [weak self] request in
@@ -59,11 +58,6 @@ actor ProxyCoordinator {
         server = nil
         currentAPIKey = nil
         proxyLogger.info("Proxy stopped")
-    }
-
-    private static func generateAPIKey() -> String {
-        let bytes = (0..<24).map { _ in UInt8.random(in: 0...255) }
-        return "sk-local-" + bytes.map { String(format: "%02x", $0) }.joined()
     }
 
     var isRunning: Bool {

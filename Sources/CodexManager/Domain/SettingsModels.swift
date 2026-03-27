@@ -7,6 +7,8 @@ struct AppSettings: Codable, Equatable {
     var restartEditorsOnSwitch: Bool
     var restartEditorTargets: [EditorAppID]
     var locale: String
+    var proxyPort: UInt16
+    var proxyApiKey: String
 
     enum CodingKeys: String, CodingKey {
         case launchAtStartup
@@ -15,6 +17,8 @@ struct AppSettings: Codable, Equatable {
         case restartEditorsOnSwitch
         case restartEditorTargets
         case locale
+        case proxyPort
+        case proxyApiKey
     }
 
     init(
@@ -23,7 +27,9 @@ struct AppSettings: Codable, Equatable {
         autoSmartSwitch: Bool,
         restartEditorsOnSwitch: Bool,
         restartEditorTargets: [EditorAppID],
-        locale: String
+        locale: String,
+        proxyPort: UInt16 = 18317,
+        proxyApiKey: String = ""
     ) {
         self.launchAtStartup = launchAtStartup
         self.launchCodexAfterSwitch = launchCodexAfterSwitch
@@ -31,6 +37,8 @@ struct AppSettings: Codable, Equatable {
         self.restartEditorsOnSwitch = restartEditorsOnSwitch
         self.restartEditorTargets = restartEditorTargets
         self.locale = AppLocale.resolve(locale).identifier
+        self.proxyPort = proxyPort
+        self.proxyApiKey = proxyApiKey
     }
 
     init(from decoder: Decoder) throws {
@@ -42,6 +50,8 @@ struct AppSettings: Codable, Equatable {
         restartEditorsOnSwitch = try container.decodeIfPresent(Bool.self, forKey: .restartEditorsOnSwitch) ?? defaults.restartEditorsOnSwitch
         restartEditorTargets = try container.decodeIfPresent([EditorAppID].self, forKey: .restartEditorTargets) ?? defaults.restartEditorTargets
         locale = AppLocale.resolve(try container.decodeIfPresent(String.self, forKey: .locale) ?? defaults.locale).identifier
+        proxyPort = try container.decodeIfPresent(UInt16.self, forKey: .proxyPort) ?? defaults.proxyPort
+        proxyApiKey = try container.decodeIfPresent(String.self, forKey: .proxyApiKey) ?? defaults.proxyApiKey
     }
 
     func encode(to encoder: Encoder) throws {
@@ -52,6 +62,8 @@ struct AppSettings: Codable, Equatable {
         try container.encode(restartEditorsOnSwitch, forKey: .restartEditorsOnSwitch)
         try container.encode(restartEditorTargets, forKey: .restartEditorTargets)
         try container.encode(locale, forKey: .locale)
+        try container.encode(proxyPort, forKey: .proxyPort)
+        try container.encode(proxyApiKey, forKey: .proxyApiKey)
     }
 
     static var defaultValue: AppSettings {
@@ -64,6 +76,11 @@ struct AppSettings: Codable, Equatable {
             locale: AppLocale.systemDefault.identifier
         )
     }
+
+    static func generateApiKey() -> String {
+        let bytes = (0..<24).map { _ in UInt8.random(in: 0...255) }
+        return "sk-local-" + bytes.map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 struct AppSettingsPatch {
@@ -73,4 +90,6 @@ struct AppSettingsPatch {
     var restartEditorsOnSwitch: Bool? = nil
     var restartEditorTargets: [EditorAppID]? = nil
     var locale: String? = nil
+    var proxyPort: UInt16? = nil
+    var proxyApiKey: String? = nil
 }

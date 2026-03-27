@@ -229,6 +229,7 @@
 "proxy.status.stopped" = "Остановлен";
 "proxy.port" = "Порт";
 "proxy.copy_url" = "Копировать URL";
+"proxy.api_key.regenerate" = "Regenerate API Key";
 "proxy.notice.started" = "Прокси запущен";
 "proxy.notice.stopped" = "Прокси остановлен";
 "proxy.notice.url_copied" = "URL прокси скопирован";

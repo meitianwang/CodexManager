@@ -229,6 +229,7 @@
 "proxy.status.stopped" = "已停止";
 "proxy.port" = "連接埠";
 "proxy.copy_url" = "複製網址";
+"proxy.api_key.regenerate" = "Regenerate API Key";
 "proxy.notice.started" = "代理已啟動";
 "proxy.notice.stopped" = "代理已停止";
 "proxy.notice.url_copied" = "代理網址已複製";

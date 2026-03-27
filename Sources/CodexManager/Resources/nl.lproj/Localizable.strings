@@ -229,6 +229,7 @@
 "proxy.status.stopped" = "Gestopt";
 "proxy.port" = "Poort";
 "proxy.copy_url" = "URL kopiëren";
+"proxy.api_key.regenerate" = "Regenerate API Key";
 "proxy.notice.started" = "Proxy gestart";
 "proxy.notice.stopped" = "Proxy gestopt";
 "proxy.notice.url_copied" = "Proxy-URL gekopieerd";

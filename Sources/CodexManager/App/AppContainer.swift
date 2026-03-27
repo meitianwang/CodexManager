@@ -99,7 +99,7 @@ final class AppContainer {
                 authRepository: authRepository,
                 configPath: paths.codexConfigPath
             )
-            proxyModel = ProxyPageModel(proxyCoordinator: proxyCoordinator)
+            proxyModel = ProxyPageModel(proxyCoordinator: proxyCoordinator, settingsCoordinator: settingsCoordinator)
             #endif
 
             return AppContainer(

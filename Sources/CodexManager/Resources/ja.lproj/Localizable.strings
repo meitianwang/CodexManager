@@ -229,6 +229,7 @@
 "proxy.status.stopped" = "停止中";
 "proxy.port" = "ポート";
 "proxy.copy_url" = "URLをコピー";
+"proxy.api_key.regenerate" = "Regenerate API Key";
 "proxy.notice.started" = "プロキシを開始しました";
 "proxy.notice.stopped" = "プロキシを停止しました";
 "proxy.notice.url_copied" = "プロキシURLをコピーしました";

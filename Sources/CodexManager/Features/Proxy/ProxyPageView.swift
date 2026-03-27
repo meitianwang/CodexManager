@@ -54,6 +54,26 @@ private struct ProxyControlSection: View {
                     Spacer()
                 }
 
+                // API Key configuration
+                HStack(spacing: 12) {
+                    Text("API Key")
+                        .font(.body)
+                    TextField("sk-local-...", text: $model.apiKey)
+                        .frostedRoundedInput(cornerRadius: 8)
+                        .frame(maxWidth: 380)
+                        .disabled(model.isRunning)
+                    Button {
+                        model.regenerateApiKey()
+                    } label: {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.body)
+                    }
+                    .buttonStyle(.frostedCapsule(prominent: false))
+                    .disabled(model.isRunning)
+                    .help(L10n.tr("proxy.api_key.regenerate"))
+                    Spacer()
+                }
+
                 // Start/Stop button
                 HStack(spacing: 12) {
                     Button {

@@ -244,6 +244,7 @@
 "proxy.status.stopped" = "已停止";
 "proxy.port" = "端口";
 "proxy.copy_url" = "复制地址";
+"proxy.api_key.regenerate" = "随机生成新的 API Key";
 "proxy.notice.started" = "代理已启动";
 "proxy.notice.stopped" = "代理已停止";
 "proxy.notice.url_copied" = "代理地址已复制";
