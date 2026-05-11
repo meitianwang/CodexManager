@@ -23,6 +23,7 @@ struct MacPageScrollContainer<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AppTheme.windowBackground)
     }
 }
 #endif
@@ -49,10 +50,11 @@ struct SectionCard<Content: View, HeaderTrailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Text(title)
-                    .font(.headline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
                 Spacer(minLength: 0)
                 headerTrailing
             }
@@ -72,6 +74,7 @@ struct CollapseChevronButton: View {
             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
         }
         .liquidGlassActionButtonStyle(density: .compact)
+        .help(isExpanded ? L10n.tr("accounts.action.collapse_all") : L10n.tr("accounts.action.expand_all"))
     }
 }
 
@@ -172,48 +175,35 @@ struct CardSurfaceModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(separatorColor, lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.035), radius: 10, x: 0, y: 5)
     }
 
-    @ViewBuilder
     private var backgroundSurface: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
+        ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.clear)
-                .glassEffect(
-                    tint == nil ? .regular : .regular.tint(tint!.opacity(0.28)),
-                    in: .rect(cornerRadius: cornerRadius)
-                )
-                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
-        } else {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.regularMaterial)
-                .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
+                .fill(AppTheme.panelBackground)
+            if let tint {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(tint.opacity(0.08))
+            }
         }
     }
 
     private var separatorColor: Color {
-        #if canImport(AppKit)
-        Color(nsColor: .separatorColor).opacity(0.9)
-        #else
-        Color.secondary.opacity(0.22)
-        #endif
+        AppTheme.separator
     }
 }
 
 enum FrostedChromeTokens {
     static var separatorColor: Color {
-        #if canImport(AppKit)
-        Color(nsColor: .separatorColor)
-        #else
-        Color.secondary.opacity(0.2)
-        #endif
+        AppTheme.separator
     }
 
     static func tintedGlass(prominent: Bool, tint: Color?) -> Color {
         if let tint {
-            return tint.opacity(prominent ? 0.22 : 0.14)
+            return tint.opacity(prominent ? 1 : 0.08)
         }
-        return Color.white.opacity(prominent ? 0.06 : 0.03)
+        return prominent ? AppTheme.accent : AppTheme.controlBackground
     }
 }
 
@@ -230,19 +220,9 @@ struct FrostedCapsuleSurfaceModifier: ViewModifier {
             }
     }
 
-    @ViewBuilder
     private var backgroundSurface: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            Capsule()
-                .fill(.clear)
-                .glassEffect(
-                    .regular.tint(FrostedChromeTokens.tintedGlass(prominent: prominent, tint: tint)),
-                    in: .capsule
-                )
-        } else {
-            Capsule()
-                .fill(prominent ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.ultraThinMaterial))
-        }
+        Capsule()
+            .fill(FrostedChromeTokens.tintedGlass(prominent: prominent, tint: tint))
     }
 }
 
@@ -260,19 +240,9 @@ struct FrostedRoundedSurfaceModifier: ViewModifier {
             }
     }
 
-    @ViewBuilder
     private var backgroundSurface: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.clear)
-                .glassEffect(
-                    .regular.tint(FrostedChromeTokens.tintedGlass(prominent: prominent, tint: tint)),
-                    in: .rect(cornerRadius: cornerRadius)
-                )
-        } else {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(prominent ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.ultraThinMaterial))
-        }
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(FrostedChromeTokens.tintedGlass(prominent: prominent, tint: tint))
     }
 }
 

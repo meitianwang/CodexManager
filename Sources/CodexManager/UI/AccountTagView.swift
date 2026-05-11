@@ -7,7 +7,7 @@ struct AccountTagView: View {
     var font: Font = .caption2.weight(.bold)
     var allowsCompression = false
     var horizontalPadding: CGFloat = 8
-    var verticalPadding: CGFloat = 4
+    var verticalPadding: CGFloat = 3
 
     var body: some View {
         Text(text)
@@ -18,7 +18,7 @@ struct AccountTagView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .fixedSize(horizontal: !allowsCompression, vertical: false)
-            .background(backgroundColor, in: Capsule())
+            .background(backgroundColor, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }
 
@@ -41,7 +41,7 @@ struct AccountCompactHeaderContent: View {
             HStack(spacing: 6) {
                 AccountTagView(
                     text: planLabel,
-                    backgroundColor: accentColor.opacity(0.18),
+                    backgroundColor: accentColor.opacity(0.11),
                     foregroundColor: accentColor,
                     font: tagFont,
                     horizontalPadding: tagHorizontalPadding,
@@ -51,7 +51,7 @@ struct AccountCompactHeaderContent: View {
                 if let workspaceLabel, !workspaceLabel.isEmpty {
                     AccountTagView(
                         text: workspaceLabel,
-                        backgroundColor: accentColor.opacity(0.18),
+                        backgroundColor: accentColor.opacity(0.11),
                         foregroundColor: accentColor,
                         font: tagFont,
                         allowsCompression: true,

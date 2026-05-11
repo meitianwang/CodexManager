@@ -6,20 +6,20 @@ import UIKit
 /// Centralized layout inputs to avoid duplicated sizing logic across pages.
 enum LayoutRules {
     static let pagePadding = CGFloat(16)
-    static let macPageHorizontalPadding = CGFloat(32)
-    static let macPageTopPadding = CGFloat(16)
-    static let macPageBottomPadding = CGFloat(18)
-    static let sectionSpacing = CGFloat(16)
-    static let cardRadius = CGFloat(14)
-    static let liquidProgressHeight = CGFloat(12)
+    static let macPageHorizontalPadding = CGFloat(24)
+    static let macPageTopPadding = CGFloat(20)
+    static let macPageBottomPadding = CGFloat(22)
+    static let sectionSpacing = CGFloat(18)
+    static let cardRadius = CGFloat(10)
+    static let liquidProgressHeight = CGFloat(8)
     static let liquidProgressInset = CGFloat(2)
     static let listRowSpacing = CGFloat(10)
     static let minimumPanelHeight = CGFloat(520)
-    static let defaultPanelHeight = CGFloat(620)
-    static let accountsRowSpacing = CGFloat(10)
+    static let defaultPanelHeight = CGFloat(640)
+    static let accountsRowSpacing = CGFloat(12)
     static let accountsExpandedColumns = 2
     static let accountsCollapsedColumns = 3
-    static let accountsCardWidth = CGFloat(250)
+    static let accountsCardWidth = CGFloat(300)
     static let iOSAccountsExpandedColumns = 1
     static let iOSAccountsCollapsedColumns = 2
     static let iPadMiniAccountsExpandedColumnsPortrait = 2
@@ -58,15 +58,15 @@ enum LayoutRules {
     }
 
     static var minimumPanelWidth: CGFloat {
-        accountsPageTargetWidth
+        760
     }
 
     static var defaultPanelWidth: CGFloat {
-        accountsPageTargetWidth
+        880
     }
 
     static var maximumPanelWidth: CGFloat {
-        accountsPageTargetWidth + 200
+        1040
     }
 
     static func iOSAccountsContentTopPadding(safeAreaTop: CGFloat) -> CGFloat {

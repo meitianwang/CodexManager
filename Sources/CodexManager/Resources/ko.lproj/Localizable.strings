@@ -276,3 +276,9 @@
 "error.proxy_runtime.summary.auth_format" = "인증 실패 %@건";
 "error.proxy_runtime.summary.permission_format" = "권한 거부 %@건";
 "error.remote.logs_unavailable" = "원격 로그를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요";
+"tray.action.open_panel" = "메인 패널 열기";
+"tray.action.quit" = "종료";
+"tray.status.current_format" = "사용 중: %@";
+"tray.status.no_account" = "선택된 계정 없음";
+"tray.status.accounts_count_format" = "%@개 계정";
+"tray.status.remaining_format" = "%@ 남음";

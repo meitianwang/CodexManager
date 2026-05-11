@@ -28,9 +28,8 @@ final class SettingsControlPresentationTests: XCTestCase {
             autoSmartSwitch: true,
             restartEditorsOnSwitch: true,
             restartEditorTargets: [.vscode],
-            autoStartApiProxy: false,
-            proxyConfiguration: .defaultValue,
-            locale: AppLocale.english.identifier
+            locale: AppLocale.english.identifier,
+            autoStartProxy: false
         )
 
         let presentation = SettingsControlPresentation.switchBehaviorSection(
@@ -54,14 +53,13 @@ final class SettingsControlPresentationTests: XCTestCase {
             autoSmartSwitch: false,
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
-            autoStartApiProxy: false,
-            proxyConfiguration: .defaultValue,
-            locale: "zh_CN"
+            locale: "zh_CN",
+            autoStartProxy: false
         )
 
         let presentation = SettingsControlPresentation.languageSection(settings: settings)
 
-        XCTAssertEqual(presentation.picker.selectedValue, .simplifiedChinese)
+        XCTAssertEqual(presentation.picker.selectedValue, AppLocale.simplifiedChinese)
         XCTAssertEqual(presentation.picker.options.count, AppLocale.allCases.count)
     }
 }

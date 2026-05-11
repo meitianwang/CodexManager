@@ -6,21 +6,30 @@ struct AccountsActionBarView: View {
     let onToggleCollapse: () -> Void
 
     var body: some View {
-        HStack(spacing: LayoutRules.listRowSpacing) {
-            ScrollView(.horizontal) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text(L10n.tr("tab.accounts"))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                CollapseChevronButton(isExpanded: presentation.collapse.isExpanded) {
+                    onToggleCollapse()
+                }
+                .accessibilityLabel(Text(presentation.collapse.accessibilityLabel))
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
                 AccountsActionStrip(
                     descriptors: presentation.descriptors,
                     onTrigger: onTriggerAction
                 )
             }
-            .scrollIndicators(.hidden)
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            CollapseChevronButton(isExpanded: presentation.collapse.isExpanded) {
-                onToggleCollapse()
-            }
-            .accessibilityLabel(Text(presentation.collapse.accessibilityLabel))
         }
+        .padding(.bottom, 2)
     }
 }
 

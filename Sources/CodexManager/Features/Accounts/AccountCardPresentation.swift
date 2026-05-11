@@ -10,15 +10,15 @@ enum AccountCardAccent: Equatable {
 
 struct AccountWindowPresentation: Equatable {
     let title: String
-    let usedPercent: Double
+    let remainingPercent: Double
     let usedText: String
     let remainingText: String
     let resetText: String
 }
 
 struct AccountCompactUsagePresentation: Equatable {
-    let fiveHourUsedPercent: Double?
-    let oneWeekUsedPercent: Double?
+    let fiveHourRemainingPercent: Double?
+    let oneWeekRemainingPercent: Double?
 }
 
 struct AccountCardPresentation: Equatable {
@@ -49,8 +49,8 @@ struct AccountCardPresentation: Equatable {
             locale: locale
         )
         compactUsage = AccountCompactUsagePresentation(
-            fiveHourUsedPercent: Self.compactUsedPercent(account.usage?.fiveHour),
-            oneWeekUsedPercent: Self.compactUsedPercent(account.usage?.oneWeek)
+            fiveHourRemainingPercent: Self.compactRemainingPercent(account.usage?.fiveHour),
+            oneWeekRemainingPercent: Self.compactRemainingPercent(account.usage?.oneWeek)
         )
     }
 
@@ -92,16 +92,16 @@ struct AccountCardPresentation: Equatable {
         let remaining = max(0, 100 - used)
         return AccountWindowPresentation(
             title: title,
-            usedPercent: used,
+            remainingPercent: remaining,
             usedText: L10n.tr("accounts.window.used_format", percent(used)),
             remainingText: L10n.tr("accounts.window.remaining_format", percent(remaining)),
             resetText: L10n.tr("accounts.window.reset_at_format", formatResetAt(window?.resetAt, locale: locale))
         )
     }
 
-    private static func compactUsedPercent(_ window: UsageWindow?) -> Double? {
+    private static func compactRemainingPercent(_ window: UsageWindow?) -> Double? {
         guard let used = window?.usedPercent else { return nil }
-        return clamped(used, fallback: used)
+        return max(0, 100 - clamped(used, fallback: used))
     }
 
     private static func clamped(_ value: Double?, fallback: Double) -> Double {

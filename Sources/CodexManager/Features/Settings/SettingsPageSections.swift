@@ -81,9 +81,9 @@ private struct SettingsQuitFooter: View {
             Button(role: .destructive) {
                 onQuit()
             } label: {
-                Text("common.quit")
+                Text(LocalizedStringKey("common.quit"))
             }
-            .buttonStyle(.frostedCapsule(prominent: true, tint: .red))
+            .buttonStyle(.frostedCapsule(prominent: true, tint: AppTheme.destructive))
         }
         .padding(.top, 6)
         .padding(.bottom, 10)

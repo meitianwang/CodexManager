@@ -16,10 +16,7 @@ final class StoreFileRepositoryTests: XCTestCase {
             accountStorePath: storePath,
             settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
-            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
-            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
-            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
-            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            codexConfigPath: tempDir.appendingPathComponent("config.toml")
         )
 
         let repository = StoreFileRepository(paths: paths)
@@ -49,10 +46,7 @@ final class StoreFileRepositoryTests: XCTestCase {
             accountStorePath: storePath,
             settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
-            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
-            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
-            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
-            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            codexConfigPath: tempDir.appendingPathComponent("config.toml")
         )
 
         let repository = StoreFileRepository(paths: paths)
@@ -119,10 +113,7 @@ final class StoreFileRepositoryTests: XCTestCase {
             accountStorePath: storePath,
             settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
-            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
-            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
-            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
-            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            codexConfigPath: tempDir.appendingPathComponent("config.toml")
         )
 
         let repository = StoreFileRepository(paths: paths)
@@ -132,8 +123,8 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(store.accounts.count, 1)
         XCTAssertNil(store.accounts[0].principalID)
         XCTAssertNil(store.currentSelection?.accountKey)
-        XCTAssertEqual(summaries.filter(\.isCurrent).count, 1)
-        XCTAssertEqual(summaries.first(where: \.isCurrent)?.accountID, "legacy-account")
+        XCTAssertEqual(summaries.filter { $0.isCurrent }.count, 1)
+        XCTAssertEqual(summaries.first(where: { $0.isCurrent })?.accountID, "legacy-account")
     }
 
     func testLoadSettingsMigratesLegacyMergedStoreIntoSeparateFiles() throws {
@@ -149,8 +140,8 @@ final class StoreFileRepositoryTests: XCTestCase {
             autoSmartSwitch: true,
             restartEditorsOnSwitch: true,
             restartEditorTargets: [.cursor],
-            autoStartApiProxy: true,
-            locale: AppLocale.english.identifier
+            locale: AppLocale.english.identifier,
+            autoStartProxy: true
         )
         let account = StoredAccount(
             id: "acct-1",
@@ -185,10 +176,7 @@ final class StoreFileRepositoryTests: XCTestCase {
             accountStorePath: storePath,
             settingsStorePath: settingsPath,
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
-            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
-            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
-            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
-            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            codexConfigPath: tempDir.appendingPathComponent("config.toml")
         )
 
         let settingsRepository = SettingsFileRepository(paths: paths)
@@ -514,8 +502,8 @@ final class StoreFileRepositoryTests: XCTestCase {
 
         let summaries = store.accountSummaries(currentAccountKey: secondAccount.accountKey)
 
-        XCTAssertEqual(summaries.filter(\.isCurrent).count, 1)
-        XCTAssertEqual(summaries.first(where: \.isCurrent)?.id, secondAccount.id)
+        XCTAssertEqual(summaries.filter { $0.isCurrent }.count, 1)
+        XCTAssertEqual(summaries.first(where: { $0.isCurrent })?.id, secondAccount.id)
     }
 
     func testCloudKitSelectionMergeOnlyAppliesNewerSelection() {
@@ -561,7 +549,7 @@ final class StoreFileRepositoryTests: XCTestCase {
         )
     }
 
-    func testAccountSummariesPreferStoredCurrentSelectionOverAuthFallback() {
+    func testAccountSummariesPreferCurrentAuthOverStoredSelection() {
         let account = StoredAccount(
             id: "acct-1",
             label: "Remote Selected",
@@ -604,10 +592,44 @@ final class StoreFileRepositoryTests: XCTestCase {
 
         XCTAssertEqual(
             summaries.first(where: { $0.accountID == "remote-account" })?.isCurrent,
-            true
+            false
         )
         XCTAssertEqual(
             summaries.first(where: { $0.accountID == "local-account" })?.isCurrent,
+            true
+        )
+    }
+
+    func testAccountSummariesDoNotUseStaleSelectionWhenCurrentAuthIsUntracked() {
+        let account = StoredAccount(
+            id: "acct-1",
+            label: "Remote Selected",
+            email: "remote@example.com",
+            accountID: "remote-account",
+            planType: "pro",
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 2,
+            usage: nil,
+            usageError: nil
+        )
+        let store = AccountsStore(
+            version: 1,
+            accounts: [account],
+            currentSelection: CurrentAccountSelection(
+                accountID: "remote-account",
+                selectedAt: 123,
+                sourceDeviceID: "device-a",
+                accountKey: account.accountKey
+            )
+        )
+
+        let summaries = store.accountSummaries(currentAccountKey: "untracked-principal|untracked-account")
+
+        XCTAssertEqual(
+            summaries.first(where: { $0.accountID == "remote-account" })?.isCurrent,
             false
         )
     }

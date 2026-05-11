@@ -5,7 +5,7 @@ struct SettingsToggleRows<Intent: Hashable>: View {
     let onChange: (Intent, Bool) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(descriptors) { descriptor in
                 ViewThatFits(in: .horizontal) {
                     toggleRow(descriptor)
@@ -18,18 +18,20 @@ struct SettingsToggleRows<Intent: Hashable>: View {
     private func toggleRow(_ descriptor: SettingsToggleDescriptor<Intent>) -> some View {
         HStack(spacing: 12) {
             Text(LocalizedStringKey(descriptor.titleKey))
-                .font(.body)
+                .font(.system(size: 13, weight: .medium))
             Spacer(minLength: 0)
             toggleControl(descriptor)
         }
+        .settingsRowChrome()
     }
 
     private func toggleColumn(_ descriptor: SettingsToggleDescriptor<Intent>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(LocalizedStringKey(descriptor.titleKey))
-                .font(.body)
+                .font(.system(size: 13, weight: .medium))
             toggleControl(descriptor)
         }
+        .settingsRowChrome()
     }
 
     private func toggleControl(_ descriptor: SettingsToggleDescriptor<Intent>) -> some View {
@@ -61,18 +63,20 @@ struct SettingsPickerRow<Value: Hashable>: View {
     private var pickerRow: some View {
         HStack(spacing: 12) {
             Text(LocalizedStringKey(descriptor.titleKey))
-                .font(.body)
+                .font(.system(size: 13, weight: .medium))
             Spacer(minLength: 0)
             pickerControl
         }
+        .settingsRowChrome()
     }
 
     private var pickerColumn: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(LocalizedStringKey(descriptor.titleKey))
-                .font(.body)
+                .font(.system(size: 13, weight: .medium))
             pickerControl
         }
+        .settingsRowChrome()
     }
 
     private var pickerControl: some View {
@@ -93,5 +97,14 @@ struct SettingsPickerRow<Value: Hashable>: View {
         .disabled(!descriptor.isEnabled)
         .labelsHidden()
         .frame(minWidth: LayoutRules.settingsPickerMinWidth, alignment: .trailing)
+    }
+}
+
+private extension View {
+    func settingsRowChrome() -> some View {
+        self
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

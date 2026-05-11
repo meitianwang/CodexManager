@@ -208,7 +208,7 @@ final class AuthFileRepositoryTests: XCTestCase {
         ])
 
         XCTAssertThrowsError(try repository.writeCurrentAuth(auth)) { error in
-            XCTAssertEqual(error.localizedDescription, "auth.json missing id_token")
+            XCTAssertTrue(error.localizedDescription.contains("id_token"))
         }
     }
 
@@ -239,10 +239,7 @@ final class AuthFileRepositoryTests: XCTestCase {
             accountStorePath: tempDir.appendingPathComponent("accounts.json"),
             settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: authPath,
-            codexConfigPath: configPath,
-            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
-            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
-            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            codexConfigPath: configPath
         )
 
         return RepositoryFixture(

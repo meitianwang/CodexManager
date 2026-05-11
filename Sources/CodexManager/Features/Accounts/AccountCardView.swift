@@ -68,16 +68,17 @@ struct AccountCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: isCollapsed ? 10 : 12) {
             if isCollapsed {
                 AccountCompactHeaderContent(
                     planLabel: presentation.planLabel,
                     workspaceLabel: presentation.teamNameTag,
                     accountName: presentation.displayAccountName,
                     accentColor: palette.toneColor,
-                    titleFont: .headline,
-                    titleColor: account.isCurrent ? palette.toneColor : .primary,
-                    spacing: 8
+                    titleFont: .subheadline.weight(.semibold),
+                    titleColor: .primary,
+                    spacing: 8,
+                    tagVerticalPadding: 3
                 )
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
@@ -90,8 +91,8 @@ struct AccountCardView: View {
                 )
 
                 Text(presentation.displayAccountName)
-                    .font(.headline)
-                    .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
                     .lineLimit(displaysExpandedTitle ? 2 : 1)
                     .fixedSize(horizontal: false, vertical: true)
                     .truncationMode(.tail)
@@ -99,12 +100,20 @@ struct AccountCardView: View {
                 AccountCardExpandedUsageSection(presentation: presentation)
             }
         }
-        .padding(isCollapsed ? 8 : 10)
-        .accountCardSurface(cornerRadius: 12, tint: palette.surfaceTint)
+        .padding(isCollapsed ? 12 : 14)
+        .accountCardSurface(cornerRadius: 10, tint: palette.surfaceTint)
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(account.isCurrent ? palette.toneColor.opacity(0.2) : .clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(account.isCurrent ? AppTheme.accent.opacity(0.36) : .clear, lineWidth: 1)
         )
+        .overlay(alignment: .leading) {
+            if account.isCurrent {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(AppTheme.accent)
+                    .frame(width: 3)
+                    .padding(.vertical, 12)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(
                 isCollapsed: isCollapsed,

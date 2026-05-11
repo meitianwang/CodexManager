@@ -31,11 +31,11 @@ struct NoticeBanner: View {
     private func accentColor(for style: NoticeStyle) -> Color {
         switch style {
         case .success:
-            return .mint
+            return AppTheme.success
         case .info:
-            return .blue
+            return AppTheme.accent
         case .error:
-            return .red
+            return AppTheme.destructive
         }
     }
 
@@ -87,11 +87,11 @@ private extension View {
     private func noticeAccentColor(_ style: NoticeStyle) -> Color {
         switch style {
         case .success:
-            return .mint
+            return AppTheme.success
         case .info:
-            return .blue
+            return AppTheme.accent
         case .error:
-            return .red
+            return AppTheme.destructive
         }
     }
 }

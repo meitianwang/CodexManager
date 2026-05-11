@@ -54,7 +54,7 @@ private struct AccountsActionBarButton<Intent: Hashable>: View {
         case .neutral, .prominent:
             nil
         case .mint:
-            .mint
+            AppTheme.accent
         }
     }
 }

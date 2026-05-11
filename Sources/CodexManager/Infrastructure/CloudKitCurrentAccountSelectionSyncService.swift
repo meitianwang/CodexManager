@@ -193,15 +193,15 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
         preferredAccountID: String,
         in store: AccountsStore
     ) -> StoredAccount? {
+        if let currentAccount = currentAuthAccount(in: store),
+           currentAccount.accountID == preferredAccountID {
+            return currentAccount
+        }
+
         if let selection = store.currentSelection,
            let matching = matchingAccount(for: selection, in: store.accounts),
            matching.accountID == preferredAccountID {
             return matching
-        }
-
-        if let currentAccount = currentAuthAccount(in: store),
-           currentAccount.accountID == preferredAccountID {
-            return currentAccount
         }
 
         let matches = store.accounts.filter { $0.accountID == preferredAccountID }

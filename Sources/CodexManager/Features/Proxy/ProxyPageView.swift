@@ -30,34 +30,17 @@ private struct ProxyControlSection: View {
 
     var body: some View {
         SectionCard(title: L10n.tr("proxy.section.control")) {
-            VStack(alignment: .leading, spacing: 16) {
-                // Status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(model.isRunning ? Color.green : Color.secondary.opacity(0.4))
-                        .frame(width: 8, height: 8)
-                    Text(model.isRunning
-                         ? L10n.tr("proxy.status.running")
-                         : L10n.tr("proxy.status.stopped"))
-                        .font(.body)
-                    Spacer()
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                ProxyStatusPill(isRunning: model.isRunning)
 
-                // Port configuration
-                HStack(spacing: 12) {
-                    Text(L10n.tr("proxy.port"))
-                        .font(.body)
+                ProxyFormRow(title: L10n.tr("proxy.port")) {
                     TextField("18317", text: $model.port)
                         .frostedRoundedInput(cornerRadius: 8)
-                        .frame(maxWidth: 100)
+                        .frame(width: 108)
                         .disabled(model.isRunning)
-                    Spacer()
                 }
 
-                // API Key configuration
-                HStack(spacing: 12) {
-                    Text("API Key")
-                        .font(.body)
+                ProxyFormRow(title: "API Key") {
                     TextField("sk-local-...", text: $model.apiKey)
                         .frostedRoundedInput(cornerRadius: 8)
                         .frame(maxWidth: 380)
@@ -71,10 +54,8 @@ private struct ProxyControlSection: View {
                     .buttonStyle(.frostedCapsule(prominent: false))
                     .disabled(model.isRunning)
                     .help(L10n.tr("proxy.api_key.regenerate"))
-                    Spacer()
                 }
 
-                // Start/Stop button
                 HStack(spacing: 12) {
                     Button {
                         model.toggleProxy()
@@ -85,7 +66,7 @@ private struct ProxyControlSection: View {
                     }
                     .buttonStyle(.frostedCapsule(
                         prominent: true,
-                        tint: model.isRunning ? .red : .green
+                        tint: model.isRunning ? AppTheme.destructive : AppTheme.success
                     ))
 
                     if model.isRunning {
@@ -99,8 +80,51 @@ private struct ProxyControlSection: View {
 
                     Spacer()
                 }
+                .padding(.top, 2)
             }
         }
+    }
+}
+
+private struct ProxyStatusPill: View {
+    let isRunning: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(isRunning ? AppTheme.success : Color.secondary.opacity(0.45))
+                .frame(width: 8, height: 8)
+            Text(isRunning ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped"))
+                .font(.system(size: 13, weight: .semibold))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct ProxyFormRow<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 68, alignment: .leading)
+            content
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -131,10 +155,10 @@ private struct ProxyEndpointRow: View {
         HStack(spacing: 8) {
             Text(endpoint.method)
                 .font(.system(.caption, design: .monospaced, weight: .bold))
-                .foregroundStyle(endpoint.method == "GET" ? Color.blue : Color.orange)
+                .foregroundStyle(AppTheme.accent)
                 .frame(width: 40, alignment: .leading)
             Text(endpoint.rawValue)
-                .font(.system(.body, design: .monospaced))
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
             Spacer()
             Text(L10n.tr(endpoint.descriptionKey))
                 .font(.caption)
@@ -143,8 +167,8 @@ private struct ProxyEndpointRow: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? AppTheme.accentSoft : Color.clear)
         )
     }
 }
@@ -161,15 +185,15 @@ private struct ProxyModelsSection: View {
                         .padding(.vertical, 5)
                         .padding(.horizontal, 10)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 7)
                                 .fill(model.selectedModel == modelName
-                                      ? Color.accentColor.opacity(0.12)
-                                      : Color.secondary.opacity(0.08))
+                                      ? AppTheme.accentSoft
+                                      : AppTheme.mutedBackground)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 7)
                                 .strokeBorder(model.selectedModel == modelName
-                                              ? Color.accentColor.opacity(0.4)
+                                              ? AppTheme.accent.opacity(0.42)
                                               : Color.clear, lineWidth: 1)
                         )
                         .contentShape(Rectangle())
@@ -273,7 +297,7 @@ private struct ProxyCopyableCodeBlock: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.accent)
                 #endif
             }
 
@@ -282,7 +306,11 @@ private struct ProxyCopyableCodeBlock: View {
                 .textSelection(.enabled)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frostedRoundedSurface(cornerRadius: 8)
+                .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(AppTheme.separator.opacity(0.55), lineWidth: 1)
+                }
         }
     }
 }

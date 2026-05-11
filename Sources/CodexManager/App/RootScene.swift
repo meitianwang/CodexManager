@@ -106,29 +106,20 @@ struct RootScene: View {
             }
         }
         #else
-        VStack(spacing: 0) {
-            // Top toolbar with segmented picker
-            HStack {
-                Picker("", selection: $selectedTab) {
-                    ForEach(AppTab.allCases) { tab in
-                        Label(tab.toolbarTitle, systemImage: tab.iconName)
-                            .tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 340)
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+        HStack(spacing: 0) {
+            AppSidebar(selectedTab: $selectedTab)
 
             Divider()
 
-            activePage
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            ZStack(alignment: .topLeading) {
+                activePage
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+            .background(AppTheme.windowBackground)
         }
+        .background(AppTheme.windowBackground)
+        .animation(.easeInOut(duration: 0.16), value: selectedTab)
         #endif
     }
 
@@ -148,6 +139,95 @@ struct RootScene: View {
         case .settings:
             SettingsPageView(model: settingsModel)
         }
+    }
+}
+
+private struct AppSidebar: View {
+    @Binding var selectedTab: AppTab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            AppSidebarHeader()
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(AppTab.allCases) { tab in
+                    AppSidebarTabButton(
+                        tab: tab,
+                        isSelected: selectedTab == tab
+                    ) {
+                        selectedTab = tab
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 16)
+        .padding(.bottom, 14)
+        .frame(width: 168)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(AppTheme.sidebarBackground)
+    }
+}
+
+private struct AppSidebarHeader: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(AppTheme.accent)
+                Image(systemName: "curlybraces")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 30, height: 30)
+
+            Text("CodexManager")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct AppSidebarTabButton: View {
+    let tab: AppTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: tab.iconName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 18, alignment: .center)
+
+                Text(tab.toolbarTitle)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .foregroundStyle(isSelected ? AppTheme.accentStrong : .secondary)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? AppTheme.accentSoft : Color.clear)
+            }
+            .overlay(alignment: .leading) {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(AppTheme.accent)
+                        .frame(width: 3, height: 16)
+                        .padding(.leading, 1)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

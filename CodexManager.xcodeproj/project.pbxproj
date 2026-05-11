@@ -89,6 +89,7 @@
 		9A2FA67A9035C9252A449927 /* AccountsWidgetSnapshotBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5DEC93269F847C98B7A78A /* AccountsWidgetSnapshotBuilderTests.swift */; };
 		9B3578432FE706FBD201AC02 /* AccountsPageViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C43C263C11AD85E7D3BBB00F /* AccountsPageViewStore.swift */; };
 		9C75C11EA1725785A9BA8532 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E68896E347C2DA394158D4 /* AppModels.swift */; };
+		A6E4AF8490D54E8C970C4B2E /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AB /* AppTheme.swift */; };
 		9CA53C94CA4C5AD2F64F7F1D /* DefaultUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A84811FE674C038DC2F896 /* DefaultUsageService.swift */; };
 		9D432A708510E300741E3449 /* SettingsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24D9AF5DD8C3B7A41CE572E /* SettingsPageModel.swift */; };
 		A28E13463DC468D03A208F70 /* AccountTagView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D524EFD16A64CD5F09DD9C7 /* AccountTagView.swift */; };
@@ -218,6 +219,7 @@
 		A71BC0ABAAA55ED43BE469CA /* CodexManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodexManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A73EA74AFF73939C07780397 /* AccountDisplayNameFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDisplayNameFormatter.swift; sourceTree = "<group>"; };
 		A8E94BEA812890B4B8C62A71 /* ChatGPTBaseOriginResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTBaseOriginResolver.swift; sourceTree = "<group>"; };
+		A4B5C6D7E8F90123456789AB /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		AB1D7B5D33C2F49FEBF9AD07 /* AppLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocaleTests.swift; sourceTree = "<group>"; };
 		AC73A721FC1034BF45376EDA /* AccountsPageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPageModel.swift; sourceTree = "<group>"; };
 		AED92F368B3398DBB78B2740 /* AppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
@@ -450,6 +452,7 @@
 			isa = PBXGroup;
 			children = (
 				4D524EFD16A64CD5F09DD9C7 /* AccountTagView.swift */,
+				A4B5C6D7E8F90123456789AB /* AppTheme.swift */,
 				133F096E8B0893280F12663F /* EmptyStateView.swift */,
 				FE7C5E7C6883D3A43BF7D3A2 /* LiquidProgress.swift */,
 				1512489A7E3F902F5440DC4B /* NoticeBanner.swift */,
@@ -694,6 +697,7 @@
 				25F4AC44C91C422F6AA005AE /* AppError.swift in Sources */,
 				0A34BA6146B5D9352EFFAA1B /* AppLocale.swift in Sources */,
 				9C75C11EA1725785A9BA8532 /* AppModels.swift in Sources */,
+				A6E4AF8490D54E8C970C4B2E /* AppTheme.swift in Sources */,
 				D48B60776A889C6904BEA1AA /* AppVersion.swift in Sources */,
 				042A3C654EB19821E1E58959 /* AtomicFileWriter.swift in Sources */,
 				E03A9E9A887833202035BC79 /* AuthFileRepository.swift in Sources */,

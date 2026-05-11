@@ -45,7 +45,9 @@ struct AccountsWidgetSnapshotBuilderTests {
         #expect(snapshot.rows.count == 1)
         #expect(snapshot.rows[0].workspaceLabel == "workspace")
         #expect(snapshot.rows[0].accountLabel == "member")
+        #expect(snapshot.rows[0].fiveHour.progressFraction == 0.55)
         #expect(snapshot.rows[0].fiveHour.remainingText == "55%")
+        #expect(snapshot.rows[0].oneWeek.progressFraction == 0.45)
         #expect(snapshot.rows[0].oneWeek.remainingText == "45%")
     }
 

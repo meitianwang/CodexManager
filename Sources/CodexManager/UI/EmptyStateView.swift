@@ -5,15 +5,19 @@ struct EmptyStateView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(AppTheme.accent)
             Text(title)
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 17, weight: .semibold))
             Text(message)
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, minHeight: 180)
-        .padding()
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding(24)
+        .cardSurface(cornerRadius: LayoutRules.cardRadius)
     }
 }

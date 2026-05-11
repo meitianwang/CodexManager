@@ -204,6 +204,12 @@ extension AccountsStore {
     }
 
     private func resolvedCurrentAccountKey(_ currentAccountKey: String?) -> String? {
+        if let currentAccountKey = AccountIdentity.normalizedSelectionKey(currentAccountKey) {
+            return accounts.contains(where: { $0.accountKey == currentAccountKey })
+                ? currentAccountKey
+                : nil
+        }
+
         if let selectionKey = AccountIdentity.normalizedSelectionKey(currentSelection?.accountKey),
            accounts.contains(where: { $0.accountKey == selectionKey }) {
             return selectionKey
@@ -216,11 +222,6 @@ extension AccountsStore {
             if matches.count == 1 {
                 return matches[0].accountKey
             }
-        }
-
-        if let currentAccountKey = AccountIdentity.normalizedSelectionKey(currentAccountKey),
-           accounts.contains(where: { $0.accountKey == currentAccountKey }) {
-            return currentAccountKey
         }
 
         return nil

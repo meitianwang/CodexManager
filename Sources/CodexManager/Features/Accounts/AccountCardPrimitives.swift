@@ -27,18 +27,12 @@ struct AccountCardPalette {
 
     init(accent: AccountCardAccent, isCurrent: Bool) {
         switch accent {
-        case .orange:
-            toneColor = .orange
-        case .pink:
-            toneColor = .pink
         case .gray:
             toneColor = .gray
-        case .indigo:
-            toneColor = .indigo
-        case .teal:
-            toneColor = .teal
+        case .orange, .pink, .indigo, .teal:
+            toneColor = AppTheme.accent
         }
-        surfaceTint = isCurrent ? .teal.opacity(0.08) : nil
+        surfaceTint = isCurrent ? AppTheme.accentSubtle : nil
     }
 }
 
@@ -73,13 +67,13 @@ struct AccountCardHeaderSection: View {
                 HStack(spacing: 6) {
                     AccountTagView(
                         text: presentation.planLabel,
-                        backgroundColor: palette.toneColor.opacity(0.14),
+                        backgroundColor: palette.toneColor.opacity(0.11),
                         foregroundColor: palette.toneColor
                     )
                     if let teamNameTag = presentation.teamNameTag {
                         AccountTagView(
                             text: teamNameTag,
-                            backgroundColor: palette.toneColor.opacity(0.14),
+                            backgroundColor: AppTheme.mutedBackground,
                             foregroundColor: palette.toneColor,
                             allowsCompression: true
                         )
@@ -94,12 +88,12 @@ struct AccountCardHeaderSection: View {
                     Image(systemName: "trash")
                 }
                 .codexManagerActionButtonStyle(
-                    prominent: true,
-                    tint: .red,
+                    prominent: false,
+                    tint: AppTheme.destructive,
                     density: .compact,
                     iOSStyle: .liquidGlass
                 )
-                .tint(.red)
+                .foregroundStyle(AppTheme.destructive)
             }
         }
     }
@@ -110,8 +104,8 @@ struct AccountCardExpandedUsageSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AccountWindowSection(presentation: presentation.fiveHourWindow, tint: .orange)
-            AccountWindowSection(presentation: presentation.oneWeekWindow, tint: .teal)
+            AccountWindowSection(presentation: presentation.fiveHourWindow, tint: AppTheme.accent)
+            AccountWindowSection(presentation: presentation.oneWeekWindow, tint: AppTheme.accent)
 
             HStack(spacing: 8) {
                 Text(L10n.tr("accounts.card.credits_format", presentation.creditsText))
@@ -132,30 +126,34 @@ struct AccountCardCompactUsageSection: View {
             rings: [
                 AccountCompactRingDescriptor(
                     id: "five-hour",
-                    valueText: compactPercentText(presentation.compactUsage.fiveHourUsedPercent),
+                    valueText: compactPercentText(presentation.compactUsage.fiveHourRemainingPercent),
                     subtitleText: "5h",
-                    progress: compactProgress(presentation.compactUsage.fiveHourUsedPercent),
-                    tint: .orange
+                    progress: compactProgress(presentation.compactUsage.fiveHourRemainingPercent),
+                    tint: AppTheme.accent
                 ),
                 AccountCompactRingDescriptor(
                     id: "one-week",
-                    valueText: compactPercentText(presentation.compactUsage.oneWeekUsedPercent),
+                    valueText: compactPercentText(presentation.compactUsage.oneWeekRemainingPercent),
                     subtitleText: "1w",
-                    progress: compactProgress(presentation.compactUsage.oneWeekUsedPercent),
-                    tint: .teal
+                    progress: compactProgress(presentation.compactUsage.oneWeekRemainingPercent),
+                    tint: AppTheme.accent
                 ),
-            ]
+            ],
+            spacing: 12,
+            ringSize: 48,
+            lineWidth: 5.5
         )
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func compactProgress(_ usedPercent: Double?) -> Double {
-        guard let usedPercent else { return 0 }
-        return max(0, min(1, usedPercent / 100))
+    private func compactProgress(_ remainingPercent: Double?) -> Double {
+        guard let remainingPercent else { return 0 }
+        return max(0, min(1, remainingPercent / 100))
     }
 
-    private func compactPercentText(_ usedPercent: Double?) -> String {
-        guard let usedPercent else { return "--" }
-        return "\(Int(usedPercent.rounded()))%"
+    private func compactPercentText(_ remainingPercent: Double?) -> String {
+        guard let remainingPercent else { return "--" }
+        return "\(Int(remainingPercent.rounded()))%"
     }
 }
 
@@ -205,10 +203,10 @@ struct AccountCollapsedSwitchOverlay: View {
         if isVisible {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.regularMaterial)
+                    .fill(AppTheme.panelBackground)
                     .overlay {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.secondary.opacity(0.22), lineWidth: 1)
+                            .strokeBorder(AppTheme.separator, lineWidth: 1)
                     }
                     .onTapGesture {
                         onDismiss()
@@ -230,23 +228,30 @@ private struct AccountWindowSection: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(presentation.title)
                     .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
                 Spacer(minLength: 0)
-                Text(presentation.usedText)
-                    .font(.caption.weight(.semibold))
                 Text(presentation.remainingText)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                Text(presentation.usedText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
 
-            LiquidProgressBar(progress: presentation.usedPercent / 100, tint: tint)
+            LiquidProgressBar(progress: presentation.remainingPercent / 100, tint: tint)
 
-            Text(presentation.resetText)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10, weight: .medium))
+                Text(presentation.resetText)
+                    .font(.caption2)
+            }
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -276,7 +281,7 @@ private struct AccountSwitchButton: View {
         }
         .codexManagerActionButtonStyle(
             prominent: true,
-            tint: .mint,
+            tint: AppTheme.accent,
             density: .compact,
             iOSStyle: .liquidGlass
         )
@@ -303,11 +308,12 @@ private struct AccountRefreshButton: View {
             }
         }
         .codexManagerActionButtonStyle(
-            prominent: true,
-            tint: .teal,
+            prominent: false,
+            tint: AppTheme.accent,
             density: .compact,
             iOSStyle: .liquidGlass
         )
+        .foregroundStyle(AppTheme.accent)
         .disabled(!isEnabled)
         .accessibilityLabel(Text(L10n.tr("common.refresh_usage")))
     }
@@ -327,7 +333,7 @@ private struct AccountTrailingActionCluster: View {
             if isCurrent {
                 AccountTagView(
                     text: L10n.tr("accounts.card.current"),
-                    backgroundColor: palette.toneColor.opacity(0.24),
+                    backgroundColor: AppTheme.accentSoft,
                     foregroundColor: palette.toneColor
                 )
             } else {
@@ -353,15 +359,15 @@ private struct AccountUsageErrorOverlay: View {
     var body: some View {
         Text(text)
             .font(.caption2.weight(.medium))
-            .foregroundStyle(.red)
+            .foregroundStyle(AppTheme.destructive)
             .multilineTextAlignment(.leading)
             .lineLimit(3)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(AppTheme.destructive.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(.red.opacity(0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(AppTheme.destructive.opacity(0.18), lineWidth: 1)
             }
     }
 }

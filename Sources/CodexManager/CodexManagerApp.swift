@@ -122,7 +122,6 @@ struct TrayPopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Status header
             statusSection
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -131,7 +130,6 @@ struct TrayPopoverView: View {
             Divider()
                 .padding(.horizontal, 12)
 
-            // Actions
             VStack(spacing: 2) {
                 TrayActionButton(
                     icon: "macwindow",
@@ -154,17 +152,22 @@ struct TrayPopoverView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
         }
-        .frame(width: 260)
+        .frame(width: 276)
+        .background(AppTheme.panelBackground)
     }
 
     @ViewBuilder
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // App icon + title
             HStack(spacing: 10) {
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(AppTheme.accent)
+                    Image(systemName: "chevron.left.forwardslash.chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("CodexManager")
@@ -185,7 +188,6 @@ struct TrayPopoverView: View {
                 Spacer(minLength: 0)
             }
 
-            // Quick stats
             if totalAccounts > 0 {
                 HStack(spacing: 12) {
                     StatChip(
@@ -222,8 +224,8 @@ private struct StatChip: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background {
-            Capsule()
-                .fill(.quaternary)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(AppTheme.mutedBackground)
         }
     }
 }
@@ -244,15 +246,15 @@ private struct TrayActionButton: View {
                     .font(.system(size: 13))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isDestructive ? Color.red : Color.primary)
+            .foregroundStyle(isDestructive ? AppTheme.destructive : Color.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .background {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(.clear)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(AppTheme.mutedBackground.opacity(0.7))
         }
         .onHover { hovering in
             if hovering {

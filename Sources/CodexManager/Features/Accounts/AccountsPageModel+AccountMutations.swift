@@ -10,6 +10,7 @@ extension AccountsPageModel {
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
             publishAndSyncLocalAccountsMutation(accounts)
+            syncCurrentAccountSelectionInBackground(accountID: imported.accountID)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_format", imported.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)

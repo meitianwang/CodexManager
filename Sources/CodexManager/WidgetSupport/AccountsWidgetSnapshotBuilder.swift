@@ -91,7 +91,7 @@ struct AccountsWidgetSnapshotBuilder {
 
         return AccountsWidgetWindowSnapshot(
             title: title,
-            progressFraction: usedPercent / 100,
+            progressFraction: Double(remaining) / 100,
             usedText: "\(Int(usedPercent.rounded()))%",
             remainingText: "\(remaining)%",
             resetText: resetText(for: window, locale: locale, timeZone: timeZone)

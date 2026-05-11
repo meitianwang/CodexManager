@@ -21,7 +21,10 @@ final class AppContainer {
             let storeRepository = StoreFileRepository(paths: paths)
             let settingsRepository = SettingsFileRepository(paths: paths)
             let authRepository = AuthFileRepository(paths: paths)
-            let initialAccounts = try initialAccountsSnapshot(using: storeRepository)
+            let initialAccounts = try initialAccountsSnapshot(
+                using: storeRepository,
+                authRepository: authRepository
+            )
             let usageService = DefaultUsageService(configPath: paths.codexConfigPath)
             let workspaceMetadataService = DefaultWorkspaceMetadataService(configPath: paths.codexConfigPath)
             let chatGPTOAuthLoginService = OpenAIChatGPTOAuthLoginService(configPath: paths.codexConfigPath)
@@ -142,9 +145,10 @@ final class AppContainer {
     }
 
     private static func initialAccountsSnapshot(
-        using storeRepository: StoreFileRepository
+        using storeRepository: StoreFileRepository,
+        authRepository: AuthRepository
     ) throws -> [AccountSummary] {
         let store = try storeRepository.loadStore()
-        return store.accountSummaries(currentAccountKey: nil)
+        return store.accountSummaries(currentAccountKey: authRepository.currentAuthAccountKey())
     }
 }

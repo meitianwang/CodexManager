@@ -276,3 +276,9 @@
 "error.proxy_runtime.summary.auth_format" = "認証失敗 %@ 件";
 "error.proxy_runtime.summary.permission_format" = "権限不足 %@ 件";
 "error.remote.logs_unavailable" = "リモートログを取得できませんでした。しばらくしてから再試行してください";
+"tray.action.open_panel" = "メインパネルを開く";
+"tray.action.quit" = "終了";
+"tray.status.current_format" = "使用中: %@";
+"tray.status.no_account" = "アカウント未選択";
+"tray.status.accounts_count_format" = "%@ 個のアカウント";
+"tray.status.remaining_format" = "残り %@";

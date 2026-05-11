@@ -119,6 +119,7 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
 
         configuration.label
             .font(font)
+            .foregroundStyle(foregroundColor)
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .frame(minHeight: minimumHeight)
@@ -129,42 +130,13 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
                     .strokeBorder(separatorColor, lineWidth: 1)
             }
             .opacity(isEnabled ? 1 : 0.45)
-            .scaleEffect(isEffectivelyPressed ? 0.97 : 1)
+            .scaleEffect(isEffectivelyPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.12), value: isEffectivelyPressed)
     }
 
-    @ViewBuilder
     private var buttonBackground: some View {
-        if #available(iOS 26.0, macOS 26.0, *) {
-            if prominent {
-                Capsule()
-                    .fill(.clear)
-                    .glassEffect(
-                        .regular
-                            .tint(effectiveTint.opacity(0.22))
-                            .interactive(),
-                        in: .capsule
-                    )
-            } else {
-                Capsule()
-                    .fill(.clear)
-                    .glassEffect(
-                        .regular
-                            .tint(Color.white.opacity(0.03))
-                            .interactive(),
-                        in: .capsule
-                    )
-            }
-        } else {
-            ZStack {
-                Capsule()
-                    .fill(prominent ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.ultraThinMaterial))
-                if prominent {
-                    Capsule()
-                        .fill(effectiveTint.opacity(0.14))
-                }
-            }
-        }
+        Capsule()
+            .fill(prominent ? effectiveTint : AppTheme.controlBackground)
     }
 
     private var font: Font {
@@ -177,7 +149,7 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var horizontalPadding: CGFloat {
-        density == .compact ? 10 : 12
+        density == .compact ? 9 : 12
     }
 
     private var verticalPadding: CGFloat {
@@ -185,20 +157,19 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var minimumHeight: CGFloat {
-        density == .compact ? 30 : 34
+        density == .compact ? 28 : 34
     }
 
     private var separatorColor: Color {
-        #if canImport(AppKit)
-        let base = Color(nsColor: .separatorColor)
-        #else
-        let base = Color.secondary.opacity(0.2)
-        #endif
-        return prominent ? base.opacity(0.85) : base
+        prominent ? Color.clear : AppTheme.separator
     }
 
     private var effectiveTint: Color {
-        tint ?? .accentColor
+        tint ?? AppTheme.accent
+    }
+
+    private var foregroundColor: Color {
+        prominent ? .white : .primary
     }
 }
 
