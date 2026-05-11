@@ -17,6 +17,7 @@ protocol AuthRepository: Sendable {
     func writeCurrentAuth(_ auth: JSONValue) throws
     func removeCurrentAuth() throws
     func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue
+    func replacingChatGPTTokens(in auth: JSONValue, with tokens: ChatGPTOAuthTokens) throws -> JSONValue
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth
 }
 
@@ -58,7 +59,14 @@ protocol CodexCLIServiceProtocol: Sendable {
 }
 
 protocol ChatGPTOAuthLoginServiceProtocol: Sendable {
-    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens
+    func signInWithChatGPT(timeoutSeconds: TimeInterval, allowedWorkspaceID: String?) async throws -> ChatGPTOAuthTokens
+    func refreshChatGPTTokens(refreshToken: String) async throws -> ChatGPTOAuthTokens
+}
+
+extension ChatGPTOAuthLoginServiceProtocol {
+    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+        try await signInWithChatGPT(timeoutSeconds: timeoutSeconds, allowedWorkspaceID: nil)
+    }
 }
 
 protocol EditorAppServiceProtocol: Sendable {

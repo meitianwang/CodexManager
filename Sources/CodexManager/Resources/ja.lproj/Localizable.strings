@@ -154,6 +154,7 @@
 "error.auth.auth_json_invalid" = "auth.json は有効な JSON ではありません";
 "error.auth.id_token_invalid_format" = "id_token の形式が不正です";
 "error.auth.decode_id_token_failed" = "id_token のデコードに失敗しました";
+"error.auth.codex_token_plan_mismatch_format" = "Codex の認可情報では %@ がまだ %@ として扱われています。CodexManager でこのアカウントを再認可してから切り替えてください。";
 "error.json.unsupported_value" = "サポートされていない JSON 値です";
 "error.json.unsupported_payload_type" = "サポートされていない JSON ペイロード型です";
 "error.codex_cli.launch_login_failed_format" = "codex login の起動に失敗しました: %@";

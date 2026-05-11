@@ -154,6 +154,7 @@
 "error.auth.auth_json_invalid" = "auth.json이 유효한 JSON이 아닙니다";
 "error.auth.id_token_invalid_format" = "id_token 형식이 잘못되었습니다";
 "error.auth.decode_id_token_failed" = "id_token 디코딩에 실패했습니다";
+"error.auth.codex_token_plan_mismatch_format" = "Codex 인증 정보가 아직 %@을(를) %@로 인식합니다. CodexManager에서 이 계정을 다시 인증한 뒤 전환하세요.";
 "error.json.unsupported_value" = "지원되지 않는 JSON 값입니다";
 "error.json.unsupported_payload_type" = "지원되지 않는 JSON payload 타입입니다";
 "error.codex_cli.launch_login_failed_format" = "codex login 실행 실패: %@";

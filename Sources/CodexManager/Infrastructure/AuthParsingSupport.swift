@@ -44,6 +44,43 @@ enum AuthJWTDecoder {
     }
 }
 
+enum AuthTokenPlanInspector {
+    static func codexVisiblePlan(in auth: JSONValue) -> String? {
+        let tokens = AuthJWTDecoder.tokenObject(from: auth)
+        return plan(in: tokens?["access_token"]?.stringValue)
+            ?? plan(in: tokens?["id_token"]?.stringValue)
+    }
+
+    static func refreshToken(in auth: JSONValue) -> String? {
+        AuthValueLookup.normalizedString(
+            AuthJWTDecoder.tokenObject(from: auth)?["refresh_token"]?.stringValue
+        )
+    }
+
+    static func plan(in token: String?) -> String? {
+        guard let token,
+              let payload = try? AuthJWTDecoder.decodePayload(token) else {
+            return nil
+        }
+        return AccountPlanResolver.normalizedPlanType(
+            payload["https://api.openai.com/auth"]?["chatgpt_plan_type"]?.stringValue
+                ?? payload["plan_type"]?.stringValue
+        )
+    }
+
+    static func needsRepair(codexVisiblePlan: String?, expectedPlan: String?) -> Bool {
+        guard AccountPlanResolver.isPaid(expectedPlan) else {
+            return false
+        }
+
+        guard let visibleTier = AccountPlanResolver.displayTier(codexVisiblePlan) else {
+            return true
+        }
+        let expectedTier = AccountPlanResolver.displayTier(expectedPlan)
+        return visibleTier == "free" || (expectedTier != nil && visibleTier != expectedTier)
+    }
+}
+
 enum AuthPrincipalIDResolver {
     static func resolve(
         from auth: JSONValue,

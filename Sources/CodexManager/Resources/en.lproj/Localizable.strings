@@ -164,6 +164,7 @@
 "error.auth.auth_json_invalid" = "auth.json is not valid JSON";
 "error.auth.id_token_invalid_format" = "id_token format is invalid";
 "error.auth.decode_id_token_failed" = "Failed to decode id_token";
+"error.auth.codex_token_plan_mismatch_format" = "Codex authorization still reports %@ as %@. Reauthorize this account in CodexManager and switch again.";
 "error.json.unsupported_value" = "Unsupported JSON value";
 "error.json.unsupported_payload_type" = "Unsupported JSON payload type";
 
@@ -291,4 +292,3 @@
 "error.proxy_runtime.summary.auth_format" = "auth failed %@";
 "error.proxy_runtime.summary.permission_format" = "permission denied %@";
 "error.remote.logs_unavailable" = "Remote logs are temporarily unavailable. Try again shortly.";
-

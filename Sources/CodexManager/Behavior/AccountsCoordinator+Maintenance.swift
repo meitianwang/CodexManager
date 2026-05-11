@@ -190,7 +190,7 @@ extension AccountsCoordinator {
         AccountsStore(accounts: [account]).accountSummaries(currentAccountKey: currentAccountKey)[0]
     }
 
-    private func resolveRemoteWorkspaceName(
+    func resolveRemoteWorkspaceName(
         for extracted: ExtractedAuth,
         forceRemoteCheck: Bool
     ) async -> String? {
@@ -369,7 +369,7 @@ extension AccountsCoordinator {
         return didChange
     }
 
-    private static func normalizedTeamName(_ value: String?) -> String? {
+    static func normalizedTeamName(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

@@ -90,6 +90,26 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
         return .object(root)
     }
 
+    func replacingChatGPTTokens(in auth: JSONValue, with tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        guard var root = auth.objectValue else {
+            throw AppError.invalidData(L10n.tr("error.auth.auth_json_invalid_structure"))
+        }
+
+        let refreshedAuth = try makeChatGPTAuth(from: tokens)
+        guard let refreshedRoot = refreshedAuth.objectValue,
+              let refreshedTokens = refreshedRoot["tokens"] else {
+            throw AppError.invalidData(L10n.tr("error.auth.auth_json_invalid_structure"))
+        }
+
+        root["auth_mode"] = refreshedRoot["auth_mode"]
+        root["last_refresh"] = refreshedRoot["last_refresh"]
+        root["tokens"] = refreshedTokens
+        if let apiKey = refreshedRoot["OPENAI_API_KEY"] {
+            root["OPENAI_API_KEY"] = apiKey
+        }
+        return .object(root)
+    }
+
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
         let mode = auth["auth_mode"]?.stringValue?.lowercased() ?? ""
         guard let tokens = authTokenObject(from: auth) else {

@@ -31,11 +31,14 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
         self.session = session
     }
 
-    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+    func signInWithChatGPT(
+        timeoutSeconds: TimeInterval,
+        allowedWorkspaceID: String? = nil
+    ) async throws -> ChatGPTOAuthTokens {
         let callback = OAuthCallbackBox<ChatGPTOAuthTokens>()
         let pkce = PKCECodes.make()
         let state = OpenAIChatGPTOAuthSupport.randomBase64URL(byteCount: 32)
-        let forcedWorkspaceID = resolveForcedWorkspaceID()
+        let forcedWorkspaceID = normalizedWorkspaceID(allowedWorkspaceID) ?? resolveForcedWorkspaceID()
 
         let (server, port) = try makeCallbackServer(
             callback: callback,
@@ -66,6 +69,10 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
             await endAuthorizationSession()
             throw error
         }
+    }
+
+    func refreshChatGPTTokens(refreshToken: String) async throws -> ChatGPTOAuthTokens {
+        try await Self.refreshTokens(session: session, refreshToken: refreshToken)
     }
 
     private func beginAuthorizationSession(
@@ -239,6 +246,39 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
         )
     }
 
+    private static func refreshTokens(session: URLSession, refreshToken: String) async throws -> ChatGPTOAuthTokens {
+        var request = URLRequest(url: endpointURL("/oauth/token"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = OpenAIChatGPTOAuthSupport.formEncodedBody([
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refreshToken),
+            ("client_id", Configuration.clientID)
+        ])
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.network(L10n.tr("error.oauth.token_exchange_failed_format", L10n.tr("error.usage.invalid_response")))
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let detail = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = detail.isEmpty ? "HTTP \(httpResponse.statusCode)" : String(detail.prefix(200))
+            throw AppError.network(L10n.tr("error.oauth.token_exchange_failed_format", message))
+        }
+
+        let tokenResponse = try JSONDecoder().decode(TokenExchangeResponse.self, from: data)
+        let apiKey = try? await exchangeIDTokenForAPIKey(session: session, idToken: tokenResponse.idToken)
+        return ChatGPTOAuthTokens(
+            accessToken: tokenResponse.accessToken,
+            refreshToken: tokenResponse.refreshToken,
+            idToken: tokenResponse.idToken,
+            apiKey: apiKey
+        )
+    }
+
     private static func exchangeIDTokenForAPIKey(session: URLSession, idToken: String) async throws -> String {
         var request = URLRequest(url: endpointURL("/oauth/token"))
         request.httpMethod = "POST"
@@ -309,6 +349,12 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
         }
 
         return nil
+    }
+
+    private func normalizedWorkspaceID(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func endpointURL(_ path: String) -> URL {

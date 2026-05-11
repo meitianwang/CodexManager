@@ -132,6 +132,82 @@ final class AuthFileRepositoryTests: XCTestCase {
         XCTAssertNotNil(auth["last_refresh"]?.stringValue)
     }
 
+    func testReplacingChatGPTTokensPreservesRootMetadata() throws {
+        let fixture = try makeRepositoryFixture()
+        defer { fixture.cleanup() }
+
+        let repository = fixture.repository
+        let oldIDToken = makeJWT(payload: [
+            "https://api.openai.com/auth": [
+                "chatgpt_account_id": "acct_old",
+                "chatgpt_plan_type": "free"
+            ]
+        ])
+        let newIDToken = makeJWT(payload: [
+            "email": "dev@example.com",
+            "https://api.openai.com/auth": [
+                "chatgpt_account_id": "acct_new",
+                "chatgpt_plan_type": "prolite"
+            ]
+        ])
+        let auth = JSONValue.object([
+            "auth_mode": .string("chatgpt"),
+            "tokens": .object([
+                "access_token": .string("old-access-token"),
+                "refresh_token": .string("old-refresh-token"),
+                "id_token": .string(oldIDToken)
+            ]),
+            "organization": .object([
+                "name": .string("workspace-alpha")
+            ])
+        ])
+
+        let replaced = try repository.replacingChatGPTTokens(
+            in: auth,
+            with: ChatGPTOAuthTokens(
+                accessToken: "new-access-token",
+                refreshToken: "new-refresh-token",
+                idToken: newIDToken,
+                apiKey: "sk-proj-new"
+            )
+        )
+
+        XCTAssertEqual(replaced["tokens"]?["access_token"]?.stringValue, "new-access-token")
+        XCTAssertEqual(replaced["tokens"]?["refresh_token"]?.stringValue, "new-refresh-token")
+        XCTAssertEqual(replaced["tokens"]?["id_token"]?.stringValue, newIDToken)
+        XCTAssertEqual(replaced["tokens"]?["account_id"]?.stringValue, "acct_new")
+        XCTAssertEqual(replaced["organization"]?["name"]?.stringValue, "workspace-alpha")
+        XCTAssertEqual(replaced["OPENAI_API_KEY"]?.stringValue, "sk-proj-new")
+        XCTAssertNotNil(replaced["last_refresh"]?.stringValue)
+    }
+
+    func testCodexVisiblePlanUsesAccessTokenPlan() {
+        let accessToken = makeJWT(payload: [
+            "https://api.openai.com/auth": [
+                "chatgpt_plan_type": "prolite"
+            ]
+        ])
+        let idToken = makeJWT(payload: [
+            "https://api.openai.com/auth": [
+                "chatgpt_plan_type": "free"
+            ]
+        ])
+        let auth = JSONValue.object([
+            "tokens": .object([
+                "access_token": .string(accessToken),
+                "id_token": .string(idToken)
+            ])
+        ])
+
+        XCTAssertEqual(AuthTokenPlanInspector.codexVisiblePlan(in: auth), "prolite")
+        XCTAssertTrue(
+            AuthTokenPlanInspector.needsRepair(
+                codexVisiblePlan: "free",
+                expectedPlan: "prolite"
+            )
+        )
+    }
+
     func testWriteCurrentAuthNormalizesFlatTokenShapeAndTimestamp() throws {
         let fixture = try makeRepositoryFixture()
         defer { fixture.cleanup() }

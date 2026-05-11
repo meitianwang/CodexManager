@@ -171,12 +171,38 @@ enum AccountPlanResolver {
         ) ?? "team"
     }
 
-    private static func normalizedPlanType(_ value: String?) -> String? {
+    static func normalizedPlanType(_ value: String?) -> String? {
         guard let value else { return nil }
         let normalized = value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return normalized.isEmpty ? nil : normalized
+    }
+
+    static func displayTier(_ value: String?) -> String? {
+        switch normalizedPlanType(value) {
+        case "pro", "prolite", "pro_lite":
+            return "pro"
+        case "plus":
+            return "plus"
+        case "free", "go":
+            return "free"
+        case "team", "business", "enterprise":
+            return "team"
+        case let value?:
+            return value
+        case nil:
+            return nil
+        }
+    }
+
+    static func isPaid(_ value: String?) -> Bool {
+        switch displayTier(value) {
+        case "pro", "plus", "team":
+            return true
+        default:
+            return false
+        }
     }
 }
 
