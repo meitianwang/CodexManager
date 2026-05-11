@@ -42,4 +42,50 @@ final class AccountSummaryPresentationTests: XCTestCase {
         XCTAssertEqual(account.normalizedPlanLabel, "PRO")
         XCTAssertFalse(account.shouldDisplayWorkspaceTag)
     }
+
+    func testProlitePlanIsDisplayedAsPro() {
+        let account = AccountSummary(
+            id: "acct-1",
+            label: "Pro",
+            email: nil,
+            accountID: "account-1",
+            planType: "prolite",
+            teamName: nil,
+            teamAlias: nil,
+            addedAt: 0,
+            updatedAt: 0,
+            usage: nil,
+            usageError: nil,
+            isCurrent: false
+        )
+
+        XCTAssertEqual(account.normalizedPlanLabel, "PRO")
+        XCTAssertFalse(account.shouldDisplayWorkspaceTag)
+    }
+
+    func testUsagePlanOverridesStaleTokenPlan() {
+        let account = AccountSummary(
+            id: "acct-1",
+            label: "Pro",
+            email: nil,
+            accountID: "account-1",
+            planType: "free",
+            teamName: nil,
+            teamAlias: nil,
+            addedAt: 0,
+            updatedAt: 0,
+            usage: UsageSnapshot(
+                fetchedAt: 0,
+                planType: "prolite",
+                fiveHour: nil,
+                oneWeek: nil,
+                credits: nil
+            ),
+            usageError: nil,
+            isCurrent: false
+        )
+
+        XCTAssertEqual(account.effectivePlanType, "prolite")
+        XCTAssertEqual(account.normalizedPlanLabel, "PRO")
+    }
 }

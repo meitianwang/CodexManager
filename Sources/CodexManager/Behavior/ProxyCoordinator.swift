@@ -157,13 +157,11 @@ actor ProxyCoordinator {
         guard let store = try? storeRepository.loadStore() else { return [] }
         var keys = Set<String>()
         for account in store.accounts {
-            let plan = (account.planType ?? account.usage?.planType ?? "team")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
+            let plan = account.effectivePlanType
             switch plan {
             case "free": keys.insert("codex-free")
             case "plus": keys.insert("codex-plus")
-            case "pro": keys.insert("codex-pro")
+            case "pro", "prolite", "pro_lite": keys.insert("codex-pro")
             default: keys.insert("codex-team")
             }
         }

@@ -78,6 +78,13 @@ struct StoredAccount: Codable, Equatable, Identifiable {
     var accountKey: String {
         AccountIdentity.key(for: self)
     }
+
+    var effectivePlanType: String {
+        AccountPlanResolver.effectivePlanType(
+            planType: planType,
+            usagePlanType: usage?.planType
+        )
+    }
 }
 
 struct AccountSummary: Equatable, Identifiable {
@@ -99,17 +106,20 @@ struct AccountSummary: Equatable, Identifiable {
         AccountIdentity.key(for: self)
     }
 
-    var normalizedPlanLabel: String {
-        let normalized = (planType ?? usage?.planType ?? "team")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+    var effectivePlanType: String {
+        AccountPlanResolver.effectivePlanType(
+            planType: planType,
+            usagePlanType: usage?.planType
+        )
+    }
 
-        switch normalized {
+    var normalizedPlanLabel: String {
+        switch effectivePlanType {
         case "free":
             return "FREE"
         case "plus":
             return "PLUS"
-        case "pro":
+        case "pro", "prolite", "pro_lite":
             return "PRO"
         case "enterprise":
             return "ENTERPRISE"
@@ -139,6 +149,34 @@ struct AccountSummary: Equatable, Identifiable {
         default:
             return false
         }
+    }
+}
+
+enum AccountPlanResolver {
+    static func preferredPlanType(
+        planType: String?,
+        usagePlanType: String?,
+        fallback: String? = nil
+    ) -> String? {
+        normalizedPlanType(usagePlanType)
+            ?? normalizedPlanType(planType)
+            ?? normalizedPlanType(fallback)
+    }
+
+    static func effectivePlanType(planType: String?, usagePlanType: String?) -> String {
+        preferredPlanType(
+            planType: planType,
+            usagePlanType: usagePlanType,
+            fallback: "team"
+        ) ?? "team"
+    }
+
+    private static func normalizedPlanType(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let normalized = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return normalized.isEmpty ? nil : normalized
     }
 }
 

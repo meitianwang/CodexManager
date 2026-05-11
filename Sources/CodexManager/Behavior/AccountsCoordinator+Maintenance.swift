@@ -145,7 +145,10 @@ extension AccountsCoordinator {
             label: label,
             email: extracted.email,
             accountID: extracted.accountID,
-            planType: extracted.planType,
+            planType: AccountPlanResolver.preferredPlanType(
+                planType: extracted.planType,
+                usagePlanType: usage?.planType
+            ),
             teamName: extracted.teamName,
             teamAlias: nil,
             authJSON: authJSON,
@@ -160,13 +163,17 @@ extension AccountsCoordinator {
             var existing = store.accounts[existingIndex]
             existing.label = account.label
             existing.email = account.email
-            existing.planType = account.planType
             if let teamName = Self.normalizedTeamName(account.teamName) {
                 existing.teamName = teamName
             }
             existing.authJSON = account.authJSON
             existing.updatedAt = now
             existing.usage = usage ?? existing.usage
+            existing.planType = AccountPlanResolver.preferredPlanType(
+                planType: extracted.planType,
+                usagePlanType: existing.usage?.planType,
+                fallback: existing.planType
+            )
             existing.usageError = usageError
             existing.principalID = extracted.principalID
             store.accounts[existingIndex] = existing
@@ -278,7 +285,11 @@ extension AccountsCoordinator {
             )
             account.usage = usage
             account.usageError = nil
-            account.planType = extracted.planType ?? account.planType
+            account.planType = AccountPlanResolver.preferredPlanType(
+                planType: extracted.planType,
+                usagePlanType: usage.planType,
+                fallback: account.planType
+            )
             if let teamName = normalizedTeamName(extracted.teamName) {
                 account.teamName = teamName
             }
@@ -337,8 +348,13 @@ extension AccountsCoordinator {
                 didChange = true
             }
 
-            if store.accounts[index].planType != reconciled.planType {
-                store.accounts[index].planType = reconciled.planType
+            let resolvedPlanType = AccountPlanResolver.preferredPlanType(
+                planType: reconciled.planType,
+                usagePlanType: storedAccount.usage?.planType,
+                fallback: storedAccount.planType
+            )
+            if store.accounts[index].planType != resolvedPlanType {
+                store.accounts[index].planType = resolvedPlanType
                 didChange = true
             }
 
