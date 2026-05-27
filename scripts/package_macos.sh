@@ -47,7 +47,8 @@ if [[ "$MODE" == "release" ]]; then
   exit 0
 fi
 
-LOCAL_BUILD_ROOT="$BUILD_ROOT/local"
+# Keep intermediate .app bundles out of Spotlight/Launchpad search results.
+LOCAL_BUILD_ROOT="$BUILD_ROOT/local.noindex"
 LOCAL_ARTIFACTS_ROOT="$ARTIFACTS_ROOT/local"
 ARCHIVE_PATH="$LOCAL_BUILD_ROOT/$SCHEME.xcarchive"
 DERIVED_DATA_PATH="$LOCAL_BUILD_ROOT/DerivedData"
