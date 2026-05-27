@@ -105,6 +105,17 @@ enum ChatToCodexTranslator {
                         continue
                     }
 
+                    if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                        continuation.yield(formatSSELine([
+                            "error": [
+                                "message": error.message,
+                                "type": "proxy_error"
+                            ]
+                        ]))
+                        continuation.yield(Data("data: [DONE]\n\n".utf8))
+                        break
+                    }
+
                     let payload = Data(line.dropFirst(dataPrefix.count))
                     guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                           !text.isEmpty,
@@ -155,6 +166,12 @@ enum ChatToCodexTranslator {
         var truncated = false
 
         for await line in lines {
+            if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                return HTTPResponse.json(
+                    statusCode: error.statusCode,
+                    object: ["error": ["message": error.message, "type": "proxy_error"]]
+                )
+            }
             guard line.starts(with: dataPrefix) else { continue }
             let payload = Data(line.dropFirst(dataPrefix.count))
             guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -220,6 +237,12 @@ enum ChatToCodexTranslator {
 
         for line in lines {
             let lineData = Data(line)
+            if let error = CodexUpstreamSSEInspector.error(fromSSELine: lineData) {
+                return HTTPResponse.json(
+                    statusCode: error.statusCode,
+                    object: ["error": ["message": error.message, "type": "proxy_error"]]
+                )
+            }
             guard lineData.starts(with: dataPrefix) else { continue }
             let payload = Data(lineData.dropFirst(dataPrefix.count))
             guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),

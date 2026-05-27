@@ -208,6 +208,19 @@ enum AnthropicToCodexTranslator {
 
                 for await line in lines {
                     guard line.starts(with: dataPrefix) else { continue }
+                    if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                        if textBlockOpen {
+                            continuation.yield(formatEvent("content_block_stop", [
+                                "type": "content_block_stop", "index": contentIndex
+                            ]))
+                        }
+                        continuation.yield(formatEvent("error", [
+                            "type": "error",
+                            "error": ["type": "api_error", "message": error.message]
+                        ]))
+                        continuation.finish()
+                        return
+                    }
                     let payload = Data(line.dropFirst(dataPrefix.count))
                     guard let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                           !text.isEmpty, text != "[DONE]",
@@ -344,6 +357,9 @@ enum AnthropicToCodexTranslator {
         var completedResponse: [String: Any]?
 
         for await line in lines {
+            if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                return anthropicErrorResponse(statusCode: error.statusCode, message: error.message)
+            }
             guard line.starts(with: dataPrefix) else { continue }
             let payload = Data(line.dropFirst(dataPrefix.count))
             if let text = String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),

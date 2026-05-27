@@ -100,6 +100,7 @@ final class AppContainer {
             let proxyCoordinator = ProxyCoordinator(
                 storeRepository: storeRepository,
                 authRepository: authRepository,
+                chatGPTOAuthLoginService: chatGPTOAuthLoginService,
                 configPath: paths.codexConfigPath
             )
             proxyModel = ProxyPageModel(proxyCoordinator: proxyCoordinator, settingsCoordinator: settingsCoordinator)

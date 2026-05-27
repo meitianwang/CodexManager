@@ -11,8 +11,13 @@ struct CodexUpstreamRequest: Sendable {
     var isStream: Bool
 }
 
+protocol CodexUpstreamClientProtocol: Sendable {
+    func execute(request: CodexUpstreamRequest) async throws -> CodexUpstreamResult
+}
+
 enum CodexUpstreamError: Error, LocalizedError {
     case httpError(statusCode: Int, body: Data)
+    case eventError(statusCode: Int, message: String, body: Data)
     case networkError(Error)
     case invalidResponse
 
@@ -20,6 +25,8 @@ enum CodexUpstreamError: Error, LocalizedError {
         switch self {
         case .httpError(let statusCode, _):
             return "HTTP \(statusCode): \(Self.categoryForStatus(statusCode))"
+        case .eventError(let statusCode, let message, _):
+            return "SSE \(statusCode): \(message)"
         case .networkError(let error):
             return error.localizedDescription
         case .invalidResponse:
@@ -43,6 +50,7 @@ enum CodexUpstreamError: Error, LocalizedError {
     var statusCode: Int {
         switch self {
         case .httpError(let code, _): return code
+        case .eventError(let code, _, _): return code
         case .networkError: return 502
         case .invalidResponse: return 502
         }
@@ -51,8 +59,15 @@ enum CodexUpstreamError: Error, LocalizedError {
     var isRetryable: Bool {
         switch self {
         case .httpError(let code, let body):
+            if code == 401 { return true }
             if code == 429 { return true }
-            if code == 403 { return isModelRestricted(body) || isAuthFailure(body) }
+            if code == 403 { return Self.isModelRestricted(body) || Self.isAuthFailure(body) }
+            if code >= 500 { return true }
+            return false
+        case .eventError(let code, _, let body):
+            if code == 401 { return true }
+            if code == 429 { return true }
+            if code == 403 { return Self.isModelRestricted(body) || Self.isAuthFailure(body) }
             if code >= 500 { return true }
             return false
         case .networkError:
@@ -62,14 +77,155 @@ enum CodexUpstreamError: Error, LocalizedError {
         }
     }
 
-    private func isModelRestricted(_ body: Data) -> Bool {
+    var isAuthenticationFailure: Bool {
+        switch self {
+        case .httpError(let code, let body), .eventError(let code, _, let body):
+            return code == 401 || Self.isAuthFailure(body)
+        case .networkError, .invalidResponse:
+            return false
+        }
+    }
+
+    var isRateLimited: Bool {
+        switch self {
+        case .httpError(let code, _), .eventError(let code, _, _):
+            return code == 429
+        case .networkError, .invalidResponse:
+            return false
+        }
+    }
+
+    var isModelRestriction: Bool {
+        switch self {
+        case .httpError(let code, let body), .eventError(let code, _, let body):
+            return code == 403 && Self.isModelRestricted(body)
+        case .networkError, .invalidResponse:
+            return false
+        }
+    }
+
+    private static func isModelRestricted(_ body: Data) -> Bool {
         let text = String(data: body.prefix(1024), encoding: .utf8) ?? ""
         return text.contains("model_restricted") || text.contains("model_not_found")
     }
 
-    private func isAuthFailure(_ body: Data) -> Bool {
+    private static func isAuthFailure(_ body: Data) -> Bool {
         let text = String(data: body.prefix(1024), encoding: .utf8) ?? ""
         return text.contains("authentication") || text.contains("unauthorized") || text.contains("invalid_api_key")
+    }
+}
+
+struct CodexUpstreamSSEError: Sendable {
+    var statusCode: Int
+    var message: String
+    var body: Data
+}
+
+enum CodexUpstreamSSEInspector {
+    private static let dataPrefix = Data("data: ".utf8)
+
+    static func event(fromSSELine line: Data) -> (type: String, object: [String: Any], rawText: String)? {
+        guard line.starts(with: dataPrefix) else { return nil }
+        let payload = Data(line.dropFirst(dataPrefix.count))
+        guard let text = String(data: payload, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !text.isEmpty,
+            let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+            let type = object["type"] as? String else {
+            return nil
+        }
+        return (type, object, text)
+    }
+
+    static func error(fromSSELine line: Data) -> CodexUpstreamSSEError? {
+        guard let event = event(fromSSELine: line) else { return nil }
+        let errorObject: [String: Any]?
+        switch event.type {
+        case "response.error":
+            errorObject = event.object["error"] as? [String: Any]
+        case "response.failed":
+            if let response = event.object["response"] as? [String: Any] {
+                errorObject = response["error"] as? [String: Any]
+            } else {
+                errorObject = event.object["error"] as? [String: Any]
+            }
+        default:
+            return nil
+        }
+
+        let message = normalizedErrorMessage(errorObject: errorObject, fallback: event.type)
+        let statusCode = statusCode(errorObject: errorObject, message: message)
+        return CodexUpstreamSSEError(
+            statusCode: statusCode,
+            message: message,
+            body: Data(event.rawText.utf8)
+        )
+    }
+
+    static func isReadyForClient(fromSSELine line: Data) -> Bool {
+        guard let event = event(fromSSELine: line) else { return false }
+        switch event.type {
+        case "response.output_text.delta",
+             "response.reasoning_summary_text.delta",
+             "response.output_item.added",
+             "response.function_call_arguments.delta",
+             "response.completed":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func normalizedErrorMessage(errorObject: [String: Any]?, fallback: String) -> String {
+        let candidates = [
+            errorObject?["message"] as? String,
+            errorObject?["code"] as? String,
+            errorObject?["type"] as? String
+        ]
+        for candidate in candidates {
+            if let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return fallback
+    }
+
+    private static func statusCode(errorObject: [String: Any]?, message: String) -> Int {
+        if let status = errorObject?["status"] as? Int {
+            return status
+        }
+        if let statusCode = errorObject?["status_code"] as? Int {
+            return statusCode
+        }
+
+        let text = [
+            message,
+            errorObject?["code"] as? String,
+            errorObject?["type"] as? String
+        ]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+
+        if text.contains("quota")
+            || text.contains("rate")
+            || text.contains("limit")
+            || text.contains("too_many_requests") {
+            return 429
+        }
+        if text.contains("auth")
+            || text.contains("unauthorized")
+            || text.contains("invalid_api_key") {
+            return 401
+        }
+        if text.contains("model_restricted")
+            || text.contains("model_not_found")
+            || text.contains("permission")
+            || text.contains("forbidden") {
+            return 403
+        }
+        return 502
     }
 }
 
@@ -84,7 +240,7 @@ enum CodexUpstreamIdentity {
     static let originator = "codex_cli_rs"
 }
 
-final class CodexUpstreamClient: Sendable {
+final class CodexUpstreamClient: CodexUpstreamClientProtocol, Sendable {
     private static let maxResponseBytes = 50 * 1024 * 1024 // 50MB
 
     private let session: URLSession

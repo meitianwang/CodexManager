@@ -11,26 +11,44 @@ actor ProxyCoordinator {
         "https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json",
     ]
 
+    private enum RetryPolicy {
+        static let shortCooldownSeconds: Int64 = 15
+        static let accountCooldownSeconds: Int64 = 60
+        static let authCooldownSeconds: Int64 = 5 * 60
+        static let maxPreflightLines = 128
+        static let maxPreflightBytes = 64 * 1024
+    }
+
     private let storeRepository: AccountsStoreRepository
     private let authRepository: AuthRepository
+    private let chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol?
     private let configPath: URL
+    private let dateProvider: DateProviding
 
     private var server: ProxyHTTPServer?
-    private var upstreamClient = CodexUpstreamClient()
-    private var roundRobinIndex = 0
+    private var upstreamClient: CodexUpstreamClientProtocol
+    private var accountCooldowns: [String: Int64] = [:]
+    private var accountModelCooldowns: [String: Int64] = [:]
     /// Random API key generated at each start — clients must send `Authorization: Bearer <key>`.
     private(set) var currentAPIKey: String?
     /// Dynamically fetched model IDs; nil until first fetch completes.
     private(set) var fetchedModels: [String]?
+    private var fetchedModelIDsByPlanKey: [String: Set<String>]?
 
     init(
         storeRepository: AccountsStoreRepository,
         authRepository: AuthRepository,
-        configPath: URL
+        chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol? = nil,
+        configPath: URL,
+        dateProvider: DateProviding = SystemDateProvider(),
+        upstreamClient: CodexUpstreamClientProtocol = CodexUpstreamClient()
     ) {
         self.storeRepository = storeRepository
         self.authRepository = authRepository
+        self.chatGPTOAuthLoginService = chatGPTOAuthLoginService
         self.configPath = configPath
+        self.dateProvider = dateProvider
+        self.upstreamClient = upstreamClient
     }
 
     // MARK: - Lifecycle
@@ -139,10 +157,11 @@ actor ProxyCoordinator {
 
         for url in Self.remoteModelsURLs {
             do {
-                let models = try await Self.fetchModels(from: url, planKeys: planKeys)
-                if !models.isEmpty {
-                    fetchedModels = models
-                    proxyLogger.info("Fetched \(models.count) models from \(url, privacy: .public)")
+                let catalog = try await Self.fetchModels(from: url, planKeys: planKeys)
+                if !catalog.ids.isEmpty {
+                    fetchedModels = catalog.ids
+                    fetchedModelIDsByPlanKey = catalog.idsByPlanKey
+                    proxyLogger.info("Fetched \(catalog.ids.count) models from \(url, privacy: .public)")
                     return
                 }
             } catch {
@@ -168,26 +187,40 @@ actor ProxyCoordinator {
         return keys
     }
 
-    private static func fetchModels(from urlString: String, planKeys: Set<String>) async throws -> [String] {
-        guard let url = URL(string: urlString) else { return [] }
+    private struct FetchedModelCatalog {
+        var ids: [String]
+        var idsByPlanKey: [String: Set<String>]
+    }
+
+    private static func fetchModels(from urlString: String, planKeys: Set<String>) async throws -> FetchedModelCatalog {
+        guard let url = URL(string: urlString) else {
+            return FetchedModelCatalog(ids: [], idsByPlanKey: [:])
+        }
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 15
         let session = URLSession(configuration: config)
         let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return [] }
-        guard let catalog = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            return FetchedModelCatalog(ids: [], idsByPlanKey: [:])
+        }
+        guard let catalog = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return FetchedModelCatalog(ids: [], idsByPlanKey: [:])
+        }
 
         var seen = Set<String>()
         var result: [String] = []
+        var idsByPlanKey: [String: Set<String>] = [:]
         for key in planKeys {
             guard let entries = catalog[key] as? [[String: Any]] else { continue }
             for entry in entries {
-                if let id = entry["id"] as? String, seen.insert(id).inserted {
+                guard let id = entry["id"] as? String else { continue }
+                idsByPlanKey[key, default: []].insert(id)
+                if seen.insert(id).inserted {
                     result.append(id)
                 }
             }
         }
-        return result
+        return FetchedModelCatalog(ids: result, idsByPlanKey: idsByPlanKey)
     }
 
     // MARK: - /v1/chat/completions
@@ -367,8 +400,14 @@ actor ProxyCoordinator {
         isStream: Bool,
         transform: @escaping (UpstreamSuccessResult) async -> ProxyHTTPResponse
     ) async -> ProxyHTTPResponse {
-        let accounts = loadAvailableAccounts()
-        guard !accounts.isEmpty else {
+        let accountSelection = loadAvailableAccounts(model: model)
+        guard !accountSelection.accounts.isEmpty else {
+            if accountSelection.hasStoredAccounts {
+                return .complete(corsResponse(HTTPResponse.json(
+                    statusCode: 429,
+                    object: Self.errorJSON(accountSelection.unavailableSummary)
+                )))
+            }
             return .complete(corsResponse(HTTPResponse.json(
                 statusCode: 503,
                 object: Self.errorJSON(L10n.tr("error.proxy_runtime.no_accounts_available"))
@@ -392,38 +431,26 @@ actor ProxyCoordinator {
         }
 
         var failures: [String] = []
-        let maxAttempts = min(accounts.count, 3)
 
-        for attempt in 0..<maxAttempts {
-            let accountIndex = (roundRobinIndex + attempt) % accounts.count
-            let account = accounts[accountIndex]
-
-            let request = CodexUpstreamRequest(
+        for account in accountSelection.accounts {
+            let request = makeUpstreamRequest(
                 url: upstreamURL,
-                body: bodyData,
-                accessToken: account.accessToken,
-                accountID: account.accountID,
-                isStream: true // always stream from upstream
+                bodyData: bodyData,
+                account: account
             )
 
-            do {
-                let result = try await upstreamClient.execute(request: request)
-                roundRobinIndex = (accountIndex + 1) % accounts.count
+            let attemptResult = await executeUpstreamRequest(
+                request,
+                account: account,
+                model: model
+            )
 
-                switch result {
-                case .stream(_, let lines, _):
-                    return await transform(.streaming(lines))
-                case .complete(_, let data, _):
-                    return await transform(.complete(data))
-                }
-            } catch let error as CodexUpstreamError {
+            switch attemptResult {
+            case .success(let result):
+                return await transform(result)
+            case .failure(let error):
                 let label = account.label
-                let bodySnippet: String
-                if case .httpError(_, let body) = error {
-                    bodySnippet = String(data: body.prefix(1024), encoding: .utf8) ?? "(non-utf8)"
-                } else {
-                    bodySnippet = ""
-                }
+                let bodySnippet = bodySnippet(from: error)
                 proxyLogger.warning("Upstream failed for \(label, privacy: .public): \(error.localizedDescription, privacy: .public) body=\(bodySnippet, privacy: .public)")
                 failures.append("\(label): \(error.localizedDescription)")
 
@@ -433,41 +460,386 @@ actor ProxyCoordinator {
                         object: Self.errorJSON(error.localizedDescription)
                     )))
                 }
-            } catch {
-                failures.append(error.localizedDescription)
             }
         }
 
-        let summary = failures.joined(separator: "; ")
+        let summary = (failures + accountSelection.unavailableReasons).joined(separator: "; ")
         return .complete(corsResponse(HTTPResponse.json(
             statusCode: 502,
             object: Self.errorJSON(L10n.tr("error.proxy_runtime.upstream_failed_format", summary))
         )))
     }
 
-    // MARK: - Account Loading
-
-    private struct ProxyAccount {
-        var label: String
-        var accessToken: String
-        var accountID: String
+    private func makeUpstreamRequest(
+        url: URL,
+        bodyData: Data,
+        account: ProxyAccount
+    ) -> CodexUpstreamRequest {
+        CodexUpstreamRequest(
+            url: url,
+            body: bodyData,
+            accessToken: account.accessToken,
+            accountID: account.accountID,
+            isStream: true // always stream from upstream
+        )
     }
 
-    private func loadAvailableAccounts() -> [ProxyAccount] {
+    private func executeUpstreamRequest(
+        _ request: CodexUpstreamRequest,
+        account: ProxyAccount,
+        model: String
+    ) async -> Result<UpstreamSuccessResult, CodexUpstreamError> {
+        do {
+            let result = try await upstreamClient.execute(request: request)
+            return .success(try await preflight(result))
+        } catch let error as CodexUpstreamError {
+            if error.isAuthenticationFailure,
+               let repairedAccount = await refreshProxyAccountAuth(account) {
+                let repairedRequest = makeUpstreamRequest(
+                    url: request.url,
+                    bodyData: request.body,
+                    account: repairedAccount
+                )
+                do {
+                    let result = try await upstreamClient.execute(request: repairedRequest)
+                    return .success(try await preflight(result))
+                } catch let repairedError as CodexUpstreamError {
+                    recordCooldown(for: repairedAccount, model: model, error: repairedError)
+                    return .failure(repairedError)
+                } catch {
+                    let networkError = CodexUpstreamError.networkError(error)
+                    recordCooldown(for: repairedAccount, model: model, error: networkError)
+                    return .failure(networkError)
+                }
+            }
+
+            recordCooldown(for: account, model: model, error: error)
+            return .failure(error)
+        } catch {
+            let networkError = CodexUpstreamError.networkError(error)
+            recordCooldown(for: account, model: model, error: networkError)
+            return .failure(networkError)
+        }
+    }
+
+    private func preflight(_ result: CodexUpstreamResult) async throws -> UpstreamSuccessResult {
+        switch result {
+        case .stream(_, let lines, _):
+            return .streaming(try await preflightStreamingLines(lines))
+        case .complete(_, let data, _):
+            if let error = Self.firstSSEError(in: data) {
+                throw CodexUpstreamError.eventError(
+                    statusCode: error.statusCode,
+                    message: error.message,
+                    body: error.body
+                )
+            }
+            return .complete(data)
+        }
+    }
+
+    private func preflightStreamingLines(_ lines: AsyncStream<Data>) async throws -> AsyncStream<Data> {
+        let gate = SSEPreflightGate()
+        let replayed = AsyncStream<Data> { continuation in
+            let task = Task {
+                var buffered: [Data] = []
+                var bufferedBytes = 0
+                var didPassPreflight = false
+
+                for await line in lines {
+                    if !didPassPreflight {
+                        buffered.append(line)
+                        bufferedBytes += line.count
+
+                        if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                            await gate.fail(CodexUpstreamError.eventError(
+                                statusCode: error.statusCode,
+                                message: error.message,
+                                body: error.body
+                            ))
+                            continuation.finish()
+                            return
+                        }
+
+                        if CodexUpstreamSSEInspector.isReadyForClient(fromSSELine: line)
+                            || buffered.count >= RetryPolicy.maxPreflightLines
+                            || bufferedBytes >= RetryPolicy.maxPreflightBytes {
+                            didPassPreflight = true
+                            await gate.succeed()
+                            for bufferedLine in buffered {
+                                continuation.yield(bufferedLine)
+                            }
+                            buffered.removeAll(keepingCapacity: false)
+                        }
+                        continue
+                    }
+
+                    continuation.yield(line)
+                }
+
+                if !didPassPreflight {
+                    await gate.succeed()
+                    for bufferedLine in buffered {
+                        continuation.yield(bufferedLine)
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+        try await gate.wait()
+        return replayed
+    }
+
+    private static func firstSSEError(in data: Data) -> CodexUpstreamSSEError? {
+        for line in data.split(separator: UInt8(ascii: "\n")) {
+            if let error = CodexUpstreamSSEInspector.error(fromSSELine: Data(line)) {
+                return error
+            }
+        }
+        return nil
+    }
+
+    private func recordCooldown(for account: ProxyAccount, model: String, error: CodexUpstreamError) {
+        let now = dateProvider.unixSecondsNow()
+        if error.isAuthenticationFailure {
+            accountCooldowns[account.accountKey] = now + RetryPolicy.authCooldownSeconds
+            return
+        }
+        if error.isRateLimited {
+            accountCooldowns[account.accountKey] = quotaRetryCooldown(for: account, now: now)
+            return
+        }
+        if error.isModelRestriction {
+            setAccountModelCooldown(
+                accountKey: account.accountKey,
+                model: model,
+                until: now + RetryPolicy.authCooldownSeconds
+            )
+            return
+        }
+        if error.isRetryable {
+            accountCooldowns[account.accountKey] = now + RetryPolicy.shortCooldownSeconds
+        }
+    }
+
+    private func bodySnippet(from error: CodexUpstreamError) -> String {
+        let body: Data
+        switch error {
+        case .httpError(_, let errorBody), .eventError(_, _, let errorBody):
+            body = errorBody
+        case .networkError, .invalidResponse:
+            return ""
+        }
+        return String(data: body.prefix(1024), encoding: .utf8) ?? "(non-utf8)"
+    }
+
+    // MARK: - Account Loading
+
+    private struct AccountSelection {
+        var accounts: [ProxyAccount]
+        var hasStoredAccounts: Bool
+        var unavailableReasons: [String]
+
+        var unavailableSummary: String {
+            let summary = unavailableReasons.isEmpty
+                ? L10n.tr("error.proxy_runtime.no_accounts_available")
+                : unavailableReasons.joined(separator: "; ")
+            return L10n.tr("error.proxy_runtime.all_accounts_unavailable_with_summary_format", summary)
+        }
+    }
+
+    private struct ProxyAccount {
+        var id: String
+        var label: String
+        var accessToken: String
+        var refreshToken: String?
+        var accountID: String
+        var accountKey: String
+        var authJSON: JSONValue
+        var effectivePlanType: String
+        var usage: UsageSnapshot?
+        var addedAt: Int64
+    }
+
+    private func loadAvailableAccounts(model: String) -> AccountSelection {
         guard let store = try? storeRepository.loadStore() else {
-            return []
+            return AccountSelection(accounts: [], hasStoredAccounts: false, unavailableReasons: [])
         }
 
-        return store.accounts.compactMap { account in
-            guard let extracted = try? authRepository.extractAuth(from: account.authJSON) else {
+        let now = dateProvider.unixSecondsNow()
+        expireCooldowns(now: now)
+
+        var unavailableReasons: [String] = []
+        let accounts = store.accounts.compactMap { account -> ProxyAccount? in
+            let accountKey = account.accountKey
+            if let resetAt = exhaustedQuotaResetTime(for: account.usage, now: now) {
+                accountCooldowns[accountKey] = resetAt
+                unavailableReasons.append("\(account.label): quota resets \(formatResetTime(resetAt))")
                 return nil
             }
-            return ProxyAccount(
-                label: account.label,
-                accessToken: extracted.accessToken,
-                accountID: extracted.accountID
-            )
+            if let cooldownUntil = accountCooldowns[accountKey], cooldownUntil > now {
+                unavailableReasons.append("\(account.label): cooling down until \(formatResetTime(cooldownUntil))")
+                return nil
+            }
+            if let modelCooldownUntil = accountModelCooldown(accountKey: accountKey, model: model),
+               modelCooldownUntil > now {
+                unavailableReasons.append("\(account.label): model \(model) cooling down until \(formatResetTime(modelCooldownUntil))")
+                return nil
+            }
+            guard modelIsSupported(model, by: account) else {
+                unavailableReasons.append("\(account.label): model \(model) unavailable for \(account.effectivePlanType)")
+                return nil
+            }
+            guard let extracted = try? authRepository.extractAuth(from: account.authJSON) else {
+                unavailableReasons.append("\(account.label): auth unavailable")
+                return nil
+            }
+            return makeProxyAccount(account, extracted: extracted)
         }
+        return AccountSelection(
+            accounts: sortProxyAccountsByAvailability(accounts),
+            hasStoredAccounts: !store.accounts.isEmpty,
+            unavailableReasons: unavailableReasons
+        )
+    }
+
+    private func sortProxyAccountsByAvailability(_ accounts: [ProxyAccount]) -> [ProxyAccount] {
+        accounts.sorted { left, right in
+            let leftScore = remainingScore(for: left.usage)
+            let rightScore = remainingScore(for: right.usage)
+            if leftScore != rightScore {
+                return leftScore > rightScore
+            }
+            return left.addedAt < right.addedAt
+        }
+    }
+
+    private func remainingScore(for usage: UsageSnapshot?) -> Double {
+        let oneWeekUsed = usage?.oneWeek?.usedPercent ?? 100
+        let fiveHourUsed = usage?.fiveHour?.usedPercent ?? 100
+        return max(0, 100 - oneWeekUsed) * 0.7 + max(0, 100 - fiveHourUsed) * 0.3
+    }
+
+    private func modelIsSupported(_ model: String, by account: StoredAccount) -> Bool {
+        guard let fetchedModelIDsByPlanKey, !fetchedModelIDsByPlanKey.isEmpty else {
+            return true
+        }
+        let planKey = Self.planKey(for: account.effectivePlanType)
+        return fetchedModelIDsByPlanKey[planKey]?.contains(model) == true
+    }
+
+    private static func planKey(for plan: String) -> String {
+        switch plan {
+        case "free": return "codex-free"
+        case "plus": return "codex-plus"
+        case "pro", "prolite", "pro_lite": return "codex-pro"
+        default: return "codex-team"
+        }
+    }
+
+    private func exhaustedQuotaResetTime(for usage: UsageSnapshot?, now: Int64) -> Int64? {
+        guard let usage else { return nil }
+        let exhaustedWindows = [usage.fiveHour, usage.oneWeek].compactMap { $0 }.filter {
+            $0.usedPercent >= 100
+        }
+        guard !exhaustedWindows.isEmpty else { return nil }
+
+        let futureResetTimes = exhaustedWindows.compactMap(\.resetAt).filter { $0 > now }
+        if let resetAt = futureResetTimes.max() {
+            return resetAt
+        }
+
+        let hasUnknownFuture = exhaustedWindows.contains { $0.resetAt == nil }
+        return hasUnknownFuture ? now + RetryPolicy.shortCooldownSeconds : nil
+    }
+
+    private func quotaRetryCooldown(for account: ProxyAccount, now: Int64) -> Int64 {
+        exhaustedQuotaResetTime(for: account.usage, now: now) ?? now + RetryPolicy.accountCooldownSeconds
+    }
+
+    private func expireCooldowns(now: Int64) {
+        accountCooldowns = accountCooldowns.filter { $0.value > now }
+        accountModelCooldowns = accountModelCooldowns.filter { $0.value > now }
+    }
+
+    private func accountModelCooldown(accountKey: String, model: String) -> Int64? {
+        accountModelCooldowns["\(accountKey)|\(model)"]
+    }
+
+    private func setAccountModelCooldown(accountKey: String, model: String, until: Int64) {
+        accountModelCooldowns["\(accountKey)|\(model)"] = until
+    }
+
+    private func formatResetTime(_ timestamp: Int64) -> String {
+        ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: TimeInterval(timestamp)))
+    }
+
+    private func refreshProxyAccountAuth(_ account: ProxyAccount) async -> ProxyAccount? {
+        guard let chatGPTOAuthLoginService,
+              let refreshToken = account.refreshToken else {
+            return nil
+        }
+
+        do {
+            let tokens = try await chatGPTOAuthLoginService.refreshChatGPTTokens(refreshToken: refreshToken)
+            let authJSON = try authRepository.replacingChatGPTTokens(in: account.authJSON, with: tokens)
+            let extracted = try authRepository.extractAuth(from: authJSON)
+            guard AccountIdentity.normalizedAccountID(extracted.accountID) == AccountIdentity.normalizedAccountID(account.accountID) else {
+                return nil
+            }
+
+            var store = try storeRepository.loadStore()
+            guard let index = store.accounts.firstIndex(where: { $0.id == account.id }) else {
+                return nil
+            }
+
+            var stored = store.accounts[index]
+            stored.authJSON = authJSON
+            stored.accountID = extracted.accountID
+            stored.email = extracted.email ?? stored.email
+            stored.principalID = extracted.principalID
+            stored.planType = AccountPlanResolver.preferredPlanType(
+                planType: extracted.planType,
+                usagePlanType: stored.usage?.planType,
+                fallback: stored.planType
+            )
+            if let teamName = extracted.teamName?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !teamName.isEmpty {
+                stored.teamName = teamName
+            }
+            stored.updatedAt = dateProvider.unixSecondsNow()
+            store.accounts[index] = stored
+            try storeRepository.saveStore(store)
+
+            if authRepository.currentAuthAccountKey() == account.accountKey {
+                do {
+                    try authRepository.writeCurrentAuth(authJSON)
+                } catch {
+                    proxyLogger.warning("Failed to update current auth after proxy token refresh: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+
+            return makeProxyAccount(stored, extracted: extracted)
+        } catch {
+            proxyLogger.warning("Failed to refresh proxy auth for \(account.label, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    private func makeProxyAccount(_ account: StoredAccount, extracted: ExtractedAuth) -> ProxyAccount {
+        ProxyAccount(
+            id: account.id,
+            label: account.label,
+            accessToken: extracted.accessToken,
+            refreshToken: AuthTokenPlanInspector.refreshToken(in: account.authJSON),
+            accountID: extracted.accountID,
+            accountKey: account.accountKey,
+            authJSON: account.authJSON,
+            effectivePlanType: account.effectivePlanType,
+            usage: account.usage,
+            addedAt: account.addedAt
+        )
     }
 
     // MARK: - Helpers
@@ -485,6 +857,12 @@ actor ProxyCoordinator {
         var completedPayload: Data?
 
         for await line in lines {
+            if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
+                return HTTPResponse.json(
+                    statusCode: error.statusCode,
+                    object: errorJSON(error.message)
+                )
+            }
             guard line.starts(with: dataPrefix) else { continue }
             let payload = line.dropFirst(dataPrefix.count)
             if let text = String(data: Data(payload), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -534,5 +912,35 @@ actor ProxyCoordinator {
             "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key, anthropic-version",
             "Access-Control-Max-Age": "86400"
         ]
+    }
+}
+
+private actor SSEPreflightGate {
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var result: Result<Void, Error>?
+
+    func wait() async throws {
+        if let result {
+            return try result.get()
+        }
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func succeed() {
+        finish(.success(()))
+    }
+
+    func fail(_ error: Error) {
+        finish(.failure(error))
+    }
+
+    private func finish(_ result: Result<Void, Error>) {
+        guard self.result == nil else { return }
+        self.result = result
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(with: result)
     }
 }
