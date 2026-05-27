@@ -5,16 +5,23 @@ final class AccountsActionPresentationTests: XCTestCase {
     func testDesktopButtonsReflectBusyState() {
         let buttons = AccountsActionPresentation.desktopButtons(
             isImporting: true,
+            isFileImporting: false,
+            isExporting: false,
             isAdding: false,
             switchingAccountID: nil,
             canRefreshUsage: true,
             isRefreshSpinnerActive: false
         )
 
-        XCTAssertEqual(buttons.map(\.intent), [.importCurrentAuth, .addAccount, .smartSwitch, .refreshUsage])
-        XCTAssertEqual(buttons.first?.title, L10n.tr("accounts.action.importing"))
-        XCTAssertFalse(buttons.first?.isEnabled ?? true)
+        XCTAssertEqual(
+            buttons.map(\.intent),
+            [.exportAccountsBackup, .importAccountsBackup, .importCurrentAuth, .addAccount, .smartSwitch, .refreshUsage]
+        )
+        XCTAssertEqual(buttons[2].title, L10n.tr("accounts.action.importing"))
+        XCTAssertFalse(buttons[0].isEnabled)
         XCTAssertFalse(buttons[1].isEnabled)
+        XCTAssertFalse(buttons[2].isEnabled)
+        XCTAssertFalse(buttons[3].isEnabled)
     }
 
     func testTrailingToolbarButtonsReflectCollapseStateAndSpinner() {

@@ -48,6 +48,7 @@ extension AccountsPageModel {
             let accounts = try await coordinator.refreshUsage(
                 accountIDs: [id],
                 force: true,
+                allowInteractiveAuthRepair: true,
                 onPartialUpdate: { [weak self] accounts in
                     guard let self else { return }
                     await MainActor.run {

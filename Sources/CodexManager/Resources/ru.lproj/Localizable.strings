@@ -16,6 +16,9 @@
 "common.install" = "Установить";
 "common.none" = "Нет";
 "common.quit" = "Выйти";
+"common.cancel" = "Cancel";
+"common.select_all" = "Select all";
+"common.deselect_all" = "Deselect all";
 
 "settings.section.general" = "Общие";
 "settings.launch_at_startup" = "Запускать при входе";
@@ -64,6 +67,9 @@
 
 "accounts.action.smart_switch" = "Умное переключение";
 "accounts.action.import_current_auth" = "Импортировать текущую auth";
+"accounts.action.import_backup" = "Import file";
+"accounts.action.export_accounts" = "Export accounts";
+"accounts.action.exporting" = "Exporting...";
 "accounts.action.importing" = "Импорт...";
 "accounts.action.add_account" = "Добавить аккаунт";
 "accounts.action.waiting_for_login" = "Ожидание входа...";
@@ -71,6 +77,11 @@
 "accounts.action.quick_actions" = "Быстрые действия";
 "accounts.action.collapse_all" = "Свернуть все карточки";
 "accounts.action.expand_all" = "Развернуть все карточки";
+"accounts.transfer.export.title" = "Choose accounts to export";
+"accounts.transfer.import.title" = "Choose accounts to import";
+"accounts.transfer.account_count_format" = "%@ accounts";
+"accounts.transfer.export.action" = "Export";
+"accounts.transfer.import.action" = "Import";
 "accounts.empty.title" = "Нет аккаунтов";
 "accounts.empty.message.no_accounts" = "Аккаунтов пока нет. Добавьте или импортируйте аккаунт, чтобы начать.";
 "accounts.empty.message.enable_icloud" = "Сначала включите iCloud в системных настройках. Синхронизированные аккаунты появятся здесь автоматически.";
@@ -89,6 +100,8 @@
 "accounts.compact.used" = "ИСПОЛЬЗОВАНО";
 "accounts.notice.imported_format" = "Аккаунт импортирован: %@";
 "accounts.notice.imported_new_format" = "Новый аккаунт импортирован: %@";
+"accounts.notice.exported_format" = "%@ accounts exported";
+"accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Использование обновлено";
 "accounts.notice.accounts_refreshed" = "Аккаунты обновлены";
 "accounts.notice.account_deleted" = "Аккаунт удален";
@@ -130,6 +143,11 @@
 "error.accounts.account_not_found_for_update" = "Target account for update was not found";
 "error.accounts.account_not_found_for_switch" = "Target account for switch was not found";
 "error.accounts.add_account_timeout" = "Timed out waiting for browser sign-in to complete. Try again.";
+"error.accounts.no_accounts_selected" = "Select at least one account";
+"error.accounts.export_package_empty" = "No accounts available to export";
+"error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
+"error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
+"error.accounts.import_file_empty" = "The import file does not contain accounts";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

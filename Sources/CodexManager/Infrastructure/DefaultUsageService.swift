@@ -45,10 +45,22 @@ private enum RequestPolicy {
             return mapPayload(payload)
         } catch EndpointRequestError.allRequestsFailed(let errors) {
             let preview = errors.prefix(2).joined(separator: " | ")
+            let message: String
             if errors.count > 2 {
-                throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
+                message = L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2))
+            } else {
+                message = L10n.tr("error.usage.request_failed_format", preview)
             }
-            throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
+            if Self.containsUnauthorizedResponse(errors) {
+                throw AppError.unauthorized(message)
+            }
+            throw AppError.network(message)
+        }
+    }
+
+    private static func containsUnauthorizedResponse(_ failures: [String]) -> Bool {
+        failures.contains { failure in
+            failure.contains("-> 401:")
         }
     }
 

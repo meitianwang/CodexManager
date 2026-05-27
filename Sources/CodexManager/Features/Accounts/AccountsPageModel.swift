@@ -26,10 +26,13 @@ final class AccountsPageModel: ObservableObject {
     @Published var isManualRefreshing = false
     @Published var isRemoteUsageRefreshing = false
     @Published var isImporting = false
+    @Published var isFileImporting = false
+    @Published var isExporting = false
     @Published var isAdding = false
     @Published var switchingAccountID: String?
     @Published var refreshingAccountIDs: Set<String> = []
     @Published var collapsedAccountIDs: Set<String> = []
+    @Published var importDraft: AccountsImportDraft?
 
     init(
         coordinator: AccountsCoordinator,
@@ -76,6 +79,11 @@ final class AccountsPageModel: ObservableObject {
         isManualRefreshing || isRemoteUsageRefreshing || !refreshingAccountIDs.isEmpty
     }
 
+    var exportSelectableAccounts: [AccountTransferSelectableItem] {
+        guard case .content(let accounts) = state else { return [] }
+        return accounts.map(AccountTransferSelectableItem.init)
+    }
+
     var isRefreshSpinnerActive: Bool {
         isManualRefreshing
     }
@@ -83,6 +91,8 @@ final class AccountsPageModel: ObservableObject {
     var desktopActionButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
         AccountsActionPresentation.desktopButtons(
             isImporting: isImporting,
+            isFileImporting: isFileImporting,
+            isExporting: isExporting,
             isAdding: isAdding,
             switchingAccountID: switchingAccountID,
             canRefreshUsage: canRefreshUsageAction,
@@ -131,6 +141,8 @@ final class AccountsPageModel: ObservableObject {
         switch intent {
         case .importCurrentAuth:
             await importCurrentAuth()
+        case .importAccountsBackup, .exportAccountsBackup:
+            break
         case .addAccount:
             await addAccountViaLogin()
         case .smartSwitch:

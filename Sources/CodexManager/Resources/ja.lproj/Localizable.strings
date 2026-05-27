@@ -16,6 +16,9 @@
 "common.install" = "インストール";
 "common.none" = "なし";
 "common.quit" = "終了";
+"common.cancel" = "キャンセル";
+"common.select_all" = "すべて選択";
+"common.deselect_all" = "選択解除";
 
 "settings.section.general" = "一般";
 "settings.launch_at_startup" = "ログイン時に起動";
@@ -64,6 +67,9 @@
 
 "accounts.action.smart_switch" = "スマート切替";
 "accounts.action.import_current_auth" = "現在の認証を取り込む";
+"accounts.action.import_backup" = "ファイルを取り込む";
+"accounts.action.export_accounts" = "アカウントを書き出す";
+"accounts.action.exporting" = "書き出し中...";
 "accounts.action.importing" = "取り込み中...";
 "accounts.action.add_account" = "アカウント追加";
 "accounts.action.waiting_for_login" = "ログイン待機中...";
@@ -71,6 +77,11 @@
 "accounts.action.quick_actions" = "クイック操作";
 "accounts.action.collapse_all" = "全カードを折りたたむ";
 "accounts.action.expand_all" = "全カードを展開";
+"accounts.transfer.export.title" = "書き出すアカウントを選択";
+"accounts.transfer.import.title" = "取り込むアカウントを選択";
+"accounts.transfer.account_count_format" = "%@ アカウント";
+"accounts.transfer.export.action" = "書き出す";
+"accounts.transfer.import.action" = "取り込む";
 "accounts.empty.title" = "アカウントがありません";
 "accounts.empty.message.no_accounts" = "アカウントがありません。追加または取り込みを行ってください。";
 "accounts.empty.message.enable_icloud" = "先にシステム設定で iCloud を有効にしてください。同期されたアカウントがここに自動表示されます。";
@@ -89,6 +100,8 @@
 "accounts.compact.used" = "USED";
 "accounts.notice.imported_format" = "アカウントを取り込みました: %@";
 "accounts.notice.imported_new_format" = "新しいアカウントを取り込みました: %@";
+"accounts.notice.exported_format" = "%@ 個のアカウントを書き出しました";
+"accounts.notice.imported_accounts_format" = "%@ 個を取り込み、%@ 個を更新しました";
 "accounts.notice.usage_refreshed" = "使用量を更新しました";
 "accounts.notice.accounts_refreshed" = "アカウントを更新しました";
 "accounts.notice.account_deleted" = "アカウントを削除しました";
@@ -130,6 +143,11 @@
 "error.accounts.account_not_found_for_update" = "更新対象のアカウントが見つかりません";
 "error.accounts.account_not_found_for_switch" = "切替対象のアカウントが見つかりません";
 "error.accounts.add_account_timeout" = "ブラウザでのサインイン待機がタイムアウトしました。再試行してください。";
+"error.accounts.no_accounts_selected" = "少なくとも 1 つのアカウントを選択してください";
+"error.accounts.export_package_empty" = "書き出せるアカウントがありません";
+"error.accounts.import_file_invalid" = "CodexManager のアカウント書き出しファイルではありません";
+"error.accounts.import_file_unsupported_version_format" = "未対応のアカウント書き出しバージョン: %@";
+"error.accounts.import_file_empty" = "取り込みファイルにアカウントがありません";
 "error.store.read_failed_format" = "アカウント保存データの読み込みに失敗しました: %@";
 "error.store.serialize_failed_format" = "アカウント保存データのシリアライズに失敗しました: %@";
 "error.store.invalid_format_format" = "アカウント保存データの形式が不正です: %@";

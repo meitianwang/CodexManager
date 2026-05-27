@@ -16,6 +16,9 @@
 "common.install" = "安裝";
 "common.none" = "無";
 "common.quit" = "退出";
+"common.cancel" = "Cancel";
+"common.select_all" = "Select all";
+"common.deselect_all" = "Deselect all";
 
 "settings.section.general" = "一般";
 "settings.launch_at_startup" = "開機啟動";
@@ -64,6 +67,9 @@
 
 "accounts.action.smart_switch" = "智慧切換";
 "accounts.action.import_current_auth" = "匯入目前授權";
+"accounts.action.import_backup" = "Import file";
+"accounts.action.export_accounts" = "Export accounts";
+"accounts.action.exporting" = "Exporting...";
 "accounts.action.importing" = "匯入中...";
 "accounts.action.add_account" = "新增帳號";
 "accounts.action.waiting_for_login" = "等待登入完成...";
@@ -71,6 +77,11 @@
 "accounts.action.quick_actions" = "快捷操作";
 "accounts.action.collapse_all" = "收起全部卡片";
 "accounts.action.expand_all" = "展開全部卡片";
+"accounts.transfer.export.title" = "Choose accounts to export";
+"accounts.transfer.import.title" = "Choose accounts to import";
+"accounts.transfer.account_count_format" = "%@ accounts";
+"accounts.transfer.export.action" = "Export";
+"accounts.transfer.import.action" = "Import";
 "accounts.empty.title" = "尚無帳號";
 "accounts.empty.message.no_accounts" = "尚無帳號，請先新增或匯入帳號。";
 "accounts.empty.message.enable_icloud" = "請先在系統設定中開啟 iCloud，已同步的帳號會自動顯示在這裡。";
@@ -89,6 +100,8 @@
 "accounts.compact.used" = "已用";
 "accounts.notice.imported_format" = "已匯入帳號：%@";
 "accounts.notice.imported_new_format" = "已匯入新帳號：%@";
+"accounts.notice.exported_format" = "%@ accounts exported";
+"accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "用量已重新整理";
 "accounts.notice.accounts_refreshed" = "帳號已重新整理";
 "accounts.notice.account_deleted" = "帳號已刪除";
@@ -130,6 +143,11 @@
 "error.accounts.account_not_found_for_update" = "Target account for update was not found";
 "error.accounts.account_not_found_for_switch" = "Target account for switch was not found";
 "error.accounts.add_account_timeout" = "Timed out waiting for browser sign-in to complete. Try again.";
+"error.accounts.no_accounts_selected" = "Select at least one account";
+"error.accounts.export_package_empty" = "No accounts available to export";
+"error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
+"error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
+"error.accounts.import_file_empty" = "The import file does not contain accounts";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

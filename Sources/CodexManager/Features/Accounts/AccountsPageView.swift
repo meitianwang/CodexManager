@@ -1,10 +1,16 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
+    @State private var isExportSelectionPresented = false
+    @State private var isImportFilePickerPresented = false
+    @State private var isExportFilePickerPresented = false
+    @State private var exportDocument = AccountsTransferDocument()
+    @State private var pendingExportAccountCount = 0
 
-    let model: AccountsPageModel
+    @ObservedObject private var model: AccountsPageModel
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
 
@@ -13,7 +19,7 @@ struct AccountsPageView: View {
         currentLocale: AppLocale,
         onSelectLocale: @escaping (AppLocale) -> Void
     ) {
-        self.model = model
+        _model = ObservedObject(wrappedValue: model)
         self.currentLocale = currentLocale
         self.onSelectLocale = onSelectLocale
         let hasResolvedInitialState = model.hasResolvedInitialState
@@ -43,6 +49,65 @@ struct AccountsPageView: View {
         .onChange(of: contentAccountCount) { _, newValue in
             triggerInitialCardEntranceIfNeeded(for: newValue)
         }
+        .sheet(isPresented: $isExportSelectionPresented) {
+            AccountTransferSelectionSheet(
+                title: L10n.tr("accounts.transfer.export.title"),
+                actionTitle: L10n.tr("accounts.transfer.export.action"),
+                accounts: model.exportSelectableAccounts,
+                initiallySelectedIDs: Set(model.exportSelectableAccounts.map(\.id)),
+                onCancel: {
+                    isExportSelectionPresented = false
+                },
+                onConfirm: { selectedIDs in
+                    isExportSelectionPresented = false
+                    Task {
+                        guard let export = await model.makeAccountsExportDocument(selectedAccountIDs: selectedIDs) else {
+                            return
+                        }
+                        exportDocument = export.document
+                        pendingExportAccountCount = export.accountCount
+                        isExportFilePickerPresented = true
+                    }
+                }
+            )
+        }
+        .sheet(item: importDraftBinding) { draft in
+            AccountTransferSelectionSheet(
+                title: L10n.tr("accounts.transfer.import.title"),
+                actionTitle: L10n.tr("accounts.transfer.import.action"),
+                accounts: draft.accounts,
+                initiallySelectedIDs: draft.defaultSelectedIDs,
+                onCancel: {
+                    model.cancelAccountsImportDraft()
+                },
+                onConfirm: { selectedIDs in
+                    Task {
+                        await model.importAccounts(from: draft, selectedAccountIDs: selectedIDs)
+                    }
+                }
+            )
+        }
+        .fileImporter(
+            isPresented: $isImportFilePickerPresented,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                Task { await model.loadAccountsImportDraft(from: url) }
+            case .failure(let error):
+                model.notice = NoticeMessage(style: .error, text: error.localizedDescription)
+            }
+        }
+        .fileExporter(
+            isPresented: $isExportFilePickerPresented,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: "CodexManager-accounts.json"
+        ) { result in
+            model.finishAccountsExport(result: result, accountCount: pendingExportAccountCount)
+        }
     }
 
     private var contentAccountCount: Int? {
@@ -57,7 +122,24 @@ struct AccountsPageView: View {
     }
 
     private func triggerAction(_ intent: AccountsPageActionIntent) {
+        switch intent {
+        case .importAccountsBackup:
+            isImportFilePickerPresented = true
+            return
+        case .exportAccountsBackup:
+            isExportSelectionPresented = true
+            return
+        default:
+            break
+        }
         Task { await model.handlePageAction(intent) }
+    }
+
+    private var importDraftBinding: Binding<AccountsImportDraft?> {
+        Binding(
+            get: { model.importDraft },
+            set: { model.importDraft = $0 }
+        )
     }
 
     private func toggleCollapse() {

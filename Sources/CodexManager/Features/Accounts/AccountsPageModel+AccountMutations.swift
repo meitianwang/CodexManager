@@ -1,6 +1,79 @@
 import Foundation
 
 extension AccountsPageModel {
+    func makeAccountsExportDocument(selectedAccountIDs: Set<String>) async -> (document: AccountsTransferDocument, accountCount: Int)? {
+        isExporting = true
+        defer { isExporting = false }
+
+        do {
+            let data = try await coordinator.encodeAccountsTransferPackage(accountIDs: selectedAccountIDs)
+            return (
+                AccountsTransferDocument(data: data),
+                selectedAccountIDs.count
+            )
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+            return nil
+        }
+    }
+
+    func finishAccountsExport(result: Result<URL, Error>, accountCount: Int) {
+        switch result {
+        case .success:
+            notice = NoticeMessage(
+                style: .success,
+                text: L10n.tr("accounts.notice.exported_format", "\(accountCount)")
+            )
+        case .failure(let error):
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func loadAccountsImportDraft(from url: URL) async {
+        isFileImporting = true
+        defer { isFileImporting = false }
+
+        do {
+            let package = try await coordinator.loadAccountsTransferPackage(from: url)
+            importDraft = AccountsImportDraft(
+                package: package,
+                accounts: package.accounts.map(AccountTransferSelectableItem.init)
+            )
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func importAccounts(from draft: AccountsImportDraft, selectedAccountIDs: Set<String>) async {
+        isFileImporting = true
+        defer { isFileImporting = false }
+
+        do {
+            let result = try await coordinator.importAccountsTransferPackage(
+                draft.package,
+                selectedAccountIDs: selectedAccountIDs
+            )
+            let accounts = try await coordinator.listAccounts()
+            applyAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
+            importDraft = nil
+            notice = NoticeMessage(
+                style: .success,
+                text: L10n.tr(
+                    "accounts.notice.imported_accounts_format",
+                    "\(result.insertedCount)",
+                    "\(result.updatedCount)"
+                )
+            )
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func cancelAccountsImportDraft() {
+        importDraft = nil
+    }
+
     func importCurrentAuth() async {
         isImporting = true
         defer { isImporting = false }

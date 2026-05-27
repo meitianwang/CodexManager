@@ -97,7 +97,14 @@ actor AccountsCoordinator {
     }
 
     private func prepareStoredAccountForSwitch(id: String) async throws -> StoredAccount {
-        let store = try storeRepository.loadStore()
+        var store = try storeRepository.loadStore()
+        if Self.reconcileCurrentAuthSnapshot(
+            in: &store,
+            authRepository: authRepository,
+            now: dateProvider.unixSecondsNow()
+        ) {
+            try storeRepository.saveStore(store)
+        }
         guard let account = store.accounts.first(where: { $0.id == id }) else {
             throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
         }

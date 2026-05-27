@@ -16,6 +16,9 @@
 "common.install" = "Instalar";
 "common.none" = "Ninguno";
 "common.quit" = "Salir";
+"common.cancel" = "Cancel";
+"common.select_all" = "Select all";
+"common.deselect_all" = "Deselect all";
 
 "settings.section.general" = "General";
 "settings.launch_at_startup" = "Abrir al iniciar sesión";
@@ -64,6 +67,9 @@
 
 "accounts.action.smart_switch" = "Cambio inteligente";
 "accounts.action.import_current_auth" = "Importar auth actual";
+"accounts.action.import_backup" = "Import file";
+"accounts.action.export_accounts" = "Export accounts";
+"accounts.action.exporting" = "Exporting...";
 "accounts.action.importing" = "Importando...";
 "accounts.action.add_account" = "Añadir cuenta";
 "accounts.action.waiting_for_login" = "Esperando inicio de sesión...";
@@ -71,6 +77,11 @@
 "accounts.action.quick_actions" = "Acciones rápidas";
 "accounts.action.collapse_all" = "Colapsar todas las tarjetas";
 "accounts.action.expand_all" = "Expandir todas las tarjetas";
+"accounts.transfer.export.title" = "Choose accounts to export";
+"accounts.transfer.import.title" = "Choose accounts to import";
+"accounts.transfer.account_count_format" = "%@ accounts";
+"accounts.transfer.export.action" = "Export";
+"accounts.transfer.import.action" = "Import";
 "accounts.empty.title" = "Sin cuentas";
 "accounts.empty.message.no_accounts" = "Todavía no hay cuentas. Añade o importa una cuenta para comenzar.";
 "accounts.empty.message.enable_icloud" = "Activa iCloud primero en la configuración del sistema. Las cuentas sincronizadas aparecerán aquí automáticamente.";
@@ -89,6 +100,8 @@
 "accounts.compact.used" = "USADO";
 "accounts.notice.imported_format" = "Cuenta importada: %@";
 "accounts.notice.imported_new_format" = "Nueva cuenta importada: %@";
+"accounts.notice.exported_format" = "%@ accounts exported";
+"accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Uso actualizado";
 "accounts.notice.accounts_refreshed" = "Cuentas actualizadas";
 "accounts.notice.account_deleted" = "Cuenta eliminada";
@@ -130,6 +143,11 @@
 "error.accounts.account_not_found_for_update" = "Target account for update was not found";
 "error.accounts.account_not_found_for_switch" = "Target account for switch was not found";
 "error.accounts.add_account_timeout" = "Timed out waiting for browser sign-in to complete. Try again.";
+"error.accounts.no_accounts_selected" = "Select at least one account";
+"error.accounts.export_package_empty" = "No accounts available to export";
+"error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
+"error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
+"error.accounts.import_file_empty" = "The import file does not contain accounts";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

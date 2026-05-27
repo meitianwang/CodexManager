@@ -5,7 +5,7 @@ struct AccountsActionStrip<Intent: Hashable>: View {
     let onTrigger: (Intent) -> Void
 
     var body: some View {
-        HStack(spacing: LayoutRules.listRowSpacing) {
+        FlowLayout(spacing: LayoutRules.listRowSpacing) {
             ForEach(descriptors) { descriptor in
                 AccountsActionBarButton(
                     descriptor: descriptor,

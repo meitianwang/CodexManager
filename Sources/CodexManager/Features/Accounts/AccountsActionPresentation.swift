@@ -2,6 +2,8 @@ import Foundation
 
 enum AccountsPageActionIntent: String, Hashable {
     case importCurrentAuth
+    case importAccountsBackup
+    case exportAccountsBackup
     case addAccount
     case smartSwitch
     case refreshUsage
@@ -42,12 +44,42 @@ struct AccountsCollapsePresentation: Equatable {
 enum AccountsActionPresentation {
     static func desktopButtons(
         isImporting: Bool,
+        isFileImporting: Bool,
+        isExporting: Bool,
         isAdding: Bool,
         switchingAccountID: String?,
         canRefreshUsage: Bool,
         isRefreshSpinnerActive: Bool
     ) -> [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
         [
+            AccountsActionButtonDescriptor(
+                intent: .exportAccountsBackup,
+                title: isExporting
+                    ? L10n.tr("accounts.action.exporting")
+                    : L10n.tr("accounts.action.export_accounts"),
+                systemImage: "square.and.arrow.up",
+                accessibilityLabel: isExporting
+                    ? L10n.tr("accounts.action.exporting")
+                    : L10n.tr("accounts.action.export_accounts"),
+                isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
+                isSpinning: false,
+                contentStyle: .label,
+                surfaceStyle: .prominent
+            ),
+            AccountsActionButtonDescriptor(
+                intent: .importAccountsBackup,
+                title: isFileImporting
+                    ? L10n.tr("accounts.action.importing")
+                    : L10n.tr("accounts.action.import_backup"),
+                systemImage: "tray.and.arrow.down",
+                accessibilityLabel: isFileImporting
+                    ? L10n.tr("accounts.action.importing")
+                    : L10n.tr("accounts.action.import_backup"),
+                isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
+                isSpinning: false,
+                contentStyle: .label,
+                surfaceStyle: .prominent
+            ),
             AccountsActionButtonDescriptor(
                 intent: .importCurrentAuth,
                 title: isImporting
@@ -57,7 +89,7 @@ enum AccountsActionPresentation {
                 accessibilityLabel: isImporting
                     ? L10n.tr("accounts.action.importing")
                     : L10n.tr("accounts.action.import_current_auth"),
-                isEnabled: !isImporting && !isAdding,
+                isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
                 surfaceStyle: .prominent
@@ -71,7 +103,7 @@ enum AccountsActionPresentation {
                 accessibilityLabel: isAdding
                     ? L10n.tr("accounts.action.waiting_for_login")
                     : L10n.tr("accounts.action.add_account"),
-                isEnabled: !isImporting && !isAdding,
+                isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
                 surfaceStyle: .prominent
@@ -81,7 +113,7 @@ enum AccountsActionPresentation {
                 title: L10n.tr("accounts.action.smart_switch"),
                 systemImage: "wand.and.stars",
                 accessibilityLabel: L10n.tr("accounts.action.smart_switch"),
-                isEnabled: !isImporting && !isAdding && switchingAccountID == nil,
+                isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding && switchingAccountID == nil,
                 isSpinning: false,
                 contentStyle: .label,
                 surfaceStyle: .prominent

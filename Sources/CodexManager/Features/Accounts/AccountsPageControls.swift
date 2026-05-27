@@ -21,12 +21,10 @@ struct AccountsActionBarView: View {
                 .accessibilityLabel(Text(presentation.collapse.accessibilityLabel))
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                AccountsActionStrip(
-                    descriptors: presentation.descriptors,
-                    onTrigger: onTriggerAction
-                )
-            }
+            AccountsActionStrip(
+                descriptors: presentation.descriptors,
+                onTrigger: onTriggerAction
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.bottom, 2)
