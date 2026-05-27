@@ -113,13 +113,26 @@ actor ProxyCoordinator {
             return .complete(corsResponse(HTTPResponse.json(statusCode: 200, object: ["status": "ok"])))
 
         case ("GET", "/v1/models"):
-            return .complete(corsResponse(handleModels()))
+            return await handleModels(request)
 
         case ("POST", "/v1/chat/completions"):
             return await handleChatCompletions(request)
 
         case ("POST", "/v1/responses"):
             return await handleResponses(request)
+
+        case ("POST", "/v1/responses/compact"):
+            return await handleCodexJSONPassthrough(request, upstreamPath: "responses/compact")
+
+        case ("POST", "/v1/memories/trace_summarize"):
+            return await handleCodexJSONPassthrough(request, upstreamPath: "memories/trace_summarize")
+
+        case ("POST", "/v1/alpha/search"):
+            return await handleCodexJSONPassthrough(
+                request,
+                upstreamPath: "alpha/search",
+                defaultModel: ""
+            )
 
         case ("POST", "/v1/messages"):
             return await handleMessages(request)
@@ -134,15 +147,34 @@ actor ProxyCoordinator {
 
     // MARK: - /v1/models
 
-    private func handleModels() -> HTTPResponse {
-        let ids = fetchedModels ?? proxyAvailableModels
-        let models = ids.map { id in
-            ["id": id, "object": "model", "owned_by": "openai"] as [String: Any]
+    private func handleModels(_ request: HTTPRequest) async -> ProxyHTTPResponse {
+        let queryItems = Self.modelsQueryItems(from: request)
+        let requestHeaders = Self.forwardableUpstreamHeaders(from: request)
+        return await executeWithRetry(
+            bodyData: Data(),
+            model: "",
+            requestHeaders: requestHeaders,
+            upstreamPath: "models",
+            upstreamMethod: "GET",
+            upstreamQueryItems: queryItems,
+            upstreamStreams: false
+        ) { result in
+            switch result {
+            case .complete(statusCode: let statusCode, data: let data, headers: let headers):
+                let responseHeaders = Self.jsonHeaders(merging: Self.mirroredDownstreamHeaders(from: headers))
+                return .complete(self.corsResponse(HTTPResponse(
+                    statusCode: statusCode,
+                    headers: responseHeaders,
+                    body: data
+                )))
+            case .streaming(statusCode: let statusCode, lines: let lines, headers: let headers):
+                return .streaming(
+                    statusCode: statusCode,
+                    headers: Self.corsHeaders(merging: Self.mirroredDownstreamHeaders(from: headers)),
+                    body: lines
+                )
+            }
         }
-        return HTTPResponse.json(statusCode: 200, object: [
-            "object": "list",
-            "data": models
-        ])
     }
 
     // MARK: - Remote Model Fetching
@@ -257,9 +289,9 @@ actor ProxyCoordinator {
             )))
         }
 
-        return await executeWithRetry(bodyData: bodyData, model: model, isStream: isStream) { result in
+        return await executeWithRetry(bodyData: bodyData, model: model) { result in
             switch result {
-            case .streaming(let lines):
+            case .streaming(statusCode: _, lines: let lines, headers: _):
                 if isStream {
                     let translated = ChatToCodexTranslator.translateStreamingResponse(model: model, lines: lines)
                     return .streaming(statusCode: 200, headers: Self.corsHeaders(), body: translated)
@@ -267,7 +299,7 @@ actor ProxyCoordinator {
                     let response = await ChatToCodexTranslator.collectAndTranslateResponse(model: model, lines: lines)
                     return .complete(self.corsResponse(response))
                 }
-            case .complete(let data):
+            case .complete(statusCode: _, data: let data, headers: _):
                 let response = ChatToCodexTranslator.translateCompleteResponse(model: model, data: data)
                 return .complete(self.corsResponse(response))
             }
@@ -287,36 +319,27 @@ actor ProxyCoordinator {
         let model = json["model"] as? String ?? "gpt-5"
         let isStream = json["stream"] as? Bool ?? true
 
-        // Ensure required fields for codex backend
+        // Preserve Codex-native request bodies. Only fill fields older or generic
+        // clients may omit, and force upstream streaming so retry preflight can work.
         var body = json
-        body["stream"] = true // always stream from upstream
-        body["store"] = false
-        body["parallel_tool_calls"] = true
-        body["include"] = ["reasoning.encrypted_content"]
+        body["stream"] = true
+        if body["store"] == nil {
+            body["store"] = false
+        }
         if body["instructions"] == nil {
             body["instructions"] = ""
         }
-        if body["reasoning"] == nil {
-            body["reasoning"] = ["effort": "medium", "summary": "auto"]
+        if body["tools"] == nil {
+            body["tools"] = [] as [Any]
         }
-        // Convert system role to developer
-        if var inputArray = body["input"] as? [[String: Any]] {
-            for i in inputArray.indices {
-                if (inputArray[i]["role"] as? String) == "system" {
-                    inputArray[i]["role"] = "developer"
-                }
-            }
-            body["input"] = inputArray
+        if body["tool_choice"] == nil {
+            body["tool_choice"] = "auto"
         }
-        // Remove fields not accepted by codex backend
-        for key in ["previous_response_id", "prompt_cache_retention", "safety_identifier",
-                     "max_output_tokens", "max_completion_tokens", "temperature",
-                     "top_p", "context_management", "truncation", "user"] {
-            body.removeValue(forKey: key)
+        if body["parallel_tool_calls"] == nil {
+            body["parallel_tool_calls"] = true
         }
-        // service_tier: only keep if "priority"
-        if (body["service_tier"] as? String) != "priority" {
-            body.removeValue(forKey: "service_tier")
+        if body["include"] == nil {
+            body["include"] = body["reasoning"] == nil ? [] as [Any] : ["reasoning.encrypted_content"]
         }
 
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
@@ -326,23 +349,78 @@ actor ProxyCoordinator {
             )))
         }
 
-        return await executeWithRetry(bodyData: bodyData, model: model, isStream: isStream) { result in
+        let requestHeaders = Self.forwardableUpstreamHeaders(from: request)
+        return await executeWithRetry(
+            bodyData: bodyData,
+            model: model,
+            requestHeaders: requestHeaders,
+            upstreamPath: "responses",
+            upstreamStreams: true
+        ) { result in
             switch result {
-            case .streaming(let lines):
+            case .streaming(statusCode: let statusCode, lines: let lines, headers: let headers):
+                let mirroredHeaders = Self.mirroredDownstreamHeaders(from: headers)
                 if isStream {
                     // Passthrough SSE lines
-                    return .streaming(statusCode: 200, headers: Self.corsHeaders(), body: lines)
+                    return .streaming(
+                        statusCode: statusCode,
+                        headers: Self.corsHeaders(merging: mirroredHeaders),
+                        body: lines
+                    )
                 } else {
                     // Collect and return completed response
-                    let response = await Self.collectCompletedResponse(lines: lines)
+                    let response = await Self.collectCompletedResponse(
+                        lines: lines,
+                        headers: mirroredHeaders
+                    )
                     return .complete(self.corsResponse(response))
                 }
-            case .complete(let data):
+            case .complete(statusCode: let statusCode, data: let data, headers: let headers):
+                let responseHeaders = Self.jsonHeaders(merging: Self.mirroredDownstreamHeaders(from: headers))
                 return .complete(self.corsResponse(HTTPResponse(
-                    statusCode: 200,
-                    headers: ["Content-Type": "application/json; charset=utf-8"],
+                    statusCode: statusCode,
+                    headers: responseHeaders,
                     body: data
                 )))
+            }
+        }
+    }
+
+    private func handleCodexJSONPassthrough(
+        _ request: HTTPRequest,
+        upstreamPath: String,
+        defaultModel: String = "gpt-5"
+    ) async -> ProxyHTTPResponse {
+        guard let json = parseJSONBody(request.body) else {
+            return .complete(corsResponse(HTTPResponse.json(
+                statusCode: 400,
+                object: Self.errorJSON(L10n.tr("error.proxy_runtime.request_body_must_be_object"))
+            )))
+        }
+
+        let model = json["model"] as? String ?? defaultModel
+        let requestHeaders = Self.forwardableUpstreamHeaders(from: request)
+        return await executeWithRetry(
+            bodyData: request.body,
+            model: model,
+            requestHeaders: requestHeaders,
+            upstreamPath: upstreamPath,
+            upstreamStreams: false
+        ) { result in
+            switch result {
+            case .complete(statusCode: let statusCode, data: let data, headers: let headers):
+                let responseHeaders = Self.jsonHeaders(merging: Self.mirroredDownstreamHeaders(from: headers))
+                return .complete(self.corsResponse(HTTPResponse(
+                    statusCode: statusCode,
+                    headers: responseHeaders,
+                    body: data
+                )))
+            case .streaming(statusCode: let statusCode, lines: let lines, headers: let headers):
+                return .streaming(
+                    statusCode: statusCode,
+                    headers: Self.corsHeaders(merging: Self.mirroredDownstreamHeaders(from: headers)),
+                    body: lines
+                )
             }
         }
     }
@@ -368,9 +446,9 @@ actor ProxyCoordinator {
             ))
         }
 
-        return await executeWithRetry(bodyData: bodyData, model: model, isStream: isStream) { result in
+        return await executeWithRetry(bodyData: bodyData, model: model) { result in
             switch result {
-            case .streaming(let lines):
+            case .streaming(statusCode: _, lines: let lines, headers: _):
                 if isStream {
                     let translated = AnthropicToCodexTranslator.translateStreamingResponse(model: model, lines: lines)
                     return .streaming(statusCode: 200, headers: Self.corsHeaders(), body: translated)
@@ -378,7 +456,7 @@ actor ProxyCoordinator {
                     let response = await AnthropicToCodexTranslator.collectAndTranslateResponse(model: model, lines: lines)
                     return .complete(self.corsResponse(response))
                 }
-            case .complete(let data):
+            case .complete(statusCode: _, data: let data, headers: _):
                 // Shouldn't happen since we always stream from upstream, but handle gracefully
                 let text = String(data: data, encoding: .utf8) ?? ""
                 let fallback = AnthropicToCodexTranslator.anthropicErrorResponse(statusCode: 502, message: "Unexpected non-stream response: \(text.prefix(200))")
@@ -390,14 +468,18 @@ actor ProxyCoordinator {
     // MARK: - Account Selection & Retry
 
     private enum UpstreamSuccessResult {
-        case streaming(AsyncStream<Data>)
-        case complete(Data)
+        case streaming(statusCode: Int, lines: AsyncStream<Data>, headers: [String: String])
+        case complete(statusCode: Int, data: Data, headers: [String: String])
     }
 
     private func executeWithRetry(
         bodyData: Data,
         model: String,
-        isStream: Bool,
+        requestHeaders: [String: String] = [:],
+        upstreamPath: String = "responses",
+        upstreamMethod: String = "POST",
+        upstreamQueryItems: [URLQueryItem] = [],
+        upstreamStreams: Bool = true,
         transform: @escaping (UpstreamSuccessResult) async -> ProxyHTTPResponse
     ) async -> ProxyHTTPResponse {
         let accountSelection = loadAvailableAccounts(model: model)
@@ -416,12 +498,12 @@ actor ProxyCoordinator {
 
         let baseURL = ChatGPTBaseOriginResolver.resolve(configPath: configPath)
         let upstreamURL: URL
-        let upstreamURLString = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/backend-api/codex/responses"
-        proxyLogger.info("Upstream URL: \(upstreamURLString, privacy: .public)")
+        let normalizedPath = upstreamPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let upstreamURLString = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/backend-api/codex/" + normalizedPath
         if let bodyStr = String(data: bodyData.prefix(2048), encoding: .utf8) {
             proxyLogger.info("Upstream body: \(bodyStr, privacy: .public)")
         }
-        if let url = URL(string: upstreamURLString) {
+        if let url = Self.upstreamURL(string: upstreamURLString, queryItems: upstreamQueryItems) {
             upstreamURL = url
         } else {
             return .complete(corsResponse(HTTPResponse.json(
@@ -429,13 +511,17 @@ actor ProxyCoordinator {
                 object: Self.errorJSON("Invalid upstream URL")
             )))
         }
+        proxyLogger.info("Upstream URL: \(upstreamURL.absoluteString, privacy: .public)")
 
         var failures: [String] = []
 
         for account in accountSelection.accounts {
             let request = makeUpstreamRequest(
+                method: upstreamMethod,
                 url: upstreamURL,
                 bodyData: bodyData,
+                headers: requestHeaders,
+                upstreamStreams: upstreamStreams,
                 account: account
             )
 
@@ -471,16 +557,21 @@ actor ProxyCoordinator {
     }
 
     private func makeUpstreamRequest(
+        method: String,
         url: URL,
         bodyData: Data,
+        headers: [String: String],
+        upstreamStreams: Bool,
         account: ProxyAccount
     ) -> CodexUpstreamRequest {
         CodexUpstreamRequest(
+            method: method,
             url: url,
             body: bodyData,
+            headers: headers,
             accessToken: account.accessToken,
             accountID: account.accountID,
-            isStream: true // always stream from upstream
+            isStream: upstreamStreams
         )
     }
 
@@ -496,8 +587,11 @@ actor ProxyCoordinator {
             if error.isAuthenticationFailure,
                let repairedAccount = await refreshProxyAccountAuth(account) {
                 let repairedRequest = makeUpstreamRequest(
+                    method: request.method,
                     url: request.url,
                     bodyData: request.body,
+                    headers: request.headers,
+                    upstreamStreams: request.isStream,
                     account: repairedAccount
                 )
                 do {
@@ -524,9 +618,13 @@ actor ProxyCoordinator {
 
     private func preflight(_ result: CodexUpstreamResult) async throws -> UpstreamSuccessResult {
         switch result {
-        case .stream(_, let lines, _):
-            return .streaming(try await preflightStreamingLines(lines))
-        case .complete(_, let data, _):
+        case .stream(let statusCode, let lines, let headers):
+            return .streaming(
+                statusCode: statusCode,
+                lines: try await preflightStreamingLines(lines),
+                headers: headers
+            )
+        case .complete(let statusCode, let data, let headers):
             if let error = Self.firstSSEError(in: data) {
                 throw CodexUpstreamError.eventError(
                     statusCode: error.statusCode,
@@ -534,7 +632,7 @@ actor ProxyCoordinator {
                     body: error.body
                 )
             }
-            return .complete(data)
+            return .complete(statusCode: statusCode, data: data, headers: headers)
         }
     }
 
@@ -722,6 +820,7 @@ actor ProxyCoordinator {
     }
 
     private func modelIsSupported(_ model: String, by account: StoredAccount) -> Bool {
+        guard !model.isEmpty else { return true }
         guard let fetchedModelIDsByPlanKey, !fetchedModelIDsByPlanKey.isEmpty else {
             return true
         }
@@ -852,15 +951,19 @@ actor ProxyCoordinator {
         return json
     }
 
-    private static func collectCompletedResponse(lines: AsyncStream<Data>) async -> HTTPResponse {
+    private static func collectCompletedResponse(
+        lines: AsyncStream<Data>,
+        headers: [String: String] = [:]
+    ) async -> HTTPResponse {
         let dataPrefix = Data("data: ".utf8)
         var completedPayload: Data?
 
         for await line in lines {
             if let error = CodexUpstreamSSEInspector.error(fromSSELine: line) {
-                return HTTPResponse.json(
+                return HTTPResponse(
                     statusCode: error.statusCode,
-                    object: errorJSON(error.message)
+                    headers: jsonHeaders(merging: headers),
+                    body: (try? JSONSerialization.data(withJSONObject: errorJSON(error.message))) ?? Data("{}".utf8)
                 )
             }
             guard line.starts(with: dataPrefix) else { continue }
@@ -878,14 +981,17 @@ actor ProxyCoordinator {
         if let data = completedPayload {
             return HTTPResponse(
                 statusCode: 200,
-                headers: ["Content-Type": "application/json; charset=utf-8"],
+                headers: jsonHeaders(merging: headers),
                 body: data
             )
         }
 
-        return HTTPResponse.json(
+        return HTTPResponse(
             statusCode: 502,
-            object: errorJSON(L10n.tr("error.proxy_runtime.sse_extract_completed_failed"))
+            headers: jsonHeaders(merging: headers),
+            body: (try? JSONSerialization.data(
+                withJSONObject: errorJSON(L10n.tr("error.proxy_runtime.sse_extract_completed_failed"))
+            )) ?? Data("{}".utf8)
         )
     }
 
@@ -905,13 +1011,126 @@ actor ProxyCoordinator {
         HTTPResponse(statusCode: statusCode, headers: Self.corsHeaders(), body: Data())
     }
 
-    private static func corsHeaders() -> [String: String] {
-        [
+    private static func corsHeaders(merging extra: [String: String] = [:]) -> [String: String] {
+        var headers = extra
+        for (key, value) in [
             "Access-Control-Allow-Origin": "http://localhost",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key, anthropic-version",
-            "Access-Control-Max-Age": "86400"
-        ]
+            "Access-Control-Allow-Headers": Self.corsAllowedHeaders,
+            "Access-Control-Expose-Headers": Self.corsExposedHeaders,
+            "Access-Control-Max-Age": "86400",
+        ] {
+            headers[key] = value
+        }
+        return headers
+    }
+
+    private static func jsonHeaders(merging extra: [String: String] = [:]) -> [String: String] {
+        var headers = extra
+        headers["Content-Type"] = "application/json; charset=utf-8"
+        return headers
+    }
+
+    private static func upstreamURL(string: String, queryItems: [URLQueryItem]) -> URL? {
+        guard var components = URLComponents(string: string) else { return nil }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+        return components.url
+    }
+
+    private static func modelsQueryItems(from request: HTTPRequest) -> [URLQueryItem] {
+        if request.queryItems.contains(where: { $0.name == "client_version" }) {
+            return request.queryItems
+        }
+        let version = request.headers["version"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var queryItems = request.queryItems
+        queryItems.append(URLQueryItem(
+            name: "client_version",
+            value: version?.isEmpty == false ? version : AppVersion.current
+        ))
+        return queryItems
+    }
+
+    private static let upstreamBlockedHeaderNames: Set<String> = [
+        "authorization",
+        "x-api-key",
+        "host",
+        "content-length",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "accept-encoding",
+        "chatgpt-account-id"
+    ]
+
+    private static let downstreamBlockedHeaderNames: Set<String> = [
+        "content-length",
+        "content-type",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "content-encoding"
+    ]
+
+    private static let corsAllowedHeaders = [
+        "Content-Type",
+        "Authorization",
+        "x-api-key",
+        "anthropic-version",
+        "session-id",
+        "thread-id",
+        "x-client-request-id",
+        "x-codex-window-id",
+        "x-codex-turn-metadata",
+        "x-codex-turn-state",
+        "x-codex-beta-features",
+        "x-openai-subagent",
+        "x-codex-parent-thread-id",
+        "x-openai-memgen-request",
+        "openai-beta",
+        "version",
+        "originator"
+    ].joined(separator: ", ")
+
+    private static let corsExposedHeaders = [
+        "x-codex-turn-state",
+        "x-request-id",
+        "openai-model",
+        "x-models-etag",
+        "x-reasoning-included",
+        "x-codex-ratelimit-reset-requests",
+        "x-codex-ratelimit-remaining-requests",
+        "x-codex-ratelimit-limit-requests",
+        "x-codex-ratelimit-reset-tokens",
+        "x-codex-ratelimit-remaining-tokens",
+        "x-codex-ratelimit-limit-tokens"
+    ].joined(separator: ", ")
+
+    private static func forwardableUpstreamHeaders(from request: HTTPRequest) -> [String: String] {
+        request.headers.filter { name, _ in
+            !upstreamBlockedHeaderNames.contains(name.lowercased())
+        }
+    }
+
+    private static func mirroredDownstreamHeaders(from headers: [String: String]) -> [String: String] {
+        var result: [String: String] = [:]
+        for (name, value) in headers {
+            if !downstreamBlockedHeaderNames.contains(name.lowercased()) {
+                result[name] = value
+            }
+        }
+        return result
     }
 }
 

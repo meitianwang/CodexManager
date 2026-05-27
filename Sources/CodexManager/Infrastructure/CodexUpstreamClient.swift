@@ -4,8 +4,10 @@ import os.log
 private let upstreamLogger = Logger(subsystem: "com.nik.mei.codexmanager", category: "CodexUpstream")
 
 struct CodexUpstreamRequest: Sendable {
+    var method: String
     var url: URL
     var body: Data
+    var headers: [String: String]
     var accessToken: String
     var accountID: String
     var isStream: Bool
@@ -242,6 +244,22 @@ enum CodexUpstreamIdentity {
 
 final class CodexUpstreamClient: CodexUpstreamClientProtocol, Sendable {
     private static let maxResponseBytes = 50 * 1024 * 1024 // 50MB
+    private static let blockedForwardedHeaders: Set<String> = [
+        "authorization",
+        "x-api-key",
+        "host",
+        "content-length",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "accept-encoding",
+        "chatgpt-account-id"
+    ]
 
     private let session: URLSession
 
@@ -254,20 +272,38 @@ final class CodexUpstreamClient: CodexUpstreamClientProtocol, Sendable {
 
     func execute(request: CodexUpstreamRequest) async throws -> CodexUpstreamResult {
         var urlRequest = URLRequest(url: request.url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.httpBody = request.body
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpMethod = request.method
+        if !request.body.isEmpty {
+            urlRequest.httpBody = request.body
+        }
+
+        for (name, value) in request.headers {
+            if Self.isForwardableHeader(name) {
+                urlRequest.setValue(value, forHTTPHeaderField: name)
+            }
+        }
+
+        if !request.body.isEmpty && urlRequest.value(forHTTPHeaderField: "Content-Type") == nil {
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         urlRequest.setValue("Bearer \(request.accessToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(CodexUpstreamIdentity.userAgent, forHTTPHeaderField: "User-Agent")
-        urlRequest.setValue(CodexUpstreamIdentity.originator, forHTTPHeaderField: "Originator")
-        urlRequest.setValue(request.accountID, forHTTPHeaderField: "Chatgpt-Account-Id")
+        urlRequest.setValue(request.accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+
+        if urlRequest.value(forHTTPHeaderField: "User-Agent") == nil {
+            urlRequest.setValue(CodexUpstreamIdentity.userAgent, forHTTPHeaderField: "User-Agent")
+        }
+        if urlRequest.value(forHTTPHeaderField: "originator") == nil {
+            urlRequest.setValue(CodexUpstreamIdentity.originator, forHTTPHeaderField: "originator")
+        }
+        if urlRequest.value(forHTTPHeaderField: "version") == nil {
+            urlRequest.setValue(AppVersion.current, forHTTPHeaderField: "version")
+        }
 
         if request.isStream {
             urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         } else {
             urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
         }
-        urlRequest.setValue("Keep-Alive", forHTTPHeaderField: "Connection")
 
         upstreamLogger.debug("Upstream request: \(request.url.absoluteString, privacy: .public)")
 
@@ -340,5 +376,9 @@ final class CodexUpstreamClient: CodexUpstreamClientProtocol, Sendable {
             headers[String(describing: key)] = String(describing: value)
         }
         return headers
+    }
+
+    private static func isForwardableHeader(_ name: String) -> Bool {
+        !blockedForwardedHeaders.contains(name.lowercased())
     }
 }
