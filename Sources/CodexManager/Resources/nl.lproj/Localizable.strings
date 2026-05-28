@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "Snelle acties";
 "accounts.action.collapse_all" = "Alle kaarten inklappen";
 "accounts.action.expand_all" = "Alle kaarten uitklappen";
+"accounts.action.view_grid" = "Rasterweergave";
+"accounts.action.view_list" = "Lijstweergave";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

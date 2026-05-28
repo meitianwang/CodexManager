@@ -28,40 +28,66 @@ struct AccountTransferSelectionSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 0) {
             header
+            Divider()
+                .padding(.horizontal, 12)
             accountList
+            Divider()
             footer
         }
-        .padding(22)
-        .frame(width: 520)
-        .frame(minHeight: 420)
-        .background(AppTheme.windowBackground)
+        .frame(width: 506)
+        .frame(minHeight: 388)
+        .background(AppTheme.panelBackground)
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        ZStack {
+            VStack(spacing: 3) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(AppTheme.primaryText)
                 Text(L10n.tr("accounts.transfer.account_count_format", "\(accounts.count)"))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(AppTheme.secondaryText)
             }
 
-            Spacer(minLength: 0)
+            HStack {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .frame(width: 24, height: 24)
+                        .background(AppTheme.mutedBackground, in: Circle())
+                }
+                .buttonStyle(.plain)
 
-            Button(selectionToggleTitle) {
-                toggleSelection()
+                Spacer(minLength: 0)
+
+                HStack(spacing: 20) {
+                    Button(L10n.tr("common.select_all")) {
+                        selectedIDs = Set(accounts.map(\.id))
+                    }
+                    .disabled(selectedIDs.count == accounts.count)
+
+                    Button(L10n.tr("common.deselect_all")) {
+                        selectedIDs.removeAll()
+                    }
+                    .disabled(selectedIDs.isEmpty)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AppTheme.accent)
             }
-            .codexManagerActionButtonStyle(prominent: false, density: .compact)
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 11)
     }
 
     private var accountList: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(spacing: 0) {
                 ForEach(accounts) { account in
                     AccountTransferSelectionRow(
                         account: account,
@@ -71,19 +97,18 @@ struct AccountTransferSelectionSheet: View {
                     }
                 }
             }
-            .padding(.vertical, 2)
         }
-        .frame(minHeight: 240, maxHeight: 360)
+        .frame(minHeight: 240, maxHeight: 294)
     }
 
     private var footer: some View {
         HStack(spacing: 12) {
+            Spacer(minLength: 0)
+
             Button(L10n.tr("common.cancel")) {
                 onCancel()
             }
             .codexManagerActionButtonStyle(prominent: false, density: .compact)
-
-            Spacer(minLength: 0)
 
             Button(actionTitle) {
                 onConfirm(selectedIDs)
@@ -91,12 +116,8 @@ struct AccountTransferSelectionSheet: View {
             .disabled(selectedIDs.isEmpty)
             .codexManagerActionButtonStyle(prominent: true, density: .compact)
         }
-    }
-
-    private var selectionToggleTitle: String {
-        selectedIDs.count == accounts.count
-            ? L10n.tr("common.deselect_all")
-            : L10n.tr("common.select_all")
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private func toggle(_ id: String) {
@@ -104,14 +125,6 @@ struct AccountTransferSelectionSheet: View {
             selectedIDs.remove(id)
         } else {
             selectedIDs.insert(id)
-        }
-    }
-
-    private func toggleSelection() {
-        if selectedIDs.count == accounts.count {
-            selectedIDs.removeAll()
-        } else {
-            selectedIDs = Set(accounts.map(\.id))
         }
     }
 }
@@ -124,38 +137,40 @@ private struct AccountTransferSelectionRow: View {
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 19, weight: .semibold))
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(isSelected ? AppTheme.accent : .secondary)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 22, height: 22)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(account.email ?? account.label)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.email ?? account.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.primaryText)
+                        .lineLimit(1)
 
-                        AccountTransferPlanBadge(text: account.planLabel)
-
-                        if account.isCurrent {
-                            AccountTransferCurrentBadge()
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        Text(account.teamName ?? account.accountID)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text(account.teamName ?? account.accountID)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(AppTheme.secondaryText)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 0)
+
+                AccountTransferPlanBadge(text: account.planLabel)
+
+                if account.isCurrent {
+                    AccountTransferCurrentBadge()
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .cardSurface(cornerRadius: LayoutRules.cardRadius)
+            .padding(.horizontal, 24)
+            .frame(height: 48)
+            .background(AppTheme.panelBackground)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppTheme.separator)
+                    .frame(height: 1)
+                    .padding(.leading, 58)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -166,12 +181,13 @@ private struct AccountTransferPlanBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(AppTheme.accent)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(AppTheme.planForeground(for: text))
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
             .background {
-                Capsule().fill(AppTheme.accent.opacity(0.12))
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(AppTheme.planBackground(for: text))
             }
     }
 }
@@ -179,12 +195,13 @@ private struct AccountTransferPlanBadge: View {
 private struct AccountTransferCurrentBadge: View {
     var body: some View {
         Text(L10n.tr("accounts.card.current"))
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(AppTheme.currentBadgeForeground)
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
             .background {
-                Capsule().fill(AppTheme.controlBackground)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(AppTheme.currentBadgeBackground)
             }
     }
 }

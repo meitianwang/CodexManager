@@ -124,7 +124,7 @@ struct TrayPopoverView: View {
         VStack(alignment: .leading, spacing: 0) {
             statusSection
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.top, 14)
                 .padding(.bottom, 12)
 
             Divider()
@@ -152,80 +152,101 @@ struct TrayPopoverView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
         }
-        .frame(width: 276)
+        .frame(width: 306)
         .background(AppTheme.panelBackground)
     }
 
     @ViewBuilder
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(AppTheme.accent)
-                    Image(systemName: "chevron.left.forwardslash.chevron.right")
+        VStack(alignment: .leading, spacing: 12) {
+            if let account = currentAccount {
+                HStack(alignment: .top, spacing: 10) {
+                    Text(accountAvatarText(account))
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)
-                }
-                .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28)
+                        .background(AppTheme.accent, in: Circle())
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("CodexManager")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(account.email ?? account.label)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(AppTheme.primaryText)
+                                .lineLimit(1)
 
-                    if let account = currentAccount {
-                        Text(L10n.tr("tray.status.current_format", account.label))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(L10n.tr("tray.status.no_account"))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+
+                            AccountTagView(
+                                text: account.normalizedPlanLabel,
+                                backgroundColor: AppTheme.planBackground(for: account.normalizedPlanLabel),
+                                foregroundColor: AppTheme.planForeground(for: account.normalizedPlanLabel),
+                                font: .system(size: 10, weight: .semibold),
+                                horizontalPadding: 8,
+                                verticalPadding: 4
+                            )
+
+                            if account.isCurrent {
+                                AccountTagView(
+                                    text: L10n.tr("accounts.card.current"),
+                                    backgroundColor: AppTheme.currentBadgeBackground,
+                                    foregroundColor: AppTheme.currentBadgeForeground,
+                                    font: .system(size: 10, weight: .semibold),
+                                    horizontalPadding: 8,
+                                    verticalPadding: 4
+                                )
+                            }
+                        }
+
+                        HStack(spacing: 10) {
+                            StatChip(
+                                icon: "person.2",
+                                text: L10n.tr("tray.status.accounts_count_format", "\(totalAccounts)")
+                            )
+
+                            if let usage = account.usage?.fiveHour {
+                                let remaining = max(0, Int((100 - usage.usedPercent).rounded()))
+                                StatChip(
+                                    icon: nil,
+                                    text: L10n.tr("tray.status.remaining_format", "\(remaining)%"),
+                                    isPositive: true
+                                )
+                            }
+                        }
                     }
                 }
-
-                Spacer(minLength: 0)
-            }
-
-            if totalAccounts > 0 {
-                HStack(spacing: 12) {
-                    StatChip(
-                        icon: "person.2.fill",
-                        text: L10n.tr("tray.status.accounts_count_format", "\(totalAccounts)")
-                    )
-
-                    if let account = currentAccount, let usage = account.usage?.fiveHour {
-                        let remaining = max(0, Int((100 - usage.usedPercent).rounded()))
-                        StatChip(
-                            icon: "chart.bar.fill",
-                            text: L10n.tr("tray.status.remaining_format", "\(remaining)%")
-                        )
-                    }
-                }
-                .padding(.top, 4)
+            } else {
+                Text(L10n.tr("tray.status.no_account"))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(AppTheme.secondaryText)
             }
         }
+    }
+
+    private func accountAvatarText(_ account: AccountSummary) -> String {
+        String((account.email ?? account.label).prefix(1)).uppercased()
     }
 }
 
 private struct StatChip: View {
-    let icon: String
+    let icon: String?
     let text: String
+    var isPositive = false
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10))
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .medium))
+            }
             Text(text)
                 .font(.system(size: 11, weight: .medium))
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .foregroundStyle(isPositive ? AppTheme.currentBadgeForeground : AppTheme.secondaryText)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(AppTheme.mutedBackground)
+                .fill(isPositive ? AppTheme.currentBadgeBackground : Color.clear)
         }
     }
 }
@@ -246,7 +267,7 @@ private struct TrayActionButton: View {
                     .font(.system(size: 13))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isDestructive ? AppTheme.destructive : Color.primary)
+            .foregroundStyle(isDestructive ? AppTheme.destructive : AppTheme.primaryText)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
@@ -254,7 +275,7 @@ private struct TrayActionButton: View {
         .buttonStyle(.plain)
         .background {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(AppTheme.mutedBackground.opacity(0.7))
+                .fill(Color.clear)
         }
         .onHover { hovering in
             if hovering {

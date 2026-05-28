@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "빠른 동작";
 "accounts.action.collapse_all" = "모든 카드 접기";
 "accounts.action.expand_all" = "모든 카드 펼치기";
+"accounts.action.view_grid" = "그리드 보기";
+"accounts.action.view_list" = "목록 보기";
 "accounts.transfer.export.title" = "내보낼 계정 선택";
 "accounts.transfer.import.title" = "가져올 계정 선택";
 "accounts.transfer.account_count_format" = "%@개 계정";

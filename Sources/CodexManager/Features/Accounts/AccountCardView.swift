@@ -68,7 +68,7 @@ struct AccountCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isCollapsed ? 10 : 12) {
+        VStack(alignment: .leading, spacing: isCollapsed ? 10 : 9) {
             if isCollapsed {
                 AccountCompactHeaderContent(
                     planLabel: presentation.planLabel,
@@ -84,49 +84,49 @@ struct AccountCardView: View {
             } else {
                 AccountCardHeaderSection(
                     presentation: presentation,
-                    isCollapsed: isCollapsed,
-                    isCurrent: account.isCurrent,
-                    palette: palette,
-                    onDelete: onDelete
+                    isCurrent: account.isCurrent
                 )
 
-                Text(presentation.displayAccountName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(displaysExpandedTitle ? 2 : 1)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .truncationMode(.tail)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(presentation.displayAccountName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.primaryText)
+                        .lineLimit(displaysExpandedTitle ? 2 : 1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .truncationMode(.tail)
 
-                AccountCardExpandedUsageSection(presentation: presentation)
+                    if let teamName = presentation.teamNameTag {
+                        Text(teamName)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(AppTheme.secondaryText)
+                            .lineLimit(1)
+                    }
+                }
+
+                AccountCardExpandedUsageSection(
+                    presentation: presentation,
+                    usageError: isUsageRefreshActive ? nil : account.usageError
+                )
+
+                AccountCardExpandedActions(
+                    isCurrent: account.isCurrent,
+                    switching: switching,
+                    refreshing: refreshing,
+                    isRefreshEnabled: isRefreshEnabled,
+                    onSwitch: onSwitch,
+                    onRefresh: onRefresh,
+                    onDelete: onDelete
+                )
             }
         }
-        .padding(isCollapsed ? 12 : 14)
-        .accountCardSurface(cornerRadius: 10, tint: palette.surfaceTint)
+        .padding(.horizontal, isCollapsed ? 12 : 12)
+        .padding(.vertical, isCollapsed ? 12 : 11)
+        .frame(minHeight: isCollapsed ? nil : 178, alignment: .topLeading)
+        .accountCardSurface(cornerRadius: 9, tint: palette.surfaceTint)
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(account.isCurrent ? AppTheme.accent.opacity(0.36) : .clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(account.isCurrent ? AppTheme.accent.opacity(0.18) : Color.clear, lineWidth: 1)
         )
-        .overlay(alignment: .leading) {
-            if account.isCurrent {
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .fill(AppTheme.accent)
-                    .frame(width: 3)
-                    .padding(.vertical, 12)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            AccountCardBottomOverlay(
-                isCollapsed: isCollapsed,
-                isCurrent: account.isCurrent,
-                switching: switching,
-                refreshing: refreshing,
-                isRefreshEnabled: isRefreshEnabled,
-                usageError: isUsageRefreshActive ? nil : account.usageError,
-                palette: palette,
-                onSwitch: onSwitch,
-                onRefresh: onRefresh
-            )
-        }
         .animation(AccountCardMorphRules.animation, value: isCollapsed)
         .animation(AccountCardMorphRules.animation, value: account.isCurrent)
         .overlay {

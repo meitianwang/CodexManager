@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "Quick actions";
 "accounts.action.collapse_all" = "Collapse all cards";
 "accounts.action.expand_all" = "Expand all cards";
+"accounts.action.view_grid" = "Grid view";
+"accounts.action.view_list" = "List view";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

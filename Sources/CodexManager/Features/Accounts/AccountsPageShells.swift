@@ -29,7 +29,6 @@ struct AccountsPageShell: View {
             model: model,
             areCardsPresented: areCardsPresented,
             onTriggerAction: onTriggerAction,
-            onToggleCollapse: onToggleCollapse,
             onSwitchAccount: onSwitchAccount,
             onRefreshAccountUsage: onRefreshAccountUsage,
             onDeleteAccount: onDeleteAccount
@@ -90,7 +89,6 @@ private struct AccountsMacPageShell: View {
     let model: AccountsPageModel
     let areCardsPresented: Bool
     let onTriggerAction: (AccountsPageActionIntent) -> Void
-    let onToggleCollapse: () -> Void
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onDeleteAccount: (String) -> Void
@@ -102,8 +100,7 @@ private struct AccountsMacPageShell: View {
             MacPageScrollContainer {
                 AccountsActionBarContainer(
                     model: model,
-                    onTriggerAction: onTriggerAction,
-                    onToggleCollapse: onToggleCollapse
+                    onTriggerAction: onTriggerAction
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -126,13 +123,15 @@ private struct AccountsMacPageShell: View {
 private struct AccountsActionBarContainer: View {
     @ObservedObject var model: AccountsPageModel
     let onTriggerAction: (AccountsPageActionIntent) -> Void
-    let onToggleCollapse: () -> Void
 
     var body: some View {
         AccountsActionBarView(
             presentation: model.makeMacActionBarPresentation(),
             onTriggerAction: onTriggerAction,
-            onToggleCollapse: onToggleCollapse
+            onSelectListMode: { newValue in
+                guard model.isListMode != newValue else { return }
+                model.isListMode = newValue
+            }
         )
     }
 }

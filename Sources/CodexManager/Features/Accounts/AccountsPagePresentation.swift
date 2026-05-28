@@ -3,11 +3,12 @@ import Foundation
 struct AccountsPageContentPresentation: Equatable {
     let state: ViewState<[AccountCardViewState]>
     let isOverviewMode: Bool
+    let isListMode: Bool
 }
 
 struct AccountsActionBarPresentation: Equatable {
     let descriptors: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
-    let collapse: AccountsCollapsePresentation
+    let isListMode: Bool
 }
 
 struct AccountCardViewState: Equatable, Identifiable {
@@ -40,14 +41,15 @@ extension AccountsPageModel {
 
         return AccountsPageContentPresentation(
             state: contentState,
-            isOverviewMode: areAllAccountsCollapsed
+            isOverviewMode: areAllAccountsCollapsed,
+            isListMode: isListMode
         )
     }
 
     func makeMacActionBarPresentation() -> AccountsActionBarPresentation {
         AccountsActionBarPresentation(
             descriptors: desktopActionButtons,
-            collapse: collapsePresentation
+            isListMode: isListMode
         )
     }
 }

@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "Actions rapides";
 "accounts.action.collapse_all" = "Réduire toutes les cartes";
 "accounts.action.expand_all" = "Développer toutes les cartes";
+"accounts.action.view_grid" = "Vue en grille";
+"accounts.action.view_list" = "Vue en liste";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

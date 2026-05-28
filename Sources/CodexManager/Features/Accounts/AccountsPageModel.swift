@@ -32,6 +32,7 @@ final class AccountsPageModel: ObservableObject {
     @Published var switchingAccountID: String?
     @Published var refreshingAccountIDs: Set<String> = []
     @Published var collapsedAccountIDs: Set<String> = []
+    @Published var isListMode: Bool = false
     @Published var importDraft: AccountsImportDraft?
 
     init(
@@ -111,12 +112,6 @@ final class AccountsPageModel: ObservableObject {
         AccountsActionPresentation.trailingToolbarButtons(
             canRefreshUsage: canRefreshUsageAction,
             isRefreshSpinnerActive: isRefreshSpinnerActive,
-            areAllAccountsCollapsed: areAllAccountsCollapsed
-        )
-    }
-
-    var collapsePresentation: AccountsCollapsePresentation {
-        AccountsActionPresentation.collapseControl(
             areAllAccountsCollapsed: areAllAccountsCollapsed
         )
     }

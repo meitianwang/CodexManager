@@ -50,7 +50,7 @@ struct SectionCard<Content: View, HeaderTrailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
@@ -60,7 +60,7 @@ struct SectionCard<Content: View, HeaderTrailing: View>: View {
             }
             content
         }
-        .padding(16)
+        .padding(14)
         .cardSurface(cornerRadius: LayoutRules.cardRadius)
     }
 }
@@ -175,7 +175,7 @@ struct CardSurfaceModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(separatorColor, lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.035), radius: 10, x: 0, y: 5)
+            .shadow(color: Color.black.opacity(0.045), radius: 12, x: 0, y: 6)
     }
 
     private var backgroundSurface: some View {
@@ -215,13 +215,13 @@ struct FrostedCapsuleSurfaceModifier: ViewModifier {
         content
             .background { backgroundSurface }
             .overlay {
-                Capsule()
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .strokeBorder(FrostedChromeTokens.separatorColor.opacity(prominent ? 0.85 : 1), lineWidth: 1)
             }
     }
 
     private var backgroundSurface: some View {
-        Capsule()
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
             .fill(FrostedChromeTokens.tintedGlass(prominent: prominent, tint: tint))
     }
 }

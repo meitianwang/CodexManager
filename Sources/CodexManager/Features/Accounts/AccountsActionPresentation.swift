@@ -36,11 +36,6 @@ struct AccountsActionButtonDescriptor<Intent: Hashable>: Identifiable, Equatable
     }
 }
 
-struct AccountsCollapsePresentation: Equatable {
-    let isExpanded: Bool
-    let accessibilityLabel: String
-}
-
 enum AccountsActionPresentation {
     static func desktopButtons(
         isImporting: Bool,
@@ -64,7 +59,7 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .neutral
             ),
             AccountsActionButtonDescriptor(
                 intent: .importAccountsBackup,
@@ -78,7 +73,7 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .neutral
             ),
             AccountsActionButtonDescriptor(
                 intent: .importCurrentAuth,
@@ -92,7 +87,7 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .neutral
             ),
             AccountsActionButtonDescriptor(
                 intent: .addAccount,
@@ -116,7 +111,7 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding && switchingAccountID == nil,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .neutral
             ),
             AccountsActionButtonDescriptor(
                 intent: .refreshUsage,
@@ -182,14 +177,4 @@ enum AccountsActionPresentation {
         ]
     }
 
-    static func collapseControl(
-        areAllAccountsCollapsed: Bool
-    ) -> AccountsCollapsePresentation {
-        AccountsCollapsePresentation(
-            isExpanded: !areAllAccountsCollapsed,
-            accessibilityLabel: areAllAccountsCollapsed
-                ? L10n.tr("accounts.action.expand_all")
-                : L10n.tr("accounts.action.collapse_all")
-        )
-    }
 }

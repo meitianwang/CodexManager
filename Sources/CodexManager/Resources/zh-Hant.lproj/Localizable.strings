@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "快捷操作";
 "accounts.action.collapse_all" = "收起全部卡片";
 "accounts.action.expand_all" = "展開全部卡片";
+"accounts.action.view_grid" = "網格檢視";
+"accounts.action.view_list" = "列表檢視";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

@@ -4,46 +4,85 @@ import AppKit
 #endif
 
 enum AppTheme {
-    static let accent = Color(red: 0.02, green: 0.48, blue: 0.55)
-    static let accentStrong = Color(red: 0.00, green: 0.36, blue: 0.43)
-    static let destructive = Color(red: 0.78, green: 0.18, blue: 0.17)
-    static let success = Color(red: 0.12, green: 0.52, blue: 0.30)
+    static let accent = Color(red: 0.35, green: 0.20, blue: 0.84)
+    static let accentStrong = Color(red: 0.27, green: 0.13, blue: 0.73)
+    static let destructive = Color(red: 0.91, green: 0.17, blue: 0.18)
+    static let success = Color(red: 0.10, green: 0.61, blue: 0.28)
+    static let info = Color(red: 0.18, green: 0.42, blue: 0.84)
+    static let warning = Color(red: 0.87, green: 0.38, blue: 0.13)
+
+    static let primaryText = Color(red: 0.07, green: 0.07, blue: 0.09)
+    static let secondaryText = Color(red: 0.34, green: 0.35, blue: 0.39)
 
     static var accentSoft: Color {
-        accent.opacity(0.11)
+        accent.opacity(0.13)
     }
 
     static var accentSubtle: Color {
-        accent.opacity(0.055)
+        accent.opacity(0.06)
+    }
+
+    static var currentBadgeBackground: Color {
+        Color(red: 0.86, green: 0.96, blue: 0.88)
+    }
+
+    static var currentBadgeForeground: Color {
+        Color(red: 0.07, green: 0.48, blue: 0.20)
+    }
+
+    static func planForeground(for planLabel: String) -> Color {
+        switch planLabel.uppercased() {
+        case "PLUS":
+            return Color(red: 0.15, green: 0.38, blue: 0.84)
+        case "TEAM":
+            return warning
+        case "FREE":
+            return Color(red: 0.38, green: 0.40, blue: 0.45)
+        default:
+            return accent
+        }
+    }
+
+    static func planBackground(for planLabel: String) -> Color {
+        switch planLabel.uppercased() {
+        case "PLUS":
+            return Color(red: 0.89, green: 0.93, blue: 1.00)
+        case "TEAM":
+            return Color(red: 1.00, green: 0.92, blue: 0.84)
+        case "FREE":
+            return Color(red: 0.93, green: 0.94, blue: 0.96)
+        default:
+            return Color(red: 0.91, green: 0.88, blue: 1.00)
+        }
     }
 
     #if canImport(AppKit)
     static var windowBackground: Color {
-        Color(nsColor: .windowBackgroundColor)
+        Color(red: 0.98, green: 0.98, blue: 0.99)
     }
 
     static var sidebarBackground: Color {
-        Color(nsColor: .controlBackgroundColor).opacity(0.76)
+        Color(red: 0.97, green: 0.96, blue: 0.99)
     }
 
     static var panelBackground: Color {
-        Color(nsColor: .textBackgroundColor).opacity(0.92)
+        Color.white.opacity(0.97)
     }
 
     static var elevatedBackground: Color {
-        Color(nsColor: .controlBackgroundColor).opacity(0.9)
+        Color.white.opacity(0.94)
     }
 
     static var controlBackground: Color {
-        Color(nsColor: .controlBackgroundColor)
+        Color.white.opacity(0.96)
     }
 
     static var mutedBackground: Color {
-        Color(nsColor: .underPageBackgroundColor).opacity(0.64)
+        Color(red: 0.95, green: 0.95, blue: 0.97)
     }
 
     static var separator: Color {
-        Color(nsColor: .separatorColor).opacity(0.72)
+        Color.black.opacity(0.11)
     }
     #else
     static var windowBackground: Color {
@@ -76,6 +115,6 @@ enum AppTheme {
     #endif
 
     static var progressTrack: Color {
-        mutedBackground.opacity(0.9)
+        Color.black.opacity(0.08)
     }
 }

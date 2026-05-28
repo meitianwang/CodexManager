@@ -123,10 +123,10 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .frame(minHeight: minimumHeight)
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .background(buttonBackground)
             .overlay {
-                Capsule()
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(separatorColor, lineWidth: 1)
             }
             .opacity(isEnabled ? 1 : 0.45)
@@ -135,7 +135,7 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var buttonBackground: some View {
-        Capsule()
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(prominent ? effectiveTint : AppTheme.controlBackground)
     }
 
@@ -149,7 +149,7 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var horizontalPadding: CGFloat {
-        density == .compact ? 9 : 12
+        density == .compact ? 10 : 12
     }
 
     private var verticalPadding: CGFloat {
@@ -158,6 +158,10 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
 
     private var minimumHeight: CGFloat {
         density == .compact ? 28 : 34
+    }
+
+    private var cornerRadius: CGFloat {
+        density == .compact ? 6 : 7
     }
 
     private var separatorColor: Color {
@@ -169,7 +173,10 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var foregroundColor: Color {
-        prominent ? .white : .primary
+        if prominent {
+            return .white
+        }
+        return tint ?? AppTheme.primaryText
     }
 }
 

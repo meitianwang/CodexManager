@@ -18,9 +18,13 @@ private struct MacSettingsPageContent: View {
 
     var body: some View {
         MacPageScrollContainer {
+            Text(L10n.tr("tab.settings"))
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(AppTheme.primaryText)
+
             SettingsGeneralSection(model: model)
-            SettingsLanguageSection(model: model)
             SettingsSwitchBehaviorSection(model: model)
+            SettingsLanguageSection(model: model)
 
             SettingsQuitFooter(onQuit: model.quitApp)
         }

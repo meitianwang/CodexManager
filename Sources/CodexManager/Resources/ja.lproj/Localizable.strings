@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "クイック操作";
 "accounts.action.collapse_all" = "全カードを折りたたむ";
 "accounts.action.expand_all" = "全カードを展開";
+"accounts.action.view_grid" = "グリッド表示";
+"accounts.action.view_list" = "リスト表示";
 "accounts.transfer.export.title" = "書き出すアカウントを選択";
 "accounts.transfer.import.title" = "取り込むアカウントを選択";
 "accounts.transfer.account_count_format" = "%@ アカウント";

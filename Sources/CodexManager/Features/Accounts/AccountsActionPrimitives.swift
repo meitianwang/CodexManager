@@ -31,6 +31,8 @@ struct AccountsToolbarButtonGroup<Intent: Hashable>: View {
 }
 
 private struct AccountsActionBarButton<Intent: Hashable>: View {
+    static var barButtonHeight: CGFloat { 28 }
+
     let descriptor: AccountsActionButtonDescriptor<Intent>
     let onTrigger: (Intent) -> Void
 
@@ -46,6 +48,7 @@ private struct AccountsActionBarButton<Intent: Hashable>: View {
             tint: tintColor,
             density: .compact
         )
+        .frame(height: Self.barButtonHeight)
         .accessibilityLabel(Text(descriptor.accessibilityLabel))
     }
 
@@ -86,8 +89,14 @@ private struct AccountsActionLabel<Intent: Hashable>: View {
     var body: some View {
         switch descriptor.contentStyle {
         case .label:
-            Label(descriptor.title ?? "", systemImage: descriptor.systemImage)
-                .lineLimit(1)
+            HStack(spacing: 5) {
+                Image(systemName: descriptor.systemImage)
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 13, height: 13)
+                if let title = descriptor.title {
+                    Text(title).lineLimit(1)
+                }
+            }
         case .icon:
             ToolbarIconLabel(
                 systemImage: descriptor.systemImage,

@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "Azioni rapide";
 "accounts.action.collapse_all" = "Comprimi tutte le schede";
 "accounts.action.expand_all" = "Espandi tutte le schede";
+"accounts.action.view_grid" = "Vista a griglia";
+"accounts.action.view_list" = "Vista a elenco";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

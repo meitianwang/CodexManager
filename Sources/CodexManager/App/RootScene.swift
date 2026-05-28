@@ -107,7 +107,7 @@ struct RootScene: View {
         }
         #else
         HStack(spacing: 0) {
-            AppSidebar(selectedTab: $selectedTab)
+            AppSidebar(selectedTab: $selectedTab, isProxyRunning: proxyModel.isRunning)
 
             Divider()
 
@@ -119,6 +119,7 @@ struct RootScene: View {
             .background(AppTheme.windowBackground)
         }
         .background(AppTheme.windowBackground)
+        .tint(AppTheme.accent)
         .animation(.easeInOut(duration: 0.16), value: selectedTab)
         #endif
     }
@@ -144,12 +145,13 @@ struct RootScene: View {
 
 private struct AppSidebar: View {
     @Binding var selectedTab: AppTab
+    let isProxyRunning: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             AppSidebarHeader()
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 ForEach(AppTab.allCases) { tab in
                     AppSidebarTabButton(
                         tab: tab,
@@ -161,11 +163,13 @@ private struct AppSidebar: View {
             }
 
             Spacer(minLength: 0)
+
+            AppSidebarFooter(isProxyRunning: isProxyRunning)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 16)
+        .padding(.horizontal, 14)
+        .padding(.top, 18)
         .padding(.bottom, 14)
-        .frame(width: 168)
+        .frame(width: 162)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(AppTheme.sidebarBackground)
     }
@@ -177,15 +181,15 @@ private struct AppSidebarHeader: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(AppTheme.accent)
-                Image(systemName: "curlybraces")
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
             }
             .frame(width: 30, height: 30)
 
             Text("CodexManager")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AppTheme.primaryText)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -201,33 +205,52 @@ private struct AppSidebarTabButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: tab.iconName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .medium))
                     .frame(width: 18, alignment: .center)
 
                 Text(tab.toolbarTitle)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
-            .frame(height: 34)
-            .foregroundStyle(isSelected ? AppTheme.accentStrong : .secondary)
+            .frame(height: 32)
+            .foregroundStyle(isSelected ? AppTheme.accentStrong : AppTheme.primaryText)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(isSelected ? AppTheme.accentSoft : Color.clear)
             }
-            .overlay(alignment: .leading) {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                        .fill(AppTheme.accent)
-                        .frame(width: 3, height: 16)
-                        .padding(.leading, 1)
-                }
-            }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct AppSidebarFooter: View {
+    let isProxyRunning: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Divider()
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(isProxyRunning ? AppTheme.success : AppTheme.destructive)
+                        .frame(width: 7, height: 7)
+                    Text("\(L10n.tr("tab.proxy")): \(isProxyRunning ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped"))")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(AppTheme.primaryText)
+                        .lineLimit(1)
+                }
+
+                Text("v\(AppVersion.current)")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
+            .padding(.horizontal, 4)
+        }
     }
 }
 

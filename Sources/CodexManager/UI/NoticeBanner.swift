@@ -8,13 +8,17 @@ struct NoticeBanner: View {
             HStack(spacing: 8) {
                 Image(systemName: iconName(for: notice.style))
                     .foregroundStyle(accentColor(for: notice.style))
+                    .font(.system(size: 16, weight: .semibold))
                 Text(notice.text)
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(AppTheme.primaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(AppTheme.secondaryText)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 10)
             .noticeSurface(style: notice.style)
             .transition(.opacity.combined(with: .move(edge: transitionEdge)))
         }
@@ -73,15 +77,26 @@ private extension View {
             }
         #else
         self
-            .cardSurface(cornerRadius: 10)
-            .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .fill(noticeAccentColor(style))
-                    .frame(width: 3)
-                    .padding(.vertical, 8)
-                    .padding(.leading, 7)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(noticeBackgroundColor(style))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(noticeAccentColor(style).opacity(0.20), lineWidth: 1)
             }
         #endif
+    }
+
+    private func noticeBackgroundColor(_ style: NoticeStyle) -> Color {
+        switch style {
+        case .success:
+            return Color(red: 0.91, green: 0.98, blue: 0.93)
+        case .info:
+            return Color(red: 0.92, green: 0.96, blue: 1.00)
+        case .error:
+            return Color(red: 1.00, green: 0.92, blue: 0.92)
+        }
     }
 
     private func noticeAccentColor(_ style: NoticeStyle) -> Color {

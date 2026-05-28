@@ -17,9 +17,19 @@ private struct ProxyPageContent: View {
 
     var body: some View {
         MacPageScrollContainer {
+            Text(L10n.tr("tab.proxy"))
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(AppTheme.primaryText)
+
             ProxyControlSection(model: model)
-            ProxyEndpointsSection(model: model)
-            ProxyModelsSection(model: model)
+
+            HStack(alignment: .top, spacing: 14) {
+                ProxyEndpointsSection(model: model)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                ProxyModelsSection(model: model)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+
             ProxyUsageSection(model: model)
         }
     }
@@ -66,7 +76,7 @@ private struct ProxyControlSection: View {
                     }
                     .buttonStyle(.frostedCapsule(
                         prominent: true,
-                        tint: model.isRunning ? AppTheme.destructive : AppTheme.success
+                        tint: model.isRunning ? AppTheme.destructive : AppTheme.accent
                     ))
 
                     if model.isRunning {
@@ -100,7 +110,11 @@ private struct ProxyStatusPill: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(AppTheme.controlBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(AppTheme.separator, lineWidth: 1)
+        }
     }
 }
 
@@ -155,8 +169,10 @@ private struct ProxyEndpointRow: View {
         HStack(spacing: 8) {
             Text(endpoint.method)
                 .font(.system(.caption, design: .monospaced, weight: .bold))
-                .foregroundStyle(AppTheme.accent)
-                .frame(width: 40, alignment: .leading)
+                .foregroundStyle(AppTheme.currentBadgeForeground)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(AppTheme.currentBadgeBackground, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             Text(endpoint.rawValue)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
             Spacer()
@@ -188,7 +204,7 @@ private struct ProxyModelsSection: View {
                             RoundedRectangle(cornerRadius: 7)
                                 .fill(model.selectedModel == modelName
                                       ? AppTheme.accentSoft
-                                      : AppTheme.mutedBackground)
+                                      : AppTheme.controlBackground)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 7)

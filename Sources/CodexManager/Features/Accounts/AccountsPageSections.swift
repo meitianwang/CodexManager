@@ -27,6 +27,7 @@ struct AccountsPageContentSection: View {
             AccountsGridSection(
                 cards: cards,
                 isOverviewMode: presentation.isOverviewMode,
+                isListMode: presentation.isListMode,
                 availableViewportSize: availableViewportSize,
                 areCardsPresented: areCardsPresented,
                 onSwitchAccount: onSwitchAccount,
@@ -40,6 +41,7 @@ struct AccountsPageContentSection: View {
 private struct AccountsGridSection: View {
     let cards: [AccountCardViewState]
     let isOverviewMode: Bool
+    let isListMode: Bool
     let availableViewportSize: CGSize
     let areCardsPresented: Bool
     let onSwitchAccount: (String) -> Void
@@ -62,7 +64,10 @@ private struct AccountsGridSection: View {
     }
 
     private var columns: [GridItem] {
-        LayoutRules.accountsGridColumns(context: gridContext)
+        if isListMode {
+            return [GridItem(.flexible(minimum: 0, maximum: .infinity), spacing: LayoutRules.accountsRowSpacing, alignment: .top)]
+        }
+        return LayoutRules.accountsGridColumns(context: gridContext)
     }
 
     var body: some View {

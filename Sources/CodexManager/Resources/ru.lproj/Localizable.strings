@@ -77,6 +77,8 @@
 "accounts.action.quick_actions" = "Быстрые действия";
 "accounts.action.collapse_all" = "Свернуть все карточки";
 "accounts.action.expand_all" = "Развернуть все карточки";
+"accounts.action.view_grid" = "Сетка";
+"accounts.action.view_list" = "Список";
 "accounts.transfer.export.title" = "Choose accounts to export";
 "accounts.transfer.import.title" = "Choose accounts to import";
 "accounts.transfer.account_count_format" = "%@ accounts";

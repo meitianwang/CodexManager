@@ -104,7 +104,11 @@ private extension View {
     func settingsRowChrome() -> some View {
         self
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(AppTheme.mutedBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.vertical, 9)
+            .background(AppTheme.controlBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(AppTheme.separator, lineWidth: 1)
+            }
     }
 }

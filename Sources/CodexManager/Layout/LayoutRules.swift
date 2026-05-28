@@ -6,20 +6,20 @@ import UIKit
 /// Centralized layout inputs to avoid duplicated sizing logic across pages.
 enum LayoutRules {
     static let pagePadding = CGFloat(16)
-    static let macPageHorizontalPadding = CGFloat(24)
-    static let macPageTopPadding = CGFloat(20)
+    static let macPageHorizontalPadding = CGFloat(22)
+    static let macPageTopPadding = CGFloat(18)
     static let macPageBottomPadding = CGFloat(22)
-    static let sectionSpacing = CGFloat(18)
-    static let cardRadius = CGFloat(10)
+    static let sectionSpacing = CGFloat(14)
+    static let cardRadius = CGFloat(8)
     static let liquidProgressHeight = CGFloat(8)
     static let liquidProgressInset = CGFloat(2)
-    static let listRowSpacing = CGFloat(10)
+    static let listRowSpacing = CGFloat(8)
     static let minimumPanelHeight = CGFloat(520)
-    static let defaultPanelHeight = CGFloat(640)
-    static let accountsRowSpacing = CGFloat(12)
-    static let accountsExpandedColumns = 2
+    static let defaultPanelHeight = CGFloat(536)
+    static let accountsRowSpacing = CGFloat(14)
+    static let accountsExpandedColumns = 3
     static let accountsCollapsedColumns = 3
-    static let accountsCardWidth = CGFloat(300)
+    static let accountsCardWidth = CGFloat(240)
     static let iOSAccountsExpandedColumns = 1
     static let iOSAccountsCollapsedColumns = 2
     static let iPadMiniAccountsExpandedColumnsPortrait = 2
@@ -30,7 +30,7 @@ enum LayoutRules {
     static let iPadRegularAccountsExpandedColumnsLandscape = 4
     static let iPadRegularAccountsCollapsedColumnsPortrait = 5
     static let iPadRegularAccountsCollapsedColumnsLandscape = 7
-    static let accountsExpandedCardMinimumWidth = CGFloat(240)
+    static let accountsExpandedCardMinimumWidth = CGFloat(220)
     static let accountsCollapsedCardMinimumWidth = CGFloat(132)
     static let iPhoneAccountsExpandedCardMinimumWidth = CGFloat(280)
     static let iPhoneAccountsCollapsedCardMinimumWidth = CGFloat(160)
@@ -58,16 +58,18 @@ enum LayoutRules {
     }
 
     static var minimumPanelWidth: CGFloat {
-        1180
+        900
     }
 
     static var defaultPanelWidth: CGFloat {
-        1280
+        960
     }
 
     static var maximumPanelWidth: CGFloat {
-        1680
+        1080
     }
+
+    static let accountsExpandedCardMaximumWidth = CGFloat(280)
 
     static func iOSAccountsContentTopPadding(safeAreaTop: CGFloat) -> CGFloat {
         safeAreaTop + pagePadding
@@ -93,7 +95,7 @@ enum LayoutRules {
     static func accountsGridColumns(context: AccountsGridContext) -> [GridItem] {
         Array(
             repeating: GridItem(
-                .flexible(minimum: 0, maximum: .infinity),
+                .flexible(minimum: 0, maximum: accountsExpandedCardMaximumWidth),
                 spacing: accountsRowSpacing,
                 alignment: .top
             ),
