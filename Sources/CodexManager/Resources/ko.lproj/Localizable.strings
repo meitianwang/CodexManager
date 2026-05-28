@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1주";
 "accounts.window.used_format" = "사용 %@";
 "accounts.window.remaining_format" = "남음 %@";
+"accounts.window.reset_header" = "재설정";
 "accounts.window.reset_at_format" = "재설정 시각: %@";
 "accounts.compact.used" = "사용";
 "accounts.notice.imported_format" = "계정을 가져왔습니다: %@";

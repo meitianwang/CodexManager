@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1 semana";
 "accounts.window.used_format" = "Usado %@";
 "accounts.window.remaining_format" = "Restante %@";
+"accounts.window.reset_header" = "Reinicio";
 "accounts.window.reset_at_format" = "Reinicio: %@";
 "accounts.compact.used" = "USADO";
 "accounts.notice.imported_format" = "Cuenta importada: %@";

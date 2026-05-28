@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1 周";
 "accounts.window.used_format" = "已用 %@";
 "accounts.window.remaining_format" = "剩余 %@";
+"accounts.window.reset_header" = "重置";
 "accounts.window.reset_at_format" = "重置时间：%@";
 "accounts.compact.used" = "已用";
 "accounts.notice.imported_format" = "已导入账号：%@";

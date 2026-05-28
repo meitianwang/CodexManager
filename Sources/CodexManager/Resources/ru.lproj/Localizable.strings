@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1 неделя";
 "accounts.window.used_format" = "Использовано %@";
 "accounts.window.remaining_format" = "Осталось %@";
+"accounts.window.reset_header" = "Сброс";
 "accounts.window.reset_at_format" = "Сброс: %@";
 "accounts.compact.used" = "ИСПОЛЬЗОВАНО";
 "accounts.notice.imported_format" = "Аккаунт импортирован: %@";

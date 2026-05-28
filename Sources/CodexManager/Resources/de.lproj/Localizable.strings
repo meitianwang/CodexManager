@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1 Woche";
 "accounts.window.used_format" = "Verbraucht %@";
 "accounts.window.remaining_format" = "Verbleibend %@";
+"accounts.window.reset_header" = "Zurücksetzen";
 "accounts.window.reset_at_format" = "Zurückgesetzt um: %@";
 "accounts.compact.used" = "VERBRAUCHT";
 "accounts.notice.imported_format" = "Konto importiert: %@";

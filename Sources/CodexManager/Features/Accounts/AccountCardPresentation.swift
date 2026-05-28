@@ -13,6 +13,7 @@ struct AccountWindowPresentation: Equatable {
     let remainingPercent: Double
     let usedText: String
     let remainingText: String
+    let resetValueText: String
     let resetText: String
 }
 
@@ -90,12 +91,14 @@ struct AccountCardPresentation: Equatable {
         let usedRaw = clamped(window?.usedPercent, fallback: 100)
         let used = roundedPercent(usedRaw)
         let remaining = max(0, 100 - used)
+        let resetValueText = formatResetAt(window?.resetAt, locale: locale)
         return AccountWindowPresentation(
             title: title,
             remainingPercent: remaining,
             usedText: L10n.tr("accounts.window.used_format", percent(used)),
             remainingText: L10n.tr("accounts.window.remaining_format", percent(remaining)),
-            resetText: L10n.tr("accounts.window.reset_at_format", formatResetAt(window?.resetAt, locale: locale))
+            resetValueText: resetValueText,
+            resetText: L10n.tr("accounts.window.reset_at_format", resetValueText)
         )
     }
 

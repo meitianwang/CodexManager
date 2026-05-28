@@ -40,6 +40,9 @@ final class AccountCardPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.fiveHourWindow.remainingPercent, 73)
         XCTAssertEqual(presentation.fiveHourWindow.remainingText, L10n.tr("accounts.window.remaining_format", "73%"))
         XCTAssertEqual(presentation.fiveHourWindow.usedText, L10n.tr("accounts.window.used_format", "27%"))
+        XCTAssertNotEqual(presentation.fiveHourWindow.resetValueText, presentation.oneWeekWindow.resetValueText)
+        XCTAssertTrue(presentation.fiveHourWindow.resetText.contains(presentation.fiveHourWindow.resetValueText))
+        XCTAssertTrue(presentation.oneWeekWindow.resetText.contains(presentation.oneWeekWindow.resetValueText))
     }
 
     func testExpandedPresentationFallsBackToTeamAccentAndMissingWindowDefaults() {
@@ -76,6 +79,7 @@ final class AccountCardPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.displayAccountName, "account-2")
         XCTAssertEqual(presentation.creditsText, L10n.tr("accounts.card.unlimited"))
         XCTAssertEqual(presentation.fiveHourWindow.remainingPercent, 0)
+        XCTAssertEqual(presentation.fiveHourWindow.resetValueText, "--")
         XCTAssertEqual(presentation.fiveHourWindow.resetText, L10n.tr("accounts.window.reset_at_format", "--"))
     }
 }

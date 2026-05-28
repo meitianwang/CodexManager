@@ -96,6 +96,7 @@
 "accounts.window.one_week" = "1 週間";
 "accounts.window.used_format" = "使用 %@";
 "accounts.window.remaining_format" = "残り %@";
+"accounts.window.reset_header" = "リセット";
 "accounts.window.reset_at_format" = "リセット時刻: %@";
 "accounts.compact.used" = "USED";
 "accounts.notice.imported_format" = "アカウントを取り込みました: %@";
