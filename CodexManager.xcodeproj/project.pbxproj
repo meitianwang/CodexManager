@@ -112,6 +112,7 @@
 		C4E5B228A0FD93AFDDF89BC9 /* AccountsTransferMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 960ADB1246E2713C83832AC1 /* AccountsTransferMerge.swift */; };
 		C5F5DE98B5BFD11C5158B2B2 /* AccountsTransferMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E71A076F3CFA42CE9D1EB7E1 /* AccountsTransferMergeTests.swift */; };
 		CA2CB58960385CCA87AB1E0D /* SettingsPageModel+Mutations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B044D730A5D04C18008F53 /* SettingsPageModel+Mutations.swift */; };
+		CA84B5177D872A019A0F909B /* ProxyCoordinatorRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 272E39F43415659E974507D8 /* ProxyCoordinatorRoutingTests.swift */; };
 		CCE1CD6BFCC098869B83E26F /* SettingsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB7A8EF6E424E67AEB5B72E /* SettingsPageSections.swift */; };
 		D286E2CE69B6A15390366C4B /* AccountCardInteractionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10E7EEA64A15B53C69D71620 /* AccountCardInteractionPresentation.swift */; };
 		D2DB3E7BCE0C948A579071DF /* AccountsWidgetSnapshotWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5457FE4ED41BD0F93AC15D /* AccountsWidgetSnapshotWriter.swift */; };
@@ -164,6 +165,7 @@
 		23B0317EEA1AC1F5D476719F /* ViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewState.swift; sourceTree = "<group>"; };
 		23F675D1453A845052DC92CB /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		24C0681C1E45D064BB2AD670 /* OpenAIChatGPTOAuthLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIChatGPTOAuthLoginService.swift; sourceTree = "<group>"; };
+		272E39F43415659E974507D8 /* ProxyCoordinatorRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCoordinatorRoutingTests.swift; sourceTree = "<group>"; };
 		2782D3F46B59C07586C3F955 /* FileSystemPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemPaths.swift; sourceTree = "<group>"; };
 		2C3A362A95CB2C43D3CA1E9F /* CodexCLIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexCLIService.swift; sourceTree = "<group>"; };
 		2D59622B087E254D4EA96B64 /* AccountsPageModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+Lifecycle.swift"; sourceTree = "<group>"; };
@@ -528,6 +530,7 @@
 				BA1C89FBD50313AB1DC96116 /* LayoutRulesTests.swift */,
 				2FC0D52731D890CE99C15D22 /* LiquidProgressMetricsTests.swift */,
 				00607C16FDDF14B0992FD9B4 /* LocalizationConsistencyTests.swift */,
+				272E39F43415659E974507D8 /* ProxyCoordinatorRoutingTests.swift */,
 				1A74FD50F909EDC7D21AF714 /* SettingsControlPresentationTests.swift */,
 				D095A286FD041C124B1903AD /* SettingsPageModelTests.swift */,
 				CA78F8B2D7933D97CB5FCAD7 /* StoreFileRepositoryTests.swift */,
@@ -807,6 +810,7 @@
 				7370AECECED60EF779F51077 /* LayoutRulesTests.swift in Sources */,
 				B0DBA51FF336A1D0F852918E /* LiquidProgressMetricsTests.swift in Sources */,
 				6DF6F71EDA9B8896E0A7657D /* LocalizationConsistencyTests.swift in Sources */,
+				CA84B5177D872A019A0F909B /* ProxyCoordinatorRoutingTests.swift in Sources */,
 				51B6FA7F71D821FA5E5DDFE6 /* SettingsControlPresentationTests.swift in Sources */,
 				5D0F93AF6B97EAA481A08DBD /* SettingsPageModelTests.swift in Sources */,
 				51A0BC018B764A7C3A62DA96 /* StoreFileRepositoryTests.swift in Sources */,
@@ -908,7 +912,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = CodexManager;
@@ -919,7 +923,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nik.mei.codexmanager;
 				PRODUCT_NAME = CodexManager;
 				SDKROOT = macosx;
@@ -932,7 +936,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = CodexManager;
@@ -943,7 +947,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nik.mei.codexmanager;
 				PRODUCT_NAME = CodexManager;
 				SDKROOT = macosx;
