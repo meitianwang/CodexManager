@@ -19,17 +19,17 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
-    expect(screen.getByRole("heading", { name: "Accounts" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Accounts" })).toBeTruthy();
     expect(screen.getByText("Add ChatGPT OAuth or import an existing Codex auth file.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Proxy" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("proxy");
-    expect(screen.getByRole("heading", { name: "Proxy" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Proxy" })).toBeTruthy();
     expect(screen.getByText("/v1/chat/completions")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("settings");
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
     expect(screen.getByText("Launch at startup")).toBeTruthy();
   });
 
@@ -81,6 +81,27 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
+  });
+
+  it("toggles account grid/list presentation and collapse state", async () => {
+    const account = makeAccount("a", "Work");
+    installMockAPI({ accounts: [account] });
+    const { container } = render(<App />);
+
+    expect(await screen.findByText(account.label)).toBeTruthy();
+    expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
+    expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    expect(container.querySelector(".account-row")?.classList.contains("list")).toBe(true);
+    expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
+    expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(true);
+    expect(screen.getByRole("button", { name: "Expand all cards" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all cards" }));
+    expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(false);
   });
 
   it("starts, stops, regenerates, and copies proxy values through mocked IPC", async () => {

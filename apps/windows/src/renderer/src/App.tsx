@@ -17,6 +17,7 @@ import { createTranslator, languageNameKey, type Translator } from "./i18n";
 import "./styles/app.css";
 
 type PageID = "accounts" | "proxy" | "settings";
+type AccountViewMode = "grid" | "list";
 type NoticeTone = "success" | "error" | "info";
 
 interface Notice {
@@ -397,9 +398,65 @@ interface AccountsPageProps {
 
 function AccountsPage(props: AccountsPageProps): ReactElement {
   const hasSelection = props.selectedAccountIds.size > 0;
+  const [viewMode, setViewMode] = useState<AccountViewMode>("grid");
+  const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<string>>(new Set());
+  const accountIds = useMemo(() => props.accounts.map((account) => account.id), [props.accounts]);
+  const areAllAccountsCollapsed = accountIds.length > 0 && accountIds.every((id) => collapsedAccountIds.has(id));
+
+  useEffect(() => {
+    setCollapsedAccountIds((current) => {
+      const availableIds = new Set(accountIds);
+      return new Set([...current].filter((id) => availableIds.has(id)));
+    });
+  }, [accountIds]);
+
+  const toggleCollapseAll = useCallback(() => {
+    setCollapsedAccountIds((current) => {
+      if (accountIds.length === 0) {
+        return new Set();
+      }
+      return accountIds.every((id) => current.has(id)) ? new Set() : new Set(accountIds);
+    });
+  }, [accountIds]);
+
   return (
     <div className="page-grid accounts-grid">
       <section className="content-region">
+        <div className="accounts-view-header">
+          <h3>{props.t("tab.accounts")}</h3>
+          <div className="accounts-view-controls">
+            <div className="segmented-control" role="group" aria-label={props.t("accounts.action.view_mode")}>
+              <button
+                aria-label={props.t("accounts.action.view_grid")}
+                aria-pressed={viewMode === "grid"}
+                title={props.t("accounts.action.view_grid")}
+                type="button"
+                onClick={() => setViewMode("grid")}
+              >
+                <span className="view-mode-icon grid-icon" aria-hidden="true" />
+              </button>
+              <button
+                aria-label={props.t("accounts.action.view_list")}
+                aria-pressed={viewMode === "list"}
+                title={props.t("accounts.action.view_list")}
+                type="button"
+                onClick={() => setViewMode("list")}
+              >
+                <span className="view-mode-icon list-icon" aria-hidden="true" />
+              </button>
+            </div>
+            <button
+              aria-label={props.t(areAllAccountsCollapsed ? "accounts.action.expand_all" : "accounts.action.collapse_all")}
+              className="icon-button"
+              title={props.t(areAllAccountsCollapsed ? "accounts.action.expand_all" : "accounts.action.collapse_all")}
+              type="button"
+              onClick={toggleCollapseAll}
+              disabled={props.accounts.length === 0}
+            >
+              <span className={areAllAccountsCollapsed ? "chevron-icon down" : "chevron-icon up"} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
         <div className="toolbar">
           <button type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
             {props.t("accounts.action.sign_in")}
@@ -436,12 +493,14 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             <h3>{props.t("accounts.empty.message")}</h3>
           </div>
         ) : (
-          <div className="account-list">
+          <div className={viewMode === "grid" ? "account-list grid" : "account-list list"}>
             {props.accounts.map((account) => (
               <AccountRow
                 key={account.id}
                 account={account}
+                isCollapsed={collapsedAccountIds.has(account.id)}
                 isSelected={props.selectedAccountIds.has(account.id)}
+                viewMode={viewMode}
                 onRefresh={() => props.onRefreshUsage(account.id)}
                 onSwitch={() => props.onSwitchAccount(account.id)}
                 onToggleSelection={() => props.onToggleSelection(account.id)}
@@ -465,26 +524,30 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
 
 interface AccountRowProps {
   account: AccountSummary;
+  isCollapsed: boolean;
   isSelected: boolean;
   onRefresh: () => void;
   onSwitch: () => void;
   onToggleSelection: () => void;
   onUpdateAlias: (alias?: string) => void;
   t: Translator;
+  viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t }: AccountRowProps): ReactElement {
+function AccountRow({ account, isCollapsed, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
   }, [account.teamAlias]);
 
+  const accountTitle = isCollapsed ? shortAccountName(account) : account.label;
+
   return (
-    <article className={account.isCurrent ? "account-row current" : "account-row"}>
+    <article className={accountCardClassName(account.isCurrent, isCollapsed, viewMode)}>
       <input aria-label={`${t("accounts.status.selected")} ${account.label}`} checked={isSelected} type="checkbox" onChange={onToggleSelection} />
       <div className="account-main">
         <div className="account-title-line">
-          <h3>{account.label}</h3>
+          <h3>{accountTitle}</h3>
           {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
           {account.shouldDisplayWorkspaceTag && <span className="badge muted">{account.displayTeamName}</span>}
         </div>
@@ -512,6 +575,24 @@ function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelectio
       </div>
     </article>
   );
+}
+
+function accountCardClassName(isCurrent: boolean, isCollapsed: boolean, viewMode: AccountViewMode): string {
+  return [
+    "account-row",
+    viewMode,
+    isCurrent ? "current" : "",
+    isCollapsed ? "collapsed" : ""
+  ].filter(Boolean).join(" ");
+}
+
+function shortAccountName(account: AccountSummary): string {
+  const displayValue = account.email ?? account.label;
+  const atIndex = displayValue.indexOf("@");
+  if (atIndex > 0) {
+    return displayValue.slice(0, atIndex);
+  }
+  return displayValue;
 }
 
 function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
