@@ -953,8 +953,9 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
   if (!endpoint) {
     throw new Error("Proxy endpoints are not configured");
   }
-  const curlText = proxyCurlExample(props.proxyState.proxyURL, endpoint.id, props.selectedModel, apiKey);
-  const configText = proxyConfigText(props.proxyState.proxyURL, endpoint.id, apiKey);
+  const apiKeyDisplay = props.proxyState.isRunning ? apiKey : "sk-local-...";
+  const curlText = proxyCurlExample(props.proxyState.proxyURL, endpoint.id, props.selectedModel, apiKeyDisplay);
+  const configText = proxyConfigText(props.proxyState.proxyURL, endpoint.id, apiKeyDisplay);
   const isBusy = Boolean(props.busyAction);
 
   return (

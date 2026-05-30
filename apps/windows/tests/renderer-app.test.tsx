@@ -214,14 +214,19 @@ describe("Windows renderer app", () => {
     expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
     expect(screen.getByText("cURL example:")).toBeTruthy();
     expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
+    expect(proxyUsageText()).toContain("sk-local-...");
+    expect(proxyUsageText()).not.toContain("sk-local-test");
 
     fireEvent.change(screen.getByLabelText("Port"), { target: { value: "17888" } });
     fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-local-test" } });
+    expect(proxyUsageText()).toContain("sk-local-...");
+    expect(proxyUsageText()).not.toContain("sk-local-test");
 
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();
     expect(await screen.findByText("Proxy started")).toBeTruthy();
+    expect(proxyUsageText()).toContain("sk-local-test");
 
     fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
     await waitFor(() => expect(api.clipboard.writeText).toHaveBeenCalledWith("http://localhost:17888"));
@@ -230,6 +235,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
     expect(await screen.findByText("Proxy stopped", { selector: ".notice" })).toBeTruthy();
+    expect(proxyUsageText()).toContain("sk-local-...");
 
     fireEvent.click(await screen.findByRole("button", { name: "Regenerate API Key" }));
     await waitFor(() => expect(api.proxy.regenerateApiKey).toHaveBeenCalledOnce());
@@ -437,6 +443,10 @@ function accountRow(label: string): HTMLElement {
     throw new Error(`Account row ${label} was not found`);
   }
   return row;
+}
+
+function proxyUsageText(): string {
+  return Array.from(document.querySelectorAll(".code-block pre")).map((element) => element.textContent ?? "").join("\n");
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {
