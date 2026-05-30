@@ -16,6 +16,6 @@ describe("renderer i18n", () => {
     const t = createTranslator("zh-Hans");
 
     expect(t("tab.accounts")).toBe("账号");
-    expect(t("accounts.action.warm_weekly_quota")).toBe("预热周配额");
+    expect(t("accounts.action.warm_weekly_quota")).toBe("一键预热");
   });
 });

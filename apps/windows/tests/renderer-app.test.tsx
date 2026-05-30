@@ -21,7 +21,7 @@ describe("Windows renderer app", () => {
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
     expect(screen.getByRole("heading", { level: 2, name: "Accounts" })).toBeTruthy();
-    expect(screen.getByText("Add ChatGPT OAuth or import an existing Codex auth file.")).toBeTruthy();
+    expect(screen.getByText("No accounts yet. Add or import an account to get started.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Proxy" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("proxy");
@@ -37,32 +37,37 @@ describe("Windows renderer app", () => {
   it("drives account import, export, delete, refresh, and switch actions through mocked IPC", async () => {
     const account = makeAccount("a", "Work");
     const api = installMockAPI({ accounts: [account] });
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(await screen.findByText("Work")).toBeTruthy();
+    expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([
+      "Export accounts",
+      "Import file",
+      "Import current auth",
+      "Add account",
+      "Smart switch",
+      "Warm up weekly quota",
+      "Refresh usage"
+    ]);
 
-    expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    expect((screen.getByRole("button", { name: "Export accounts" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Export accounts" }));
     const exportDialog = await screen.findByRole("dialog", { name: "Choose accounts to export" });
     expect((within(exportDialog).getByLabelText("Selected Work") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(exportDialog).getByRole("button", { name: "Export" }));
     await waitFor(() => expect(api.accounts.exportPackage).toHaveBeenCalledWith(["a"]));
     expect(await screen.findByText("Exported 1 accounts")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
     await waitFor(() => expect(api.accounts.addViaLogin).toHaveBeenCalledOnce());
     await waitFor(() => expect(api.accounts.list).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("New account imported: OAuth")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Import current" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
     await waitFor(() => expect(api.accounts.importCurrentAuth).toHaveBeenCalledOnce());
     expect(await screen.findByText("Account imported: Current auth")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
-    await waitFor(() => expect(api.accounts.importAuthFile).toHaveBeenCalledOnce());
-    expect(await screen.findByText("Account imported: Imported file")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Import package" }));
     await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
     const importDialog = await screen.findByRole("dialog", { name: "Choose accounts to import" });
     expect((within(importDialog).getByLabelText("Selected Package") as HTMLInputElement).checked).toBe(true);
@@ -100,17 +105,17 @@ describe("Windows renderer app", () => {
     expect(await screen.findByText("Account deleted")).toBeTruthy();
   });
 
-  it("does not show a success notice when importing an auth file is canceled", async () => {
+  it("does not show a success notice when importing an account file is canceled", async () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
-    api.accounts.importAuthFile = vi.fn(async () => undefined);
+    api.accounts.prepareImportPackage = vi.fn(async () => undefined);
     render(<App />);
 
     expect(await screen.findByText("Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
-    await waitFor(() => expect(api.accounts.importAuthFile).toHaveBeenCalledOnce());
+    await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
 
     expect(screen.queryByText("Import file complete")).toBeNull();
-    expect(screen.queryByText("Account imported: Imported file")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Choose accounts to import" })).toBeNull();
   });
 
   it("toggles account grid/list presentation and collapse state", async () => {
@@ -264,8 +269,8 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "zh-Hans" } });
     fireEvent.click(screen.getByRole("button", { name: "账号" }));
-    await waitFor(() => expect((screen.getByRole("button", { name: "登录" }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "添加账号" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "添加账号" }));
 
     expect(await screen.findByText("IPC 桥不可用")).toBeTruthy();
   });

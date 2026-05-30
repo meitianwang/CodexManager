@@ -260,23 +260,6 @@ function App(): ReactElement {
                 accounts: accounts.map(accountSummaryToTransferSelectableItem)
               });
             }}
-            onImportAuthFile={() =>
-              runAction(
-                t("accounts.action.import_file"),
-                async () => {
-                  if (!api) {
-                    throw new Error(t("error.ipc_bridge_unavailable"));
-                  }
-                  const imported = await api.accounts.importAuthFile();
-                  if (!imported) {
-                    return;
-                  }
-                  await reloadAccounts();
-                  setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: imported.label }) });
-                },
-                { silentSuccess: true }
-              )
-            }
             onImportCurrent={() =>
               runAction(
                 t("accounts.action.import_current"),
@@ -530,7 +513,6 @@ interface AccountsPageProps {
   onAddViaLogin: () => void;
   onDeleteAccount: (id: string) => void;
   onExportSelected: () => void;
-  onImportAuthFile: () => void;
   onImportCurrent: () => void;
   onImportPackage: () => void;
   onRefreshAll: () => void;
@@ -603,29 +585,26 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
           </div>
         </div>
         <div className="toolbar">
-          <button type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.sign_in")}
-          </button>
-          <button type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.import_current")}
-          </button>
-          <button type="button" onClick={props.onImportAuthFile} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.import_file")}
+          <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
+            {props.t("accounts.action.export")}
           </button>
           <button type="button" onClick={props.onImportPackage} disabled={Boolean(props.busyAction)}>
             {props.t("accounts.action.import_package")}
           </button>
-          <button type="button" onClick={props.onRefreshAll} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.refresh_usage")}
+          <button type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
+            {props.t("accounts.action.import_current")}
           </button>
-          <button type="button" onClick={props.onWarmUpWeeklyQuota} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.warm_weekly_quota")}
+          <button type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
+            {props.t("accounts.action.sign_in")}
           </button>
           <button type="button" onClick={props.onSmartSwitch} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
             {props.t("accounts.action.smart_switch")}
           </button>
-          <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.export")}
+          <button type="button" onClick={props.onWarmUpWeeklyQuota} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
+            {props.t("accounts.action.warm_weekly_quota")}
+          </button>
+          <button type="button" onClick={props.onRefreshAll} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
+            {props.t("accounts.action.refresh_usage")}
           </button>
         </div>
 
