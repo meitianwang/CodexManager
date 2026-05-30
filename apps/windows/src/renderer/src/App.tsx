@@ -187,6 +187,20 @@ function App(): ReactElement {
                 await reloadAccounts();
               })
             }
+            onDeleteAccount={(id) =>
+              runAction(t("accounts.action.delete"), async () => {
+                if (!api) {
+                  throw new Error(t("error.ipc_bridge_unavailable"));
+                }
+                await api.accounts.delete(id);
+                setSelectedAccountIds((current) => {
+                  const next = new Set(current);
+                  next.delete(id);
+                  return next;
+                });
+                await reloadAccounts();
+              })
+            }
             onExportSelected={() =>
               runAction(t("accounts.action.export"), async () => {
                 if (!api) {
@@ -380,6 +394,7 @@ interface AccountsPageProps {
   accounts: AccountSummary[];
   busyAction?: string;
   onAddViaLogin: () => void;
+  onDeleteAccount: (id: string) => void;
   onDeleteSelected: () => void;
   onExportSelected: () => void;
   onImportAuthFile: () => void;
@@ -501,6 +516,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
                 isCollapsed={collapsedAccountIds.has(account.id)}
                 isSelected={props.selectedAccountIds.has(account.id)}
                 viewMode={viewMode}
+                onDelete={() => props.onDeleteAccount(account.id)}
                 onRefresh={() => props.onRefreshUsage(account.id)}
                 onSwitch={() => props.onSwitchAccount(account.id)}
                 onToggleSelection={() => props.onToggleSelection(account.id)}
@@ -526,6 +542,7 @@ interface AccountRowProps {
   account: AccountSummary;
   isCollapsed: boolean;
   isSelected: boolean;
+  onDelete: () => void;
   onRefresh: () => void;
   onSwitch: () => void;
   onToggleSelection: () => void;
@@ -534,7 +551,7 @@ interface AccountRowProps {
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isCollapsed, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, isCollapsed, isSelected, onDelete, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
@@ -566,11 +583,14 @@ function AccountRow({ account, isCollapsed, isSelected, onRefresh, onSwitch, onT
       <UsageCell title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
       <div className="account-actions">
         <span className="plan-label">{account.normalizedPlanLabel}</span>
+        <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
+          {t("accounts.action.switch")}
+        </button>
         <button type="button" onClick={onRefresh}>
           {t("common.refresh")}
         </button>
-        <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
-          {t("accounts.action.switch")}
+        <button className="danger" type="button" onClick={onDelete}>
+          {t("accounts.action.delete")}
         </button>
       </div>
     </article>

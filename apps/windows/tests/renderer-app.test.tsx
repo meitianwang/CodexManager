@@ -79,7 +79,9 @@ describe("Windows renderer app", () => {
     fireEvent.blur(screen.getByLabelText("Team alias Work"));
     await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const accountDeleteButton = screen.getAllByRole("button", { name: "Delete" })[1];
+    expect(accountDeleteButton).toBeDefined();
+    fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
   });
 
