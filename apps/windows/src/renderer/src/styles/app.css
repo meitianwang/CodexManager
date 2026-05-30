@@ -415,6 +415,7 @@ button.danger {
 
 .account-row.grid .usage-cell,
 .account-row.grid .reset-cell,
+.account-row.grid .usage-error,
 .account-row.grid .account-actions {
   grid-column: 1;
 }
@@ -700,6 +701,15 @@ button.danger {
   color: #f0f3ea;
   font-size: 11px;
   font-weight: 520;
+}
+
+.usage-error {
+  grid-column: 2 / 5;
+  margin: -4px 0 0;
+  color: #ff8f8f;
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.35;
 }
 
 .account-actions {
@@ -1233,6 +1243,11 @@ button.danger {
   .account-actions {
     grid-column: 1 / -1;
     grid-template-columns: 90px 1fr 1fr;
+  }
+
+  .usage-error {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
   .proxy-control {

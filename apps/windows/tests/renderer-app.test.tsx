@@ -96,6 +96,7 @@ describe("Windows renderer app", () => {
     expect(accountRow("Work").querySelectorAll(".quota-ring")).toHaveLength(2);
     expect(accountRow("Work").querySelector(".usage-track")).toBeNull();
     expect(within(accountRow("Work")).getByText("Reset")).toBeTruthy();
+    expect(screen.queryByText("Usage refresh failed")).toBeNull();
     const resetRows = Array.from(accountRow("Work").querySelectorAll(".reset-row")).map((row) => row.textContent ?? "");
     expect(resetRows).toHaveLength(2);
     expect(resetRows[0]).toContain("5h");
@@ -140,6 +141,19 @@ describe("Windows renderer app", () => {
 
     expect(screen.queryByText("Import file complete")).toBeNull();
     expect(screen.queryByRole("dialog", { name: "Choose accounts to import" })).toBeNull();
+  });
+
+  it("shows usage refresh errors on expanded account cards only", async () => {
+    const account = { ...makeAccount("a", "Work"), usageError: "Usage refresh failed" };
+    installMockAPI({ accounts: [account] });
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("Usage refresh failed")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
+    expect(container.querySelector(".account-row.collapsed .usage-error")).toBeNull();
+    expect(screen.queryByText("Usage refresh failed")).toBeNull();
   });
 
   it("toggles account grid/list presentation and collapse state", async () => {

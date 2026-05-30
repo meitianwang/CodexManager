@@ -762,6 +762,7 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
               <span>{t("accounts.action.delete")}</span>
             </button>
           </div>
+          {account.usageError && <p className="usage-error">{account.usageError}</p>}
         </>
       )}
       {canShowCollapsedSwitchOverlay && (
