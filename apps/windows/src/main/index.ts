@@ -2,9 +2,12 @@ import path from "node:path";
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions } from "electron";
 import started from "electron-squirrel-startup";
 import { appInfo } from "../shared/app-info";
+import { ipcChannels } from "../shared/ipc/schema";
+import type { AccountSummary } from "../shared/models/accounts";
 import { createWindowsAppContext, type WindowsAppContext } from "./app-context";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { TrayService, type TrayMenuItem } from "./platform/tray-service";
+import { BackgroundAccountMaintenanceService } from "./services/background-account-maintenance-service";
 
 if (started) {
   app.quit();
@@ -12,6 +15,7 @@ if (started) {
 
 let mainWindow: BrowserWindow | null = null;
 let trayService: TrayService | undefined;
+let backgroundAccountMaintenanceService: BackgroundAccountMaintenanceService | undefined;
 let isQuitting = false;
 
 function rendererEntry(): string {
@@ -79,6 +83,14 @@ function showMainWindow(): void {
   mainWindow?.focus();
 }
 
+function publishAccounts(accounts: AccountSummary[]): void {
+  for (const browserWindow of BrowserWindow.getAllWindows()) {
+    if (!browserWindow.isDestroyed()) {
+      browserWindow.webContents.send(ipcChannels.accountsChanged, accounts);
+    }
+  }
+}
+
 async function createTray(context: WindowsAppContext): Promise<TrayService> {
   const tray = new Tray(trayIconImage());
   const adapter = {
@@ -103,10 +115,11 @@ async function createTray(context: WindowsAppContext): Promise<TrayService> {
     actions: {
       showWindow: showMainWindow,
       async refreshAccounts() {
-        await context.accountsCoordinator.refreshAllUsage();
+        publishAccounts(await context.accountsCoordinator.refreshAllUsage());
       },
       async smartSwitch() {
         await context.accountsCoordinator.smartSwitch();
+        publishAccounts(await context.accountsCoordinator.listAccounts());
       },
       async startProxy() {
         const state = await context.proxyRuntimeService.getState();
@@ -159,6 +172,15 @@ app.whenReady().then(async () => {
   });
   trayService = await createTray(context);
   createMainWindow();
+  backgroundAccountMaintenanceService = new BackgroundAccountMaintenanceService({
+    accountsCoordinator: context.accountsCoordinator,
+    settingsCoordinator: context.settingsCoordinator,
+    onAccountsUpdated: publishAccounts,
+    onError(error) {
+      console.error("Background account maintenance failed", error);
+    }
+  });
+  backgroundAccountMaintenanceService.start();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -169,6 +191,7 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  backgroundAccountMaintenanceService?.stop();
   trayService?.destroy();
 });
 

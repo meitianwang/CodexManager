@@ -4,6 +4,7 @@ import { appLocales, editorAppIds } from "../models/settings";
 export const ipcChannels = {
   appInfo: "app:info",
   accountsAddViaLogin: "accounts:addViaLogin",
+  accountsChanged: "accounts:changed",
   accountsDelete: "accounts:delete",
   accountsExportPackage: "accounts:exportPackage",
   accountsImportAuthFile: "accounts:importAuthFile",

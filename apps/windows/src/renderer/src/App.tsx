@@ -95,6 +95,13 @@ function App(): ReactElement {
     setAccounts(await api.accounts.list());
   }, [api]);
 
+  useEffect(() => {
+    if (!api) {
+      return undefined;
+    }
+    return api.accounts.onChanged(setAccounts);
+  }, [api]);
+
   const updateSettings = useCallback(
     async (patch: AppSettingsPatch) => {
       if (!api) {

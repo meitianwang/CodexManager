@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AppInfo } from "../shared/app-info";
 import type { AccountsImportResult } from "../shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/accounts";
@@ -17,6 +17,7 @@ export interface CodexManagerAPI {
     importCurrentAuth: () => Promise<AccountSummary>;
     importPackage: () => Promise<AccountsImportResult | undefined>;
     list: () => Promise<AccountSummary[]>;
+    onChanged: (listener: (accounts: AccountSummary[]) => void) => () => void;
     refreshAllUsage: () => Promise<AccountSummary[]>;
     refreshUsage: (id: string) => Promise<AccountSummary>;
     refreshWorkspaceMetadata: (forceRemoteCheck?: boolean) => Promise<AccountSummary[]>;
@@ -52,6 +53,13 @@ const api: CodexManagerAPI = {
     importCurrentAuth: () => invoke<AccountSummary>(ipcChannels.accountsImportCurrentAuth),
     importPackage: () => invoke<AccountsImportResult | undefined>(ipcChannels.accountsImportPackage),
     list: () => invoke<AccountSummary[]>(ipcChannels.accountsList),
+    onChanged: (listener) => {
+      const handler = (_event: IpcRendererEvent, accounts: AccountSummary[]) => {
+        listener(accounts);
+      };
+      ipcRenderer.on(ipcChannels.accountsChanged, handler);
+      return () => ipcRenderer.off(ipcChannels.accountsChanged, handler);
+    },
     refreshAllUsage: () => invoke<AccountSummary[]>(ipcChannels.accountsRefreshAllUsage),
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
     refreshWorkspaceMetadata: (forceRemoteCheck) =>
