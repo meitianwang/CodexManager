@@ -5,14 +5,29 @@ import { proxyAvailableModels } from "../../shared/models/proxy";
 import type { ProxyCoordinator } from "../proxy/proxy-coordinator";
 import type { SettingsCoordinator } from "./settings-coordinator";
 
+export interface RemoteModelCatalogServiceLike {
+  cachedAvailableModels(): string[] | undefined;
+  refreshModels(): Promise<string[] | undefined>;
+}
+
+export interface ProxyRuntimeServiceOptions {
+  modelCatalogService?: RemoteModelCatalogServiceLike;
+}
+
 export class ProxyRuntimeService {
   private isRunning = false;
   private runningPort: number | undefined;
+  private availableModels: string[] = [...proxyAvailableModels];
+  private readonly modelCatalogService: RemoteModelCatalogServiceLike | undefined;
 
   constructor(
     private readonly proxyCoordinator: ProxyCoordinator,
-    private readonly settingsCoordinator: SettingsCoordinator
-  ) {}
+    private readonly settingsCoordinator: SettingsCoordinator,
+    options: ProxyRuntimeServiceOptions = {}
+  ) {
+    this.modelCatalogService = options.modelCatalogService;
+    this.availableModels = options.modelCatalogService?.cachedAvailableModels() ?? [...proxyAvailableModels];
+  }
 
   async getState(): Promise<ProxyRuntimeState> {
     const settings = await this.settingsWithApiKey();
@@ -26,6 +41,7 @@ export class ProxyRuntimeService {
     });
     this.runningPort = await this.proxyCoordinator.start(settings.proxyPort);
     this.isRunning = true;
+    this.availableModels = await this.refreshAvailableModels();
     return this.stateFromSettings({ ...settings, proxyPort: this.runningPort });
   }
 
@@ -33,6 +49,7 @@ export class ProxyRuntimeService {
     await this.proxyCoordinator.stop();
     this.isRunning = false;
     this.runningPort = undefined;
+    this.availableModels = [...proxyAvailableModels];
     return this.getState();
   }
 
@@ -51,11 +68,24 @@ export class ProxyRuntimeService {
     return this.settingsCoordinator.updateSettings({ proxyApiKey: generateProxyApiKey() });
   }
 
+  private async refreshAvailableModels(): Promise<string[]> {
+    if (!this.modelCatalogService) {
+      return [...proxyAvailableModels];
+    }
+    try {
+      const models = await this.modelCatalogService.refreshModels();
+      return models && models.length > 0 ? models : [...proxyAvailableModels];
+    } catch (error) {
+      console.warn("Failed to refresh remote model catalog", error);
+      return [...proxyAvailableModels];
+    }
+  }
+
   private stateFromSettings(settings: AppSettings): ProxyRuntimeState {
     const port = this.runningPort ?? settings.proxyPort;
     return {
       apiKey: settings.proxyApiKey,
-      availableModels: [...proxyAvailableModels],
+      availableModels: [...this.availableModels],
       isRunning: this.isRunning,
       port,
       proxyURL: `http://localhost:${port}`

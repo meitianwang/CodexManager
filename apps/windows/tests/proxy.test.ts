@@ -203,6 +203,32 @@ describe("local proxy", () => {
     expect(second.status).toBe(200);
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
   });
+
+  it("skips accounts whose plan does not support the requested catalog model", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "resp-pro" })]);
+    const context = await makeProxyContext({
+      modelCatalogService: new FakeModelCatalogService({
+        "codex-plus": ["plus-model"],
+        "codex-pro": ["pro-model"]
+      }),
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("plus", "acct-plus", "access-plus", 1, "refresh-plus", "plus"),
+          makeAccount("pro", "acct-pro", "access-pro", 2, "refresh-pro", "pro")
+        ]
+      },
+      upstream
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "pro-model",
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-pro"]);
+  });
 });
 
 async function makeProxyContext(options: {
@@ -212,6 +238,7 @@ async function makeProxyContext(options: {
   upstream?: FakeUpstreamClient;
   authRepository?: FakeAuthRepository;
   refreshService?: FakeRefreshTokenService;
+  modelCatalogService?: FakeModelCatalogService;
 } = {}) {
   const store = options.store ?? {
     version: 1,
@@ -225,6 +252,7 @@ async function makeProxyContext(options: {
     authRepository: options.authRepository ?? new FakeAuthRepository(),
     codexConfigPath: "/missing-config.toml",
     chatGPTOAuthLoginService: options.refreshService,
+    modelCatalogService: options.modelCatalogService,
     upstreamClient: upstream,
     dateProvider: { unixSecondsNow: () => 1_780_000_000 }
   });
@@ -354,13 +382,27 @@ class FakeUpstreamClient implements CodexUpstreamClientLike {
   }
 }
 
-function makeAccount(id: string, accountId: string, accessToken: string, addedAt: number, refreshToken = `refresh-${id}`) {
+class FakeModelCatalogService {
+  private readonly modelsByPlanKey: Map<string, Set<string>>;
+
+  constructor(values: Record<string, readonly string[]>) {
+    this.modelsByPlanKey = new Map(
+      Object.entries(values).map(([planKey, models]) => [planKey, new Set(models)])
+    );
+  }
+
+  cachedModelIDsByPlanKey(): ReadonlyMap<string, ReadonlySet<string>> {
+    return this.modelsByPlanKey;
+  }
+}
+
+function makeAccount(id: string, accountId: string, accessToken: string, addedAt: number, refreshToken = `refresh-${id}`, planType = "plus") {
   return {
     id,
     label: id,
     email: `${id}@example.com`,
     accountId,
-    planType: "plus",
+    planType,
     authJson: fakeAuth(accountId, accessToken, `${id}@example.com`, refreshToken),
     addedAt,
     updatedAt: addedAt,

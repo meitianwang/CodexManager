@@ -5,7 +5,7 @@ import type { AccountsStore, StoredAccount } from "../../shared/models/accounts"
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import { accountSummaries } from "../../shared/domain/accounts-store";
 import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId } from "../../shared/domain/account-identity";
-import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
+import { effectivePlanType, preferredPlanType } from "../../shared/domain/account-plan-resolver";
 import { sortForDisplay } from "../../shared/domain/account-ranking";
 import { resolveChatGPTBaseOrigin, removeSuffix } from "../services/chatgpt-base-origin";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../services/accounts-coordinator";
@@ -13,6 +13,7 @@ import { tokenObjectFromAuth } from "../repositories/auth-parsing";
 import { translateChatRequest, translateCodexSSEToChatCompletion } from "./chat-to-codex-translator";
 import { translateAnthropicRequest } from "./anthropic-to-codex-translator";
 import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamRequest, type CodexUpstreamResult } from "./upstream-client";
+import { modelCatalogPlanKey } from "../services/remote-model-catalog-service";
 
 const maxRequestBytes = 50 * 1024 * 1024;
 const accountCooldownSeconds = 60;
@@ -29,12 +30,17 @@ export interface ProxyCoordinatorOptions {
   authRepository: AuthRepositoryLike;
   codexConfigPath: string;
   chatGPTOAuthLoginService?: ProxyRefreshTokenServiceLike;
+  modelCatalogService?: ProxyModelCatalogServiceLike;
   upstreamClient?: CodexUpstreamClientLike;
   dateProvider?: { unixSecondsNow(): number };
 }
 
 export interface ProxyRefreshTokenServiceLike {
   refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens>;
+}
+
+export interface ProxyModelCatalogServiceLike {
+  cachedModelIDsByPlanKey(): ReadonlyMap<string, ReadonlySet<string>> | undefined;
 }
 
 export class ProxyCoordinator {
@@ -310,7 +316,23 @@ export class ProxyCoordinator {
     }
 
     const modelCooldownUntil = this.accountModelCooldowns.get(modelCooldownKey(accountKey, model));
-    return modelCooldownUntil === undefined || modelCooldownUntil <= now;
+    if (modelCooldownUntil !== undefined && modelCooldownUntil > now) {
+      return false;
+    }
+
+    return this.modelIsSupported(model, account);
+  }
+
+  private modelIsSupported(model: string, account: StoredAccount): boolean {
+    if (!model) {
+      return true;
+    }
+    const modelsByPlanKey = this.options.modelCatalogService?.cachedModelIDsByPlanKey();
+    if (!modelsByPlanKey || modelsByPlanKey.size === 0) {
+      return true;
+    }
+    const planKey = modelCatalogPlanKey(effectivePlanType(account.planType, account.usage?.planType));
+    return modelsByPlanKey.get(planKey)?.has(model) === true;
   }
 
   private async currentAuthAccountKey(): Promise<string | undefined> {

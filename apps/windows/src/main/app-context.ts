@@ -12,6 +12,7 @@ import { SettingsCoordinator } from "./services/settings-coordinator";
 import { DefaultUsageService } from "./services/usage-service";
 import { DefaultWeeklyQuotaWarmupService } from "./services/weekly-quota-warmup-service";
 import { DefaultWorkspaceMetadataService } from "./services/workspace-metadata-service";
+import { RemoteModelCatalogService } from "./services/remote-model-catalog-service";
 import { CodexCLIService } from "./platform/codex-cli-service";
 import { EditorAppService } from "./platform/editor-app-service";
 import { LaunchAtStartupService } from "./platform/launch-at-startup-service";
@@ -40,6 +41,7 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
   const workspaceMetadataService = new DefaultWorkspaceMetadataService(paths);
   const chatGPTOAuthLoginService = new OpenAIChatGPTOAuthLoginService(paths);
   const editorAppService = new EditorAppService();
+  const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({
     storeRepository,
     settingsRepository,
@@ -57,9 +59,11 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
       settingsRepository,
       authRepository,
       codexConfigPath: paths.codexConfigPath,
-      chatGPTOAuthLoginService
+      chatGPTOAuthLoginService,
+      modelCatalogService: remoteModelCatalogService
     }),
-    settingsCoordinator
+    settingsCoordinator,
+    { modelCatalogService: remoteModelCatalogService }
   );
 
   await settingsCoordinator.syncLaunchAtStartupFromStore();
