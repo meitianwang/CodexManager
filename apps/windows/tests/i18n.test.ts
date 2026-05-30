@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { appLocales } from "../src/shared/models/settings";
-import { createTranslator, messageKeys } from "../src/renderer/src/i18n";
+import { createTranslator, messageKeys, type MessageKey } from "../src/renderer/src/i18n";
+
+const windowsParityLocalizedKeys: MessageKey[] = [
+  "accounts.action.import_package",
+  "accounts.action.export",
+  "accounts.notice.exported_format",
+  "accounts.notice.imported_accounts_format",
+  "proxy.api_key.regenerate",
+  "settings.auto_start_proxy"
+];
 
 describe("renderer i18n", () => {
   it("has non-empty messages for every supported locale and key", () => {
@@ -24,5 +33,16 @@ describe("renderer i18n", () => {
     expect(t("settings.language")).toBe("语言");
     expect(t("language.japanese")).toBe("日本語");
     expect(t("proxy.section.models")).toBe("可用模型");
+  });
+
+  it("does not leave Windows parity labels in English for non-English locales", () => {
+    const english = createTranslator("en");
+
+    for (const locale of appLocales.filter((candidate) => candidate !== "en")) {
+      const t = createTranslator(locale);
+      for (const key of windowsParityLocalizedKeys) {
+        expect(t(key), `${locale}:${key}`).not.toBe(english(key));
+      }
+    }
   });
 });
