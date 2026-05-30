@@ -4,15 +4,16 @@ import { appInfo as fallbackAppInfo, type AppInfo } from "@shared/app-info";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "@shared/models/accounts";
 import type { InstalledEditorApp } from "@shared/models/app";
 import {
+  appLocales,
   defaultAppSettings,
   generateProxyApiKey,
   resolveAppLocale,
-  type AppLocaleID,
   type AppSettings,
   type AppSettingsPatch,
   type EditorAppID
 } from "@shared/models/settings";
 import { proxyAvailableModels, proxyEndpoints, type ProxyEndpointID, type ProxyRuntimeState } from "@shared/models/proxy";
+import { createTranslator, languageNameKey, type Translator } from "./i18n";
 import "./styles/app.css";
 
 type PageID = "accounts" | "proxy" | "settings";
@@ -22,26 +23,6 @@ interface Notice {
   text: string;
   tone: NoticeTone;
 }
-
-const pages: Array<{ id: PageID; label: string }> = [
-  { id: "accounts", label: "Accounts" },
-  { id: "proxy", label: "Proxy" },
-  { id: "settings", label: "Settings" }
-];
-
-const localeOptions: Array<{ id: AppLocaleID; label: string }> = [
-  { id: "en", label: "English" },
-  { id: "zh-Hans", label: "简体中文" },
-  { id: "zh-Hant", label: "繁體中文" },
-  { id: "ja", label: "日本語" },
-  { id: "ko", label: "한국어" },
-  { id: "fr", label: "Français" },
-  { id: "de", label: "Deutsch" },
-  { id: "it", label: "Italiano" },
-  { id: "es", label: "Español" },
-  { id: "ru", label: "Русский" },
-  { id: "nl", label: "Nederlands" }
-];
 
 function App(): ReactElement {
   const api = window.codexManager;
@@ -56,6 +37,15 @@ function App(): ReactElement {
   const [selectedModel, setSelectedModel] = useState<string>("gpt-5");
   const [notice, setNotice] = useState<Notice | undefined>();
   const [busyAction, setBusyAction] = useState<string | undefined>();
+  const t = useMemo(() => createTranslator(settings.locale), [settings.locale]);
+  const pages = useMemo(
+    () => [
+      { id: "accounts" as const, label: t("tab.accounts") },
+      { id: "proxy" as const, label: t("tab.proxy") },
+      { id: "settings" as const, label: t("tab.settings") }
+    ],
+    [t]
+  );
 
   const runAction = useCallback(
     async (label: string, action: () => Promise<void>, options: { silentSuccess?: boolean; success?: string } = {}) => {
@@ -64,7 +54,7 @@ function App(): ReactElement {
       try {
         await action();
         if (!options.silentSuccess) {
-          setNotice({ tone: "success", text: options.success ?? `${label} complete` });
+          setNotice({ tone: "success", text: options.success ?? t("notice.action_complete", { action: label }) });
         }
       } catch (error) {
         setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
@@ -72,7 +62,7 @@ function App(): ReactElement {
         setBusyAction(undefined);
       }
     },
-    []
+    [t]
   );
 
   const loadData = useCallback(async () => {
@@ -121,19 +111,16 @@ function App(): ReactElement {
     [api]
   );
 
-  const currentPageLabel = useMemo(
-    () => pages.find((page) => page.id === activePage)?.label ?? "Accounts",
-    [activePage]
-  );
+  const currentPageLabel = useMemo(() => pages.find((page) => page.id === activePage)?.label ?? t("tab.accounts"), [activePage, pages, t]);
 
   return (
     <main className="app-shell">
-      <aside className="sidebar" aria-label="Primary">
+      <aside className="sidebar" aria-label={t("aria.primary")}>
         <div className="brand-block">
           <div className="brand-mark">CM</div>
           <div>
             <h1>{appInfo.displayName}</h1>
-            <p>Windows</p>
+            <p>{t("app.platform")}</p>
           </div>
         </div>
 
@@ -152,14 +139,14 @@ function App(): ReactElement {
 
         <div className="sidebar-footer">
           <span className={proxyState.isRunning ? "status-dot running" : "status-dot"} />
-          <span>{proxyState.isRunning ? `Proxy ${proxyState.port}` : "Proxy stopped"}</span>
+          <span>{proxyState.isRunning ? t("sidebar.proxy_running", { port: proxyState.port }) : t("sidebar.proxy_stopped")}</span>
         </div>
       </aside>
 
       <section className="workspace" aria-labelledby="page-title">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">CodexManager for Windows</p>
+            <p className="eyebrow">{t("app.eyebrow")}</p>
             <h2 id="page-title">{currentPageLabel}</h2>
           </div>
           {notice && <div className={`notice ${notice.tone}`}>{notice.text}</div>}
@@ -170,7 +157,7 @@ function App(): ReactElement {
             accounts={accounts}
             busyAction={busyAction}
             onAddViaLogin={() =>
-              runAction("ChatGPT sign-in", async () => {
+              runAction(t("accounts.action.sign_in"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -179,7 +166,7 @@ function App(): ReactElement {
               })
             }
             onDeleteSelected={() =>
-              runAction("Delete selected accounts", async () => {
+              runAction(t("accounts.action.delete"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -191,18 +178,18 @@ function App(): ReactElement {
               })
             }
             onExportSelected={() =>
-              runAction("Export accounts", async () => {
+              runAction(t("accounts.action.export"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
                 const result = await api.accounts.exportPackage([...selectedAccountIds]);
                 if (result.canceled) {
-                  setNotice({ tone: "info", text: "Export canceled" });
+                  setNotice({ tone: "info", text: t("notice.export_canceled") });
                 }
               })
             }
             onImportAuthFile={() =>
-              runAction("Import auth file", async () => {
+              runAction(t("accounts.action.import_file"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -211,7 +198,7 @@ function App(): ReactElement {
               })
             }
             onImportCurrent={() =>
-              runAction("Import current auth", async () => {
+              runAction(t("accounts.action.import_current"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -220,7 +207,7 @@ function App(): ReactElement {
               })
             }
             onImportPackage={() =>
-              runAction("Import package", async () => {
+              runAction(t("accounts.action.import_package"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -229,7 +216,7 @@ function App(): ReactElement {
               })
             }
             onRefreshAll={() =>
-              runAction("Refresh usage", async () => {
+              runAction(t("accounts.action.refresh_usage"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -238,20 +225,20 @@ function App(): ReactElement {
             }
             onWarmUpWeeklyQuota={() =>
               runAction(
-                "Warm up weekly quota",
+                t("accounts.action.warm_weekly_quota"),
                 async () => {
                   if (!api) {
                     throw new Error("IPC bridge is unavailable");
                   }
                   const result = await api.accounts.warmUpWeeklyQuota();
                   setAccounts(result.accounts);
-                  setNotice({ tone: result.failures.length > 0 ? "info" : "success", text: weeklyWarmupNotice(result) });
+                  setNotice({ tone: result.failures.length > 0 ? "info" : "success", text: weeklyWarmupNotice(result, t) });
                 },
                 { silentSuccess: true }
               )
             }
             onRefreshUsage={(id) =>
-              runAction("Refresh account", async () => {
+              runAction(t("common.refresh"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -260,7 +247,7 @@ function App(): ReactElement {
               })
             }
             onSmartSwitch={() =>
-              runAction("Smart switch", async () => {
+              runAction(t("accounts.action.smart_switch"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -269,7 +256,7 @@ function App(): ReactElement {
               })
             }
             onSwitchAccount={(id) =>
-              runAction("Switch account", async () => {
+              runAction(t("accounts.action.switch"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -279,7 +266,7 @@ function App(): ReactElement {
             }
             onToggleSelection={(id) => setSelectedAccountIds((current) => toggleSetValue(current, id))}
             onUpdateAlias={(id, alias) =>
-              runAction("Update alias", async () => {
+              runAction(t("accounts.card.team_alias"), async () => {
                 if (!api) {
                   throw new Error("IPC bridge is unavailable");
                 }
@@ -288,6 +275,7 @@ function App(): ReactElement {
               })
             }
             selectedAccountIds={selectedAccountIds}
+            t={t}
           />
         )}
 
@@ -295,7 +283,7 @@ function App(): ReactElement {
           <ProxyPage
             busyAction={busyAction}
             onCopy={(text) =>
-              runAction("Copy", async () => {
+              runAction(t("action.copy"), async () => {
                 if (!api) {
                   await navigator.clipboard.writeText(text);
                   return;
@@ -304,7 +292,7 @@ function App(): ReactElement {
               })
             }
             onRegenerateApiKey={() =>
-              runAction("Regenerate API key", async () => {
+              runAction(t("proxy.api_key.regenerate"), async () => {
                 if (!api) {
                   const apiKey = generateProxyApiKey();
                   setProxyState((current) => ({ ...current, apiKey }));
@@ -314,7 +302,7 @@ function App(): ReactElement {
               })
             }
             onStart={(port, apiKey) =>
-              runAction("Start proxy", async () => {
+              runAction(t("common.start"), async () => {
                 if (!api) {
                   setProxyState((current) => ({ ...current, apiKey, isRunning: true, port, proxyURL: `http://localhost:${port}` }));
                   return;
@@ -323,7 +311,7 @@ function App(): ReactElement {
               })
             }
             onStop={() =>
-              runAction("Stop proxy", async () => {
+              runAction(t("common.stop"), async () => {
                 if (!api) {
                   setProxyState((current) => ({ ...current, isRunning: false }));
                   return;
@@ -336,14 +324,16 @@ function App(): ReactElement {
             selectedModel={selectedModel}
             setSelectedEndpoint={setSelectedEndpoint}
             setSelectedModel={setSelectedModel}
+            t={t}
           />
         )}
 
         {activePage === "settings" && (
           <SettingsPage
             installedEditors={installedEditors}
-            onUpdateSettings={(patch) => runAction("Update settings", () => updateSettings(patch), { silentSuccess: true })}
+            onUpdateSettings={(patch) => runAction(t("tab.settings"), () => updateSettings(patch), { silentSuccess: true })}
             settings={settings}
+            t={t}
           />
         )}
       </section>
@@ -368,6 +358,7 @@ interface AccountsPageProps {
   onUpdateAlias: (id: string, alias?: string) => void;
   onWarmUpWeeklyQuota: () => void;
   selectedAccountIds: ReadonlySet<string>;
+  t: Translator;
 }
 
 function AccountsPage(props: AccountsPageProps): ReactElement {
@@ -377,38 +368,38 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
       <section className="content-region">
         <div className="toolbar">
           <button type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
-            Sign in
+            {props.t("accounts.action.sign_in")}
           </button>
           <button type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
-            Import current
+            {props.t("accounts.action.import_current")}
           </button>
           <button type="button" onClick={props.onImportAuthFile} disabled={Boolean(props.busyAction)}>
-            Import file
+            {props.t("accounts.action.import_file")}
           </button>
           <button type="button" onClick={props.onImportPackage} disabled={Boolean(props.busyAction)}>
-            Import package
+            {props.t("accounts.action.import_package")}
           </button>
           <button type="button" onClick={props.onRefreshAll} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            Refresh usage
+            {props.t("accounts.action.refresh_usage")}
           </button>
           <button type="button" onClick={props.onWarmUpWeeklyQuota} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            Warm weekly quota
+            {props.t("accounts.action.warm_weekly_quota")}
           </button>
           <button type="button" onClick={props.onSmartSwitch} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            Smart switch
+            {props.t("accounts.action.smart_switch")}
           </button>
           <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || !hasSelection}>
-            Export
+            {props.t("accounts.action.export")}
           </button>
           <button className="danger" type="button" onClick={props.onDeleteSelected} disabled={Boolean(props.busyAction) || !hasSelection}>
-            Delete
+            {props.t("accounts.action.delete")}
           </button>
         </div>
 
         {props.accounts.length === 0 ? (
           <div className="empty-state">
-            <span>No accounts</span>
-            <h3>Add ChatGPT OAuth or import an existing Codex auth file.</h3>
+            <span>{props.t("accounts.empty.title")}</span>
+            <h3>{props.t("accounts.empty.message")}</h3>
           </div>
         ) : (
           <div className="account-list">
@@ -421,6 +412,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
                 onSwitch={() => props.onSwitchAccount(account.id)}
                 onToggleSelection={() => props.onToggleSelection(account.id)}
                 onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
+                t={props.t}
               />
             ))}
           </div>
@@ -428,10 +420,10 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
       </section>
 
       <aside className="inspector">
-        <h3>Account status</h3>
-        <MetricRow label="Accounts" value={String(props.accounts.length)} />
-        <MetricRow label="Selected" value={String(props.selectedAccountIds.size)} />
-        <MetricRow label="Current" value={props.accounts.find((account) => account.isCurrent)?.label ?? "None"} />
+        <h3>{props.t("accounts.status.title")}</h3>
+        <MetricRow label={props.t("accounts.status.accounts")} value={String(props.accounts.length)} />
+        <MetricRow label={props.t("accounts.status.selected")} value={String(props.selectedAccountIds.size)} />
+        <MetricRow label={props.t("accounts.status.current")} value={props.accounts.find((account) => account.isCurrent)?.label ?? props.t("common.none")} />
       </aside>
     </div>
   );
@@ -444,9 +436,10 @@ interface AccountRowProps {
   onSwitch: () => void;
   onToggleSelection: () => void;
   onUpdateAlias: (alias?: string) => void;
+  t: Translator;
 }
 
-function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias }: AccountRowProps): ReactElement {
+function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
@@ -454,46 +447,46 @@ function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelectio
 
   return (
     <article className={account.isCurrent ? "account-row current" : "account-row"}>
-      <input aria-label={`Select ${account.label}`} checked={isSelected} type="checkbox" onChange={onToggleSelection} />
+      <input aria-label={`${t("accounts.status.selected")} ${account.label}`} checked={isSelected} type="checkbox" onChange={onToggleSelection} />
       <div className="account-main">
         <div className="account-title-line">
           <h3>{account.label}</h3>
-          {account.isCurrent && <span className="badge">Current</span>}
+          {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
           {account.shouldDisplayWorkspaceTag && <span className="badge muted">{account.displayTeamName}</span>}
         </div>
         <p>{account.email ?? account.accountId}</p>
         <div className="alias-line">
           <input
-            aria-label={`Team alias for ${account.label}`}
-            placeholder="Team alias"
+            aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
+            placeholder={t("accounts.card.team_alias")}
             value={alias}
             onChange={(event) => setAlias(event.target.value)}
             onBlur={() => onUpdateAlias(alias)}
           />
         </div>
       </div>
-      <UsageCell title="5 hour" usedPercent={account.usage?.fiveHour?.usedPercent} />
-      <UsageCell title="Weekly" usedPercent={account.usage?.oneWeek?.usedPercent} />
+      <UsageCell title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+      <UsageCell title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
       <div className="account-actions">
         <span className="plan-label">{account.normalizedPlanLabel}</span>
         <button type="button" onClick={onRefresh}>
-          Refresh
+          {t("common.refresh")}
         </button>
         <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
-          Switch
+          {t("accounts.action.switch")}
         </button>
       </div>
     </article>
   );
 }
 
-function UsageCell({ title, usedPercent }: { title: string; usedPercent?: number }): ReactElement {
+function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
   const percent = clampPercent(usedPercent);
   return (
     <div className="usage-cell">
       <div>
         <span>{title}</span>
-        <strong>{usedPercent === undefined ? "No data" : `${Math.round(percent)}% used`}</strong>
+        <strong>{usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: Math.round(percent) })}</strong>
       </div>
       <div className="usage-track">
         <span style={{ width: `${percent}%` }} />
@@ -513,6 +506,7 @@ interface ProxyPageProps {
   selectedModel: string;
   setSelectedEndpoint: (id: ProxyEndpointID) => void;
   setSelectedModel: (model: string) => void;
+  t: Translator;
 }
 
 function ProxyPage(props: ProxyPageProps): ReactElement {
@@ -538,22 +532,22 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
         <div className="proxy-control">
           <div className={props.proxyState.isRunning ? "status-pill running" : "status-pill"}>
             <span />
-            {props.proxyState.isRunning ? "Running" : "Stopped"}
+            {props.proxyState.isRunning ? props.t("proxy.status.running") : props.t("proxy.status.stopped")}
           </div>
           <label>
-            <span>Port</span>
+            <span>{props.t("proxy.port")}</span>
             <input disabled={props.proxyState.isRunning} inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value)} />
           </label>
           <label className="api-key-field">
-            <span>API key</span>
+            <span>{props.t("proxy.api_key")}</span>
             <input disabled={props.proxyState.isRunning} value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
           </label>
           <button type="button" disabled={props.proxyState.isRunning || isBusy} onClick={props.onRegenerateApiKey}>
-            Regenerate
+            {props.t("proxy.api_key.regenerate")}
           </button>
           {props.proxyState.isRunning ? (
             <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
-              Stop
+              {props.t("common.stop")}
             </button>
           ) : (
             <button
@@ -562,14 +556,14 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
               disabled={isBusy}
               onClick={() => props.onStart(Number(port), apiKey)}
             >
-              Start
+              {props.t("common.start")}
             </button>
           )}
         </div>
 
         <div className="split-region">
           <section>
-            <h3>Endpoints</h3>
+            <h3>{props.t("proxy.section.endpoints")}</h3>
             <div className="endpoint-list">
               {proxyEndpoints.map((item) => (
                 <button
@@ -580,14 +574,14 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
                 >
                   <span>{item.method}</span>
                   <code>{item.path}</code>
-                  <em>{item.description}</em>
+                  <em>{proxyEndpointDescription(item.id, props.t)}</em>
                 </button>
               ))}
             </div>
           </section>
 
           <section>
-            <h3>Models</h3>
+            <h3>{props.t("proxy.section.models")}</h3>
             <div className="model-list">
               {props.proxyState.availableModels.map((model) => (
                 <button
@@ -603,27 +597,27 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
           </section>
         </div>
 
-        <CodeBlock label="curl" text={curlText} onCopy={() => props.onCopy(curlText)} />
-        <CodeBlock label="environment" text={configText} onCopy={() => props.onCopy(configText)} />
+        <CodeBlock label={props.t("proxy.code.curl")} text={curlText} onCopy={() => props.onCopy(curlText)} t={props.t} />
+        <CodeBlock label={props.t("proxy.code.environment")} text={configText} onCopy={() => props.onCopy(configText)} t={props.t} />
       </section>
 
       <aside className="inspector">
-        <h3>Proxy details</h3>
-        <MetricRow label="Base URL" value={props.proxyState.proxyURL} />
-        <MetricRow label="API key" value={apiKey ? maskSecret(apiKey) : "Missing"} />
-        <MetricRow label="Selected model" value={props.selectedModel} />
+        <h3>{props.t("proxy.details.title")}</h3>
+        <MetricRow label={props.t("proxy.details.base_url")} value={props.proxyState.proxyURL} />
+        <MetricRow label={props.t("proxy.api_key")} value={apiKey ? maskSecret(apiKey) : props.t("common.missing")} />
+        <MetricRow label={props.t("proxy.details.selected_model")} value={props.selectedModel} />
       </aside>
     </div>
   );
 }
 
-function CodeBlock({ label, text, onCopy }: { label: string; text: string; onCopy: () => void }): ReactElement {
+function CodeBlock({ label, text, onCopy, t }: { label: string; text: string; onCopy: () => void; t: Translator }): ReactElement {
   return (
     <section className="code-block">
       <div>
         <span>{label}</span>
         <button type="button" onClick={onCopy}>
-          Copy
+          {t("common.copy")}
         </button>
       </div>
       <pre>{text}</pre>
@@ -635,45 +629,47 @@ interface SettingsPageProps {
   installedEditors: InstalledEditorApp[];
   onUpdateSettings: (patch: AppSettingsPatch) => void;
   settings: AppSettings;
+  t: Translator;
 }
 
-function SettingsPage({ installedEditors, onUpdateSettings, settings }: SettingsPageProps): ReactElement {
+function SettingsPage({ installedEditors, onUpdateSettings, settings, t }: SettingsPageProps): ReactElement {
+  const localeOptions = appLocales.map((locale) => ({ id: locale, label: t(languageNameKey(locale)) }));
   return (
     <div className="settings-layout">
       <section className="settings-section">
-        <h3>General</h3>
+        <h3>{t("settings.section.general")}</h3>
         <ToggleRow
           checked={settings.launchAtStartup}
-          label="Launch at startup"
+          label={t("settings.launch_at_startup")}
           onChange={(value) => onUpdateSettings({ launchAtStartup: value })}
         />
         <ToggleRow
           checked={settings.autoStartProxy}
-          label="Start proxy automatically"
+          label={t("settings.auto_start_proxy")}
           onChange={(value) => onUpdateSettings({ autoStartProxy: value })}
         />
       </section>
 
       <section className="settings-section">
-        <h3>Switch behavior</h3>
+        <h3>{t("settings.section.switch_behavior")}</h3>
         <ToggleRow
           checked={settings.launchCodexAfterSwitch}
-          label="Launch Codex after switching"
+          label={t("settings.launch_codex_after_switch")}
           onChange={(value) => onUpdateSettings({ launchCodexAfterSwitch: value })}
         />
         <ToggleRow
           checked={settings.autoSmartSwitch}
-          label="Auto smart switch"
+          label={t("settings.auto_smart_switch")}
           onChange={(value) => onUpdateSettings({ autoSmartSwitch: value })}
         />
         <ToggleRow
           checked={settings.restartEditorsOnSwitch}
-          label="Restart editors after switching"
+          label={t("settings.restart_editors_on_switch")}
           onChange={(value) => onUpdateSettings({ restartEditorsOnSwitch: value })}
         />
         <div className="editor-targets" aria-disabled={!settings.restartEditorsOnSwitch}>
           {installedEditors.length === 0 ? (
-            <p>No supported editors detected.</p>
+            <p>{t("settings.no_supported_editors")}</p>
           ) : (
             installedEditors.map((editor) => (
               <label key={editor.id}>
@@ -695,9 +691,9 @@ function SettingsPage({ installedEditors, onUpdateSettings, settings }: Settings
       </section>
 
       <section className="settings-section">
-        <h3>Language</h3>
+        <h3>{t("settings.section.language")}</h3>
         <label className="select-row">
-          <span>Application language</span>
+          <span>{t("settings.application_language")}</span>
           <select value={settings.locale} onChange={(event) => onUpdateSettings({ locale: event.target.value })}>
             {localeOptions.map((locale) => (
               <option key={locale.id} value={locale.id}>
@@ -785,14 +781,25 @@ function proxyConfigText(baseURL: string, endpoint: ProxyEndpointID, apiKey: str
   return `OPENAI_BASE_URL=${baseURL}/v1\nOPENAI_API_KEY=${apiKey}`;
 }
 
-function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult): string {
+function proxyEndpointDescription(endpoint: ProxyEndpointID, t: Translator): string {
+  switch (endpoint) {
+    case "chatCompletions":
+      return t("proxy.endpoint.chat_completions");
+    case "responses":
+      return t("proxy.endpoint.responses");
+    case "messages":
+      return t("proxy.endpoint.messages");
+  }
+}
+
+function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult, t: Translator): string {
   if (result.targetCount === 0) {
-    return "No weekly quota accounts need warmup";
+    return t("accounts.notice.weekly_no_targets");
   }
   if (result.failures.length === 0) {
-    return `Weekly quota warmup complete: ${result.succeededCount} succeeded`;
+    return t("accounts.notice.weekly_complete", { succeeded: result.succeededCount });
   }
-  return `Weekly quota warmup finished: ${result.succeededCount} succeeded, ${result.failures.length} failed`;
+  return t("accounts.notice.weekly_partial", { succeeded: result.succeededCount, failed: result.failures.length });
 }
 
 export default App;
