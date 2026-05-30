@@ -1,7 +1,6 @@
 import { resolveAppLocale, type AppLocaleID } from "@shared/models/settings";
 
 const enMessages = {
-  "app.eyebrow": "CodexManager for Windows",
   "aria.primary": "Primary",
   "tab.accounts": "Accounts",
   "tab.proxy": "Proxy",
@@ -123,7 +122,6 @@ export type Translator = (key: MessageKey, values?: Record<string, string | numb
 const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   en: enMessages,
   "zh-Hans": {
-    "app.eyebrow": "CodexManager Windows 版",
     "aria.primary": "主导航",
     "tab.accounts": "账号",
     "tab.proxy": "代理",
@@ -239,7 +237,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   "zh-Hant": {
-    "app.eyebrow": "CodexManager Windows 版",
     "aria.primary": "主導覽",
     "tab.accounts": "帳號",
     "tab.proxy": "代理",
@@ -355,7 +352,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   ja: {
-    "app.eyebrow": "CodexManager for Windows",
     "aria.primary": "メイン",
     "tab.accounts": "アカウント",
     "tab.proxy": "プロキシ",
@@ -471,7 +467,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   ko: {
-    "app.eyebrow": "Windows용 CodexManager",
     "aria.primary": "기본",
     "tab.accounts": "계정",
     "tab.proxy": "프록시",
@@ -587,7 +582,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   fr: {
-    "app.eyebrow": "CodexManager pour Windows",
     "aria.primary": "Principal",
     "tab.accounts": "Comptes",
     "tab.proxy": "Proxy",
@@ -703,7 +697,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   de: {
-    "app.eyebrow": "CodexManager für Windows",
     "aria.primary": "Primär",
     "tab.accounts": "Konten",
     "tab.proxy": "Proxy",
@@ -819,7 +812,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   it: {
-    "app.eyebrow": "CodexManager per Windows",
     "aria.primary": "Principale",
     "tab.accounts": "Account",
     "tab.proxy": "Proxy",
@@ -935,7 +927,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   es: {
-    "app.eyebrow": "CodexManager para Windows",
     "aria.primary": "Principal",
     "tab.accounts": "Cuentas",
     "tab.proxy": "Proxy",
@@ -1051,7 +1042,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   ru: {
-    "app.eyebrow": "CodexManager для Windows",
     "aria.primary": "Основной",
     "tab.accounts": "Аккаунты",
     "tab.proxy": "Прокси",
@@ -1167,7 +1157,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
     "language.dutch": "Nederlands"
   },
   nl: {
-    "app.eyebrow": "CodexManager voor Windows",
     "aria.primary": "Primair",
     "tab.accounts": "Accounts",
     "tab.proxy": "Proxy",

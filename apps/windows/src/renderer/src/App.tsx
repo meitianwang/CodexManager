@@ -217,7 +217,6 @@ function App(): ReactElement {
       <section className="workspace" aria-labelledby="page-title">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">{t("app.eyebrow")}</p>
             <h2 id="page-title">{currentPageLabel}</h2>
           </div>
           {notice && <div className={`notice ${notice.tone}`}>{notice.text}</div>}

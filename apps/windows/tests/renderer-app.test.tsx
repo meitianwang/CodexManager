@@ -24,9 +24,14 @@ describe("Windows renderer app", () => {
     expect(rendererStyles()).toContain("grid-template-columns: 162px minmax(0, 1fr);");
     expect(rendererStyles()).toContain("gap: 18px;");
     expect(rendererStyles()).toContain("padding: 18px 14px 14px;");
+    expect(rendererStyles()).toContain("padding: 18px 22px 22px;");
+    expect(rendererStyles()).toContain("margin-bottom: 14px;");
+    expect(rendererStyles()).toContain("font-size: 20px;");
     expect(container.querySelector(".brand-block .brand-mark")?.textContent).toBe("</>");
     expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
     expect(container.querySelector(".brand-block p")).toBeNull();
+    expect(container.querySelector(".workspace-header .eyebrow")).toBeNull();
+    expect(screen.queryByText("CodexManager for Windows")).toBeNull();
     expect(container.querySelectorAll(".nav-list .nav-icon")).toHaveLength(3);
     expect(container.querySelector(".nav-list .accounts-nav-icon")).toBeTruthy();
     expect(container.querySelector(".nav-list .proxy-nav-icon")).toBeTruthy();
