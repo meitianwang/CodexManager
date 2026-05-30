@@ -720,14 +720,17 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
             t={t}
           />
           <div className="account-actions">
-            <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
-              {t("accounts.action.switch")}
+            <button className="account-action-button" type="button" onClick={onSwitch} disabled={account.isCurrent}>
+              <span className="account-action-icon switch-icon" aria-hidden="true" />
+              <span>{t("accounts.action.switch")}</span>
             </button>
-            <button type="button" onClick={onRefresh}>
-              {t("common.refresh")}
+            <button className="account-action-button" type="button" onClick={onRefresh}>
+              <span className="account-action-icon refresh-icon" aria-hidden="true" />
+              <span>{t("common.refresh")}</span>
             </button>
-            <button className="danger" type="button" onClick={onDelete}>
-              {t("accounts.action.delete")}
+            <button className="account-action-button danger" type="button" onClick={onDelete}>
+              <span className="account-action-icon trash-icon" aria-hidden="true" />
+              <span>{t("accounts.action.delete")}</span>
             </button>
           </div>
         </>

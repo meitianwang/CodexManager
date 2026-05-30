@@ -46,6 +46,9 @@ describe("Windows renderer app", () => {
     expect(accountRow("Work").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
     expect(accountRow("Work").querySelector(".account-identifier")).toBeNull();
     expect(accountRow("Work").querySelector(".account-actions")?.textContent).toBe("SwitchRefreshDelete");
+    expect(accountRow("Work").querySelector(".account-actions .switch-icon")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".account-actions .refresh-icon")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".account-actions .trash-icon")).toBeTruthy();
     expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
     expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
     expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([

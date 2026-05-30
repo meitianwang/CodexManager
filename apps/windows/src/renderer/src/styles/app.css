@@ -674,6 +674,93 @@ button.danger {
   gap: 7px;
 }
 
+.account-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.account-action-button > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-action-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+}
+
+.switch-icon::before,
+.switch-icon::after,
+.refresh-icon::before,
+.refresh-icon::after,
+.trash-icon::before,
+.trash-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.switch-icon::before,
+.switch-icon::after {
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+.switch-icon::before {
+  left: 1px;
+  transform: rotate(-135deg);
+}
+
+.switch-icon::after {
+  right: 1px;
+  transform: rotate(45deg);
+}
+
+.refresh-icon::before {
+  inset: 2px;
+  border: 2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 999px;
+}
+
+.refresh-icon::after {
+  right: 1px;
+  top: 1px;
+  width: 5px;
+  height: 5px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: rotate(20deg);
+}
+
+.trash-icon::before {
+  left: 4px;
+  top: 1px;
+  width: 7px;
+  height: 2px;
+  border-top: 2px solid currentColor;
+}
+
+.trash-icon::after {
+  left: 3px;
+  top: 5px;
+  width: 9px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-top-width: 1px;
+  border-radius: 0 0 2px 2px;
+}
+
 .metric-row {
   display: grid;
   gap: 3px;
