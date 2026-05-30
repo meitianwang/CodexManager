@@ -10,6 +10,7 @@ import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import type { SwitchAccountExecutionResult } from "../../shared/models/app";
 import { idleSwitchAccountExecutionResult } from "../../shared/models/app";
+import type { AppSettings, EditorAppID } from "../../shared/models/settings";
 import type { UsageSnapshot } from "../../shared/models/usage";
 import { accountKeyForExtractedAuth, accountKeyForStoredAccount, preferredMatchIndex } from "../../shared/domain/account-identity";
 import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
@@ -38,8 +39,22 @@ export interface UsageServiceLike {
   fetchUsage(accessToken: string, accountId: string): Promise<UsageSnapshot>;
 }
 
+export interface SettingsRepositoryLike {
+  loadSettings(): Promise<AppSettings>;
+}
+
 export interface ChatGPTOAuthLoginServiceLike {
   signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens>;
+}
+
+export interface CodexCLIServiceLike {
+  launchApp(workspacePath?: string): Promise<boolean>;
+}
+
+export interface EditorAppServiceLike {
+  restartSelectedApps(
+    targets: readonly EditorAppID[]
+  ): Promise<{ restarted: EditorAppID[]; error?: string }> | { restarted: EditorAppID[]; error?: string };
 }
 
 export interface DateProviderLike {
@@ -50,8 +65,11 @@ export interface DateProviderLike {
 export interface AccountsCoordinatorOptions {
   storeRepository: AccountsStoreRepositoryLike;
   authRepository: AuthRepositoryLike;
+  settingsRepository?: SettingsRepositoryLike;
   usageService?: UsageServiceLike;
   chatGPTOAuthLoginService?: ChatGPTOAuthLoginServiceLike;
+  codexCLIService?: CodexCLIServiceLike;
+  editorAppService?: EditorAppServiceLike;
   dateProvider?: DateProviderLike;
   sourceDeviceID?: string;
 }
@@ -64,16 +82,22 @@ export interface SmartSwitchResult {
 export class AccountsCoordinator {
   private readonly storeRepository: AccountsStoreRepositoryLike;
   private readonly authRepository: AuthRepositoryLike;
+  private readonly settingsRepository?: SettingsRepositoryLike;
   private readonly usageService?: UsageServiceLike;
   private readonly chatGPTOAuthLoginService?: ChatGPTOAuthLoginServiceLike;
+  private readonly codexCLIService?: CodexCLIServiceLike;
+  private readonly editorAppService?: EditorAppServiceLike;
   private readonly dateProvider: DateProviderLike;
   private readonly sourceDeviceID: string;
 
   constructor(options: AccountsCoordinatorOptions) {
     this.storeRepository = options.storeRepository;
     this.authRepository = options.authRepository;
+    this.settingsRepository = options.settingsRepository;
     this.usageService = options.usageService;
     this.chatGPTOAuthLoginService = options.chatGPTOAuthLoginService;
+    this.codexCLIService = options.codexCLIService;
+    this.editorAppService = options.editorAppService;
     this.dateProvider =
       options.dateProvider ??
       {
@@ -138,9 +162,14 @@ export class AccountsCoordinator {
     await this.updateCurrentAccountProjection(account.authJson);
   }
 
-  async switchAccountAndApplySettings(id: string): Promise<SwitchAccountExecutionResult> {
-    await this.switchAccount(id);
-    return { ...idleSwitchAccountExecutionResult };
+  async switchAccountAndApplySettings(id: string, workspacePath?: string): Promise<SwitchAccountExecutionResult> {
+    const account = await this.prepareStoredAccountForSwitch(id);
+    await this.updateCurrentAccountProjection(account.authJson);
+    const settings = await this.settingsRepository?.loadSettings();
+    if (!settings) {
+      return { ...idleSwitchAccountExecutionResult };
+    }
+    return this.applySwitchSideEffects(settings, workspacePath);
   }
 
   async smartSwitch(): Promise<SmartSwitchResult | undefined> {
@@ -299,6 +328,25 @@ export class AccountsCoordinator {
     };
     await this.storeRepository.saveStore(store);
     await this.authRepository.writeCurrentAuth(authJson);
+  }
+
+  private async applySwitchSideEffects(
+    settings: AppSettings,
+    workspacePath: string | undefined
+  ): Promise<SwitchAccountExecutionResult> {
+    const result: SwitchAccountExecutionResult = { ...idleSwitchAccountExecutionResult };
+
+    if (settings.restartEditorsOnSwitch && this.editorAppService) {
+      const restart = await this.editorAppService.restartSelectedApps(settings.restartEditorTargets);
+      result.restartedEditorApps = restart.restarted;
+      result.editorRestartError = restart.error;
+    }
+
+    if (settings.launchCodexAfterSwitch && this.codexCLIService) {
+      result.usedFallbackCLI = await this.codexCLIService.launchApp(workspacePath);
+    }
+
+    return result;
   }
 
   private async currentAuthAccountKey(): Promise<string | undefined> {

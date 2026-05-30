@@ -6,9 +6,13 @@ import type { UsageSnapshot } from "../src/shared/models/usage";
 import type {
   AccountsStoreRepositoryLike,
   AuthRepositoryLike,
+  CodexCLIServiceLike,
+  EditorAppServiceLike,
+  SettingsRepositoryLike,
   UsageServiceLike
 } from "../src/main/services/accounts-coordinator";
 import { AccountsCoordinator } from "../src/main/services/accounts-coordinator";
+import { defaultAppSettings, type AppSettings, type EditorAppID } from "../src/shared/models/settings";
 import { accountKeyForStoredAccount } from "../src/shared/domain/account-identity";
 import {
   pickAutoSwitchTarget,
@@ -191,6 +195,52 @@ describe("accounts coordinator", () => {
     });
     expect(authRepository.currentAuth).toEqual(accountB.authJson);
   });
+
+  it("applies launch and editor restart side effects after switching accounts", async () => {
+    const account = makeStoredAccount({ id: "b", accountId: "acct-b", email: "b@example.com" });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(undefined);
+    const settingsRepository = new FakeSettingsRepository({
+      ...defaultAppSettings(),
+      launchCodexAfterSwitch: true,
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: ["cursor"]
+    });
+    let launchedWorkspacePath: string | undefined;
+    let restartTargets: EditorAppID[] = [];
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      settingsRepository,
+      codexCLIService: {
+        async launchApp(workspacePath?: string) {
+          launchedWorkspacePath = workspacePath;
+          return true;
+        }
+      } satisfies CodexCLIServiceLike,
+      editorAppService: {
+        async restartSelectedApps(targets: readonly EditorAppID[]) {
+          restartTargets = [...targets];
+          return { restarted: ["cursor"], error: "Cursor restart warning" };
+        }
+      } satisfies EditorAppServiceLike,
+      dateProvider: fixedDateProvider()
+    });
+
+    const execution = await coordinator.switchAccountAndApplySettings("b", String.raw`C:\workspaces\demo`);
+
+    expect(execution).toEqual({
+      usedFallbackCLI: true,
+      restartedEditorApps: ["cursor"],
+      editorRestartError: "Cursor restart warning"
+    });
+    expect(launchedWorkspacePath).toBe(String.raw`C:\workspaces\demo`);
+    expect(restartTargets).toEqual(["cursor"]);
+    expect(authRepository.currentAuth).toEqual(account.authJson);
+  });
 });
 
 class MemoryStoreRepository implements AccountsStoreRepositoryLike {
@@ -202,6 +252,14 @@ class MemoryStoreRepository implements AccountsStoreRepositoryLike {
 
   async saveStore(store: AccountsStore): Promise<void> {
     this.store = structuredClone(store);
+  }
+}
+
+class FakeSettingsRepository implements SettingsRepositoryLike {
+  constructor(private readonly settings: AppSettings) {}
+
+  async loadSettings(): Promise<AppSettings> {
+    return structuredClone(this.settings);
   }
 }
 
