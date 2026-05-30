@@ -85,8 +85,10 @@ function App(): ReactElement {
   }, [api]);
 
   useEffect(() => {
-    void runAction("Loading", loadData, { silentSuccess: true });
-  }, [loadData, runAction]);
+    void loadData().catch((error: unknown) => {
+      setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
+    });
+  }, [loadData]);
 
   const reloadAccounts = useCallback(async () => {
     if (!api) {
@@ -166,7 +168,7 @@ function App(): ReactElement {
             onAddViaLogin={() =>
               runAction(t("accounts.action.sign_in"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.addViaLogin();
                 await reloadAccounts();
@@ -175,7 +177,7 @@ function App(): ReactElement {
             onDeleteSelected={() =>
               runAction(t("accounts.action.delete"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 for (const id of selectedAccountIds) {
                   await api.accounts.delete(id);
@@ -187,7 +189,7 @@ function App(): ReactElement {
             onExportSelected={() =>
               runAction(t("accounts.action.export"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 const result = await api.accounts.exportPackage([...selectedAccountIds]);
                 if (result.canceled) {
@@ -198,7 +200,7 @@ function App(): ReactElement {
             onImportAuthFile={() =>
               runAction(t("accounts.action.import_file"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.importAuthFile();
                 await reloadAccounts();
@@ -207,7 +209,7 @@ function App(): ReactElement {
             onImportCurrent={() =>
               runAction(t("accounts.action.import_current"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.importCurrentAuth();
                 await reloadAccounts();
@@ -216,7 +218,7 @@ function App(): ReactElement {
             onImportPackage={() =>
               runAction(t("accounts.action.import_package"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.importPackage();
                 await reloadAccounts();
@@ -225,7 +227,7 @@ function App(): ReactElement {
             onRefreshAll={() =>
               runAction(t("accounts.action.refresh_usage"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 setAccounts(await api.accounts.refreshAllUsage());
               })
@@ -235,7 +237,7 @@ function App(): ReactElement {
                 t("accounts.action.warm_weekly_quota"),
                 async () => {
                   if (!api) {
-                    throw new Error("IPC bridge is unavailable");
+                    throw new Error(t("error.ipc_bridge_unavailable"));
                   }
                   const result = await api.accounts.warmUpWeeklyQuota();
                   setAccounts(result.accounts);
@@ -247,7 +249,7 @@ function App(): ReactElement {
             onRefreshUsage={(id) =>
               runAction(t("common.refresh"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 const refreshed = await api.accounts.refreshUsage(id);
                 setAccounts((current) => current.map((account) => (account.id === id ? refreshed : account)));
@@ -256,7 +258,7 @@ function App(): ReactElement {
             onSmartSwitch={() =>
               runAction(t("accounts.action.smart_switch"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.smartSwitch();
                 await reloadAccounts();
@@ -265,7 +267,7 @@ function App(): ReactElement {
             onSwitchAccount={(id) =>
               runAction(t("accounts.action.switch"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.switch(id);
                 await reloadAccounts();
@@ -275,7 +277,7 @@ function App(): ReactElement {
             onUpdateAlias={(id, alias) =>
               runAction(t("accounts.card.team_alias"), async () => {
                 if (!api) {
-                  throw new Error("IPC bridge is unavailable");
+                  throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 const updated = await api.accounts.updateTeamAlias(id, alias);
                 setAccounts((current) => current.map((account) => (account.id === id ? updated : account)));
