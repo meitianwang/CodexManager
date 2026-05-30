@@ -22,6 +22,7 @@ alfred/team654301-card-tool-src/__pycache__/
 
 # Orphaned files from referenced Codex Electron project
 package.json
+!apps/windows/package.json
 node_modules/
 config-queries-*.js
 external-agent-config-utils-*.js
