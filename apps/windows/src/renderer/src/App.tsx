@@ -662,8 +662,9 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
   const isBusy = Boolean(props.busyAction);
 
   return (
-    <div className="page-grid proxy-grid">
-      <section className="content-region">
+    <div className="proxy-layout">
+      <section className="proxy-section">
+        <h3>{props.t("proxy.section.control")}</h3>
         <div className="proxy-control">
           <div className={props.proxyState.isRunning ? "status-pill running" : "status-pill"}>
             <span />
@@ -700,53 +701,49 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
             </button>
           )}
         </div>
-
-        <div className="split-region">
-          <section>
-            <h3>{props.t("proxy.section.endpoints")}</h3>
-            <div className="endpoint-list">
-              {proxyEndpoints.map((item) => (
-                <button
-                  key={item.id}
-                  className={item.id === props.selectedEndpoint ? "endpoint-row selected" : "endpoint-row"}
-                  type="button"
-                  onClick={() => props.setSelectedEndpoint(item.id)}
-                >
-                  <span>{item.method}</span>
-                  <code>{item.path}</code>
-                  <em>{proxyEndpointDescription(item.id, props.t)}</em>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h3>{props.t("proxy.section.models")}</h3>
-            <div className="model-list">
-              {props.proxyState.availableModels.map((model) => (
-                <button
-                  key={model}
-                  className={model === props.selectedModel ? "model-chip selected" : "model-chip"}
-                  type="button"
-                  onClick={() => props.setSelectedModel(model)}
-                >
-                  {model}
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <CodeBlock label={props.t("proxy.code.curl")} text={curlText} onCopy={() => props.onCopy(curlText)} t={props.t} />
-        <CodeBlock label={props.t("proxy.code.environment")} text={configText} onCopy={() => props.onCopy(configText)} t={props.t} />
       </section>
 
-      <aside className="inspector">
-        <h3>{props.t("proxy.details.title")}</h3>
-        <MetricRow label={props.t("proxy.details.base_url")} value={props.proxyState.proxyURL} />
-        <MetricRow label={props.t("proxy.api_key")} value={apiKey ? maskSecret(apiKey) : props.t("common.missing")} />
-        <MetricRow label={props.t("proxy.details.selected_model")} value={props.selectedModel} />
-      </aside>
+      <div className="split-region">
+        <section className="proxy-section">
+          <h3>{props.t("proxy.section.endpoints")}</h3>
+          <div className="endpoint-list">
+            {proxyEndpoints.map((item) => (
+              <button
+                key={item.id}
+                className={item.id === props.selectedEndpoint ? "endpoint-row selected" : "endpoint-row"}
+                type="button"
+                onClick={() => props.setSelectedEndpoint(item.id)}
+              >
+                <span>{item.method}</span>
+                <code>{item.path}</code>
+                <em>{proxyEndpointDescription(item.id, props.t)}</em>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="proxy-section">
+          <h3>{props.t("proxy.section.models")}</h3>
+          <div className="model-list">
+            {props.proxyState.availableModels.map((model) => (
+              <button
+                key={model}
+                className={model === props.selectedModel ? "model-chip selected" : "model-chip"}
+                type="button"
+                onClick={() => props.setSelectedModel(model)}
+              >
+                {model}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="proxy-section">
+        <h3>{props.t("proxy.section.usage")}</h3>
+        <CodeBlock label={props.t("proxy.usage.curl_example")} text={curlText} onCopy={() => props.onCopy(curlText)} t={props.t} />
+        <CodeBlock label={props.t("proxy.usage.config_hint")} text={configText} onCopy={() => props.onCopy(configText)} t={props.t} />
+      </section>
     </div>
   );
 }
@@ -914,13 +911,6 @@ function clampPercent(value: number | undefined): number {
     return 0;
   }
   return Math.max(0, Math.min(100, value));
-}
-
-function maskSecret(value: string): string {
-  if (value.length <= 14) {
-    return value;
-  }
-  return `${value.slice(0, 10)}...${value.slice(-4)}`;
 }
 
 function proxyCurlExample(baseURL: string, endpoint: ProxyEndpointID, model: string, apiKey: string): string {

@@ -111,6 +111,12 @@ describe("Windows renderer app", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Proxy" }));
+    expect(screen.getByRole("heading", { name: "Proxy Control" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Endpoints" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Models" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
+    expect(screen.getByText("cURL example:")).toBeTruthy();
+    expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Port"), { target: { value: "17888" } });
     fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-local-test" } });

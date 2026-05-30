@@ -226,6 +226,7 @@ select:focus {
 
 .content-region,
 .inspector,
+.proxy-section,
 .settings-section {
   border: 1px solid #2b2e25;
   border-radius: 8px;
@@ -238,12 +239,14 @@ select:focus {
 }
 
 .inspector,
+.proxy-section,
 .settings-section {
   padding: 16px;
 }
 
 .inspector h3,
 .content-region h3,
+.proxy-section h3,
 .settings-section h3 {
   margin-bottom: 14px;
   color: #f0f3ea;
@@ -548,8 +551,9 @@ button.danger {
   font-size: 13px;
 }
 
-.proxy-grid {
-  grid-template-columns: minmax(0, 1fr) 320px;
+.proxy-layout {
+  display: grid;
+  gap: 14px;
 }
 
 .proxy-control {
@@ -557,7 +561,6 @@ button.danger {
   grid-template-columns: 120px 110px minmax(280px, 1fr) auto auto;
   gap: 10px;
   align-items: end;
-  margin-bottom: 16px;
 }
 
 .proxy-control label {
@@ -595,7 +598,6 @@ button.danger {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
   gap: 16px;
-  margin-bottom: 16px;
 }
 
 .endpoint-list,
@@ -650,7 +652,7 @@ button.danger {
   text-overflow: ellipsis;
 }
 
-.code-block {
+.code-block + .code-block {
   margin-top: 10px;
 }
 
@@ -714,7 +716,7 @@ button.danger {
 
 @media (max-width: 1080px) {
   .page-grid,
-  .proxy-grid {
+  .split-region {
     grid-template-columns: 1fr;
   }
 
@@ -731,8 +733,7 @@ button.danger {
     grid-template-columns: 90px 1fr 1fr;
   }
 
-  .proxy-control,
-  .split-region {
+  .proxy-control {
     grid-template-columns: 1fr;
   }
 }
