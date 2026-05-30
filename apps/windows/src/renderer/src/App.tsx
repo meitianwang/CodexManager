@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { appInfo as fallbackAppInfo, type AppInfo } from "@shared/app-info";
 import { sortByRemaining } from "@shared/domain/account-ranking";
 import type { AccountsImportDraftDescriptor, AccountTransferSelectableItem } from "@shared/models/account-transfer";
@@ -684,8 +684,8 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
           />
         </div>
       </div>
-      <UsageCell title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
-      <UsageCell title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+      <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+      <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
       <ResetCell
         fiveHourResetAt={account.usage?.fiveHour?.resetAt}
         locale={locale}
@@ -810,24 +810,47 @@ function AccountTransferSelectionDialog({
   );
 }
 
-function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
+type QuotaRingStyle = CSSProperties & {
+  "--quota-progress": string;
+};
+
+function UsageCell({
+  title,
+  tone,
+  usedPercent,
+  t
+}: {
+  title: string;
+  tone: "success" | "info";
+  usedPercent?: number;
+  t: Translator;
+}): ReactElement {
   const hasUsage = usedPercent !== undefined && Number.isFinite(usedPercent);
   const used = hasUsage ? clampPercent(usedPercent) : 0;
   const remaining = hasUsage ? Math.max(0, 100 - used) : 0;
+  const remainingText = hasUsage ? `${Math.round(remaining)}%` : "--";
+  const usedText = hasUsage ? t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` }) : t("accounts.usage.no_data");
   return (
-    <div className="usage-cell">
-      <div>
-        <span>{title}</span>
-        <strong>
-          {usedPercent === undefined ? "--" : `${Math.round(remaining)}%`}
-        </strong>
-        <small>{usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` })}</small>
+    <div className={`usage-cell quota-ring-card ${tone}`}>
+      <div className="quota-ring" style={quotaRingStyle(remaining)}>
+        <div className="quota-ring-center">
+          <span>{compactWindowTitle(title)}</span>
+          <strong>{remainingText}</strong>
+        </div>
       </div>
-      <div className="usage-track">
-        <span style={{ width: `${remaining}%` }} />
-      </div>
+      <small>{usedText}</small>
     </div>
   );
+}
+
+function quotaRingStyle(remainingPercent: number): QuotaRingStyle {
+  return {
+    "--quota-progress": `${Math.max(0, Math.min(100, remainingPercent))}%`
+  };
+}
+
+function compactWindowTitle(title: string): string {
+  return title === "1 week" ? "1w" : title;
 }
 
 function ResetCell({

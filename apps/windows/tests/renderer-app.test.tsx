@@ -84,6 +84,8 @@ describe("Windows renderer app", () => {
     expect(within(accountRow("Work")).getByText("66%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 34%")).toBeTruthy();
+    expect(accountRow("Work").querySelectorAll(".quota-ring")).toHaveLength(2);
+    expect(accountRow("Work").querySelector(".usage-track")).toBeNull();
     expect(within(accountRow("Work")).getByText("Reset")).toBeTruthy();
     const resetRows = Array.from(accountRow("Work").querySelectorAll(".reset-row")).map((row) => row.textContent ?? "");
     expect(resetRows).toHaveLength(2);
