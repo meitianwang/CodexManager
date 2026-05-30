@@ -776,6 +776,20 @@ interface SettingsPageProps {
 
 function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSettings, settings, t }: SettingsPageProps): ReactElement {
   const localeOptions = appLocales.map((locale) => ({ id: locale, label: t(languageNameKey(locale)) }));
+  const selectedRestartEditorTarget = settings.restartEditorTargets[0] ?? "";
+  const updateRestartEditorsOnSwitch = (value: boolean) => {
+    if (!value || settings.restartEditorTargets.length > 0) {
+      onUpdateSettings({ restartEditorsOnSwitch: value });
+      return;
+    }
+
+    const firstInstalledEditor = installedEditors[0]?.id;
+    onUpdateSettings({
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: firstInstalledEditor ? [firstInstalledEditor] : []
+    });
+  };
+
   return (
     <div className="settings-layout">
       <section className="settings-section">
@@ -784,6 +798,11 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
           checked={settings.launchAtStartup}
           label={t("settings.launch_at_startup")}
           onChange={(value) => onUpdateSettings({ launchAtStartup: value })}
+        />
+        <ToggleRow
+          checked={settings.launchCodexAfterSwitch}
+          label={t("settings.launch_codex_after_switch")}
+          onChange={(value) => onUpdateSettings({ launchCodexAfterSwitch: value })}
         />
         <ToggleRow
           checked={settings.autoStartProxy}
@@ -795,11 +814,6 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
       <section className="settings-section">
         <h3>{t("settings.section.switch_behavior")}</h3>
         <ToggleRow
-          checked={settings.launchCodexAfterSwitch}
-          label={t("settings.launch_codex_after_switch")}
-          onChange={(value) => onUpdateSettings({ launchCodexAfterSwitch: value })}
-        />
-        <ToggleRow
           checked={settings.autoSmartSwitch}
           label={t("settings.auto_smart_switch")}
           onChange={(value) => onUpdateSettings({ autoSmartSwitch: value })}
@@ -807,29 +821,28 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
         <ToggleRow
           checked={settings.restartEditorsOnSwitch}
           label={t("settings.restart_editors_on_switch")}
-          onChange={(value) => onUpdateSettings({ restartEditorsOnSwitch: value })}
+          onChange={updateRestartEditorsOnSwitch}
         />
-        <div className="editor-targets" aria-disabled={!settings.restartEditorsOnSwitch}>
-          {installedEditors.length === 0 ? (
-            <p>{t("settings.no_supported_editors")}</p>
-          ) : (
-            installedEditors.map((editor) => (
-              <label key={editor.id}>
-                <input
-                  checked={settings.restartEditorTargets.includes(editor.id)}
-                  disabled={!settings.restartEditorsOnSwitch}
-                  type="checkbox"
-                  onChange={() =>
-                    onUpdateSettings({
-                      restartEditorTargets: toggleArrayValue(settings.restartEditorTargets, editor.id)
-                    })
-                  }
-                />
-                <span>{editor.label}</span>
-              </label>
-            ))
-          )}
-        </div>
+        <label className="select-row">
+          <span>{t("settings.editor_restart_target")}</span>
+          <select
+            aria-label={t("settings.editor_restart_target")}
+            disabled={!settings.restartEditorsOnSwitch || installedEditors.length === 0}
+            value={selectedRestartEditorTarget}
+            onChange={(event) =>
+              onUpdateSettings({
+                restartEditorTargets: event.target.value ? [event.target.value as EditorAppID] : []
+              })
+            }
+          >
+            <option value="">{t("common.none")}</option>
+            {installedEditors.map((editor) => (
+              <option key={editor.id} value={editor.id}>
+                {editor.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <section className="settings-section">
@@ -894,10 +907,6 @@ function toggleSetValue(values: ReadonlySet<string>, value: string): Set<string>
     next.add(value);
   }
   return next;
-}
-
-function toggleArrayValue(values: readonly EditorAppID[], value: EditorAppID): EditorAppID[] {
-  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }
 
 function clampPercent(value: number | undefined): number {

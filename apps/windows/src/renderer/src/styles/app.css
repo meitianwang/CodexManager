@@ -686,8 +686,7 @@ button.danger {
 }
 
 .toggle-row,
-.select-row,
-.editor-targets label {
+.select-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -697,32 +696,13 @@ button.danger {
 }
 
 .toggle-row:first-of-type,
-.select-row:first-of-type,
-.editor-targets label:first-child {
+.select-row:first-of-type {
   border-top: 0;
 }
 
-.toggle-row input,
-.editor-targets input {
+.toggle-row input {
   width: 18px;
   min-height: 18px;
-}
-
-.editor-targets {
-  display: grid;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #282c22;
-}
-
-.editor-targets p {
-  margin: 0;
-  color: #9ea697;
-  font-size: 13px;
-}
-
-.editor-targets label {
-  justify-content: flex-start;
 }
 
 .settings-footer {

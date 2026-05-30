@@ -136,7 +136,10 @@ describe("Windows renderer app", () => {
 
   it("persists settings toggles, editor targets, and locale through mocked IPC", async () => {
     const api = installMockAPI({
-      installedEditors: [{ id: "cursor", label: "Cursor" }]
+      installedEditors: [
+        { id: "cursor", label: "Cursor" },
+        { id: "vscode", label: "VS Code" }
+      ]
     });
     render(<App />);
 
@@ -146,10 +149,15 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ launchAtStartup: true }));
 
     fireEvent.click(screen.getByLabelText("Restart editors after switching"));
-    await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorsOnSwitch: true }));
+    await waitFor(() =>
+      expect(api.settings.update).toHaveBeenCalledWith({
+        restartEditorsOnSwitch: true,
+        restartEditorTargets: ["cursor"]
+      })
+    );
 
-    fireEvent.click(await screen.findByLabelText("Cursor"));
-    await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorTargets: ["cursor"] }));
+    fireEvent.change(await screen.findByLabelText("Editor restart target"), { target: { value: "vscode" } });
+    await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorTargets: ["vscode"] }));
 
     fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "zh-Hans" } });
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ locale: "zh-Hans" }));
