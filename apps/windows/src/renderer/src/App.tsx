@@ -659,15 +659,44 @@ interface AccountRowProps {
 
 function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
+  const [isCollapsedSwitchOverlayVisible, setCollapsedSwitchOverlayVisible] = useState(false);
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
   }, [account.teamAlias]);
 
+  const canShowCollapsedSwitchOverlay = isCollapsed && !account.isCurrent;
   const accountTitle = isCollapsed ? shortAccountName(account) : fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
+  useEffect(() => {
+    if (!canShowCollapsedSwitchOverlay) {
+      setCollapsedSwitchOverlayVisible(false);
+    }
+  }, [canShowCollapsedSwitchOverlay]);
+
+  const showCollapsedSwitchOverlay = () => {
+    if (canShowCollapsedSwitchOverlay) {
+      setCollapsedSwitchOverlayVisible(true);
+    }
+  };
+
+  const hideCollapsedSwitchOverlay = () => {
+    setCollapsedSwitchOverlayVisible(false);
+  };
 
   return (
-    <article className={accountCardClassName(account.isCurrent, isCollapsed, viewMode)}>
+    <article
+      aria-label={canShowCollapsedSwitchOverlay ? accountTitle : undefined}
+      className={accountCardClassName(account.isCurrent, isCollapsed, viewMode, isCollapsedSwitchOverlayVisible)}
+      tabIndex={canShowCollapsedSwitchOverlay ? 0 : undefined}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          hideCollapsedSwitchOverlay();
+        }
+      }}
+      onFocus={showCollapsedSwitchOverlay}
+      onMouseEnter={showCollapsedSwitchOverlay}
+      onMouseLeave={hideCollapsedSwitchOverlay}
+    >
       <div className="account-main">
         {isCollapsed ? (
           <div className="account-compact-header">
@@ -735,16 +764,35 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
           </div>
         </>
       )}
+      {canShowCollapsedSwitchOverlay && (
+        <div className="collapsed-switch-overlay" aria-hidden={!isCollapsedSwitchOverlayVisible}>
+          <button
+            className="account-action-button collapsed-switch-button"
+            tabIndex={isCollapsedSwitchOverlayVisible ? 0 : -1}
+            type="button"
+            onClick={onSwitch}
+          >
+            <span className="account-action-icon switch-icon" aria-hidden="true" />
+            <span>{t("accounts.action.switch")}</span>
+          </button>
+        </div>
+      )}
     </article>
   );
 }
 
-function accountCardClassName(isCurrent: boolean, isCollapsed: boolean, viewMode: AccountViewMode): string {
+function accountCardClassName(
+  isCurrent: boolean,
+  isCollapsed: boolean,
+  viewMode: AccountViewMode,
+  isCollapsedSwitchOverlayVisible = false
+): string {
   return [
     "account-row",
     viewMode,
     isCurrent ? "current" : "",
-    isCollapsed ? "collapsed" : ""
+    isCollapsed ? "collapsed" : "",
+    isCollapsedSwitchOverlayVisible ? "switch-overlay-visible" : ""
   ].filter(Boolean).join(" ");
 }
 

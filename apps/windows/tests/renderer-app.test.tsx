@@ -144,7 +144,7 @@ describe("Windows renderer app", () => {
 
   it("toggles account grid/list presentation and collapse state", async () => {
     const account = makeAccount("a", "Work");
-    installMockAPI({ accounts: [account] });
+    const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
     expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
@@ -161,6 +161,12 @@ describe("Windows renderer app", () => {
     expect(container.querySelectorAll(".account-row.collapsed .quota-ring")).toHaveLength(2);
     expect(container.querySelector(".account-row.collapsed .reset-cell")).toBeNull();
     expect(container.querySelector(".account-row.collapsed .account-actions")).toBeNull();
+    expect(container.querySelector(".account-row.collapsed .collapsed-switch-overlay")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Switch" })).toBeNull();
+    fireEvent.mouseEnter(container.querySelector(".account-row.collapsed") as HTMLElement);
+    expect(container.querySelector(".account-row.collapsed")?.classList.contains("switch-overlay-visible")).toBe(true);
+    fireEvent.click(within(container.querySelector(".account-row.collapsed") as HTMLElement).getByRole("button", { name: "Switch" }));
+    await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
     expect(screen.getByRole("button", { name: "Expand all cards" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Expand all cards" }));

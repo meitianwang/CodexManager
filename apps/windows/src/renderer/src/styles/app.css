@@ -390,15 +390,22 @@ button.danger {
 }
 
 .account-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(200px, 1.2fr) minmax(120px, 0.62fr) minmax(120px, 0.62fr) minmax(150px, 0.8fr) 152px;
   gap: 14px;
   align-items: center;
   min-height: 112px;
+  overflow: hidden;
   padding: 12px;
   border: 1px solid #2a2e24;
   border-radius: 8px;
   background: #141710;
+}
+
+.account-row:focus-visible {
+  outline: 2px solid rgba(214, 240, 95, 0.58);
+  outline-offset: 2px;
 }
 
 .account-row.grid {
@@ -436,6 +443,32 @@ button.danger {
 .account-row.current {
   border-color: rgba(214, 240, 95, 0.38);
   background: #1a1f13;
+}
+
+.collapsed-switch-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: inherit;
+  background: rgba(20, 23, 16, 0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 130ms ease;
+}
+
+.account-row.switch-overlay-visible .collapsed-switch-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.collapsed-switch-button {
+  min-width: 118px;
+  border-color: rgba(214, 240, 95, 0.38);
+  background: #20231c;
+  color: #efffb1;
 }
 
 .account-card-header {
