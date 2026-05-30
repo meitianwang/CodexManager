@@ -3,6 +3,8 @@ import { appLocales, editorAppIds } from "../models/settings";
 
 export const ipcChannels = {
   appInfo: "app:info",
+  appOpenRepository: "app:openRepository",
+  appQuit: "app:quit",
   accountsAddViaLogin: "accounts:addViaLogin",
   accountsChanged: "accounts:changed",
   accountsDelete: "accounts:delete",

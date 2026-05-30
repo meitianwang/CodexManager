@@ -130,6 +130,19 @@ describe("Windows renderer app", () => {
     expect(await screen.findByRole("heading", { name: "设置" })).toBeTruthy();
   });
 
+  it("opens the repository and quits from the settings footer through mocked IPC", async () => {
+    const api = installMockAPI();
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "GitHub Star" }));
+    await waitFor(() => expect(api.app.openRepository).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "Quit" }));
+    await waitFor(() => expect(api.app.quit).toHaveBeenCalledOnce());
+  });
+
   it("uses localized IPC-unavailable errors in fallback mode", async () => {
     render(<App />);
 
@@ -151,6 +164,10 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
 
   const api: CodexManagerAPI = {
     getAppInfo: vi.fn(async () => fallbackAppInfo),
+    app: {
+      openRepository: vi.fn(async () => undefined),
+      quit: vi.fn(async () => undefined)
+    },
     accounts: {
       addViaLogin: vi.fn(async () => appendAccount(accounts, "login", "OAuth")),
       delete: vi.fn(async (id) => {

@@ -601,6 +601,13 @@ button.danger {
   justify-content: flex-start;
 }
 
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0 10px;
+}
+
 @media (max-width: 1080px) {
   .page-grid,
   .proxy-grid {

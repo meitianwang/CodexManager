@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import type { IpcMain } from "electron";
-import { clipboard, dialog } from "electron";
+import { app, clipboard, dialog, shell } from "electron";
 import type { WindowsAppContext } from "../app-context";
 import { appInfo } from "../../shared/app-info";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
@@ -23,6 +23,10 @@ export interface IpcHandlerOptions {
 
 export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext, options: IpcHandlerOptions = {}): void {
   ipcMain.handle(ipcChannels.appInfo, () => appInfo);
+  ipcMain.handle(ipcChannels.appOpenRepository, () => shell.openExternal("https://github.com/meitianwang/CodexManager"));
+  ipcMain.handle(ipcChannels.appQuit, () => {
+    app.quit();
+  });
 
   ipcMain.handle(ipcChannels.accountsList, () => context.accountsCoordinator.listAccounts());
   ipcMain.handle(ipcChannels.accountsImportCurrentAuth, () => context.accountsCoordinator.importCurrentAuthAccount());

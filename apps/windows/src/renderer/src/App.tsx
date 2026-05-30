@@ -340,6 +340,31 @@ function App(): ReactElement {
         {activePage === "settings" && (
           <SettingsPage
             installedEditors={installedEditors}
+            onOpenRepository={() =>
+              runAction(
+                t("settings.star_on_github"),
+                async () => {
+                  if (!api) {
+                    window.open("https://github.com/meitianwang/CodexManager", "_blank", "noopener,noreferrer");
+                    return;
+                  }
+                  await api.app.openRepository();
+                },
+                { silentSuccess: true }
+              )
+            }
+            onQuit={() =>
+              runAction(
+                t("common.quit"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  await api.app.quit();
+                },
+                { silentSuccess: true }
+              )
+            }
             onUpdateSettings={(patch) => runAction(t("tab.settings"), () => updateSettings(patch), { silentSuccess: true })}
             settings={settings}
             t={t}
@@ -636,12 +661,14 @@ function CodeBlock({ label, text, onCopy, t }: { label: string; text: string; on
 
 interface SettingsPageProps {
   installedEditors: InstalledEditorApp[];
+  onOpenRepository: () => void;
+  onQuit: () => void;
   onUpdateSettings: (patch: AppSettingsPatch) => void;
   settings: AppSettings;
   t: Translator;
 }
 
-function SettingsPage({ installedEditors, onUpdateSettings, settings, t }: SettingsPageProps): ReactElement {
+function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSettings, settings, t }: SettingsPageProps): ReactElement {
   const localeOptions = appLocales.map((locale) => ({ id: locale, label: t(languageNameKey(locale)) }));
   return (
     <div className="settings-layout">
@@ -712,6 +739,15 @@ function SettingsPage({ installedEditors, onUpdateSettings, settings, t }: Setti
           </select>
         </label>
       </section>
+
+      <footer className="settings-footer">
+        <button type="button" onClick={onOpenRepository}>
+          {t("settings.star_on_github")}
+        </button>
+        <button className="danger" type="button" onClick={onQuit}>
+          {t("common.quit")}
+        </button>
+      </footer>
     </div>
   );
 }

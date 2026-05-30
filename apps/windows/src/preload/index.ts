@@ -9,6 +9,10 @@ import { ipcChannels } from "../shared/ipc/schema";
 
 export interface CodexManagerAPI {
   getAppInfo: () => Promise<AppInfo>;
+  app: {
+    openRepository: () => Promise<void>;
+    quit: () => Promise<void>;
+  };
   accounts: {
     addViaLogin: () => Promise<AccountSummary>;
     delete: (id: string) => Promise<void>;
@@ -44,6 +48,10 @@ export interface CodexManagerAPI {
 
 const api: CodexManagerAPI = {
   getAppInfo: () => invoke<AppInfo>(ipcChannels.appInfo),
+  app: {
+    openRepository: () => invoke<void>(ipcChannels.appOpenRepository),
+    quit: () => invoke<void>(ipcChannels.appQuit)
+  },
   accounts: {
     addViaLogin: () => invoke<AccountSummary>(ipcChannels.accountsAddViaLogin),
     delete: (id) => invoke<void>(ipcChannels.accountsDelete, { id }),
