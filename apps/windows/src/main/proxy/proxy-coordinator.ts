@@ -10,10 +10,19 @@ import { sortForDisplay } from "../../shared/domain/account-ranking";
 import { resolveChatGPTBaseOrigin, removeSuffix } from "../services/chatgpt-base-origin";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../services/accounts-coordinator";
 import { tokenObjectFromAuth } from "../repositories/auth-parsing";
-import { translateChatRequest, translateCodexSSEToChatCompletion } from "./chat-to-codex-translator";
-import { translateAnthropicRequest } from "./anthropic-to-codex-translator";
+import {
+  translateChatRequest,
+  translateCodexSSEToChatCompletion,
+  translateCodexSSEToChatCompletionChunks
+} from "./chat-to-codex-translator";
+import {
+  translateAnthropicRequest,
+  translateCodexSSEToAnthropicMessage,
+  translateCodexSSEToAnthropicStream
+} from "./anthropic-to-codex-translator";
 import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamRequest, type CodexUpstreamResult } from "./upstream-client";
 import { modelCatalogPlanKey } from "../services/remote-model-catalog-service";
+import { collectCompletedResponseFromSSE } from "./codex-sse";
 
 const maxRequestBytes = 50 * 1024 * 1024;
 const accountCooldownSeconds = 60;
@@ -166,7 +175,12 @@ export class ProxyCoordinator {
     if (json.stream === false) {
       sendJson(response, 200, translateCodexSSEToChatCompletion(model, result.body.toString("utf8")));
     } else {
-      sendUpstream(response, result, "text/event-stream; charset=utf-8");
+      sendText(
+        response,
+        200,
+        translateCodexSSEToChatCompletionChunks(model, result.body.toString("utf8")),
+        "text/event-stream; charset=utf-8"
+      );
     }
   }
 
@@ -190,7 +204,17 @@ export class ProxyCoordinator {
       readOptionalString(json.model) ?? "",
       false
     );
-    sendUpstream(response, result, translation.isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
+    if (translation.isStream) {
+      sendText(
+        response,
+        200,
+        translateCodexSSEToAnthropicStream(translation.model, result.body.toString("utf8")),
+        "text/event-stream; charset=utf-8"
+      );
+    } else {
+      const translated = translateCodexSSEToAnthropicMessage(translation.model, result.body.toString("utf8"));
+      sendJson(response, translated.statusCode, translated.body);
+    }
   }
 
   private async forwardCodexJSON(
@@ -201,6 +225,7 @@ export class ProxyCoordinator {
     forceStream: boolean
   ): Promise<void> {
     const model = readOptionalString(json.model) ?? "";
+    const clientWantsStream = json.stream !== false;
     const body = forceStream ? { ...json, stream: true } : json;
     const result = await this.forwardProxyRequest(
       request,
@@ -211,6 +236,11 @@ export class ProxyCoordinator {
       model,
       false
     );
+    if (forceStream && !clientWantsStream) {
+      const completed = collectCompletedResponseFromSSE(result.body.toString("utf8"));
+      sendJson(response, completed.statusCode, completed.body, result.headers);
+      return;
+    }
     sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
   }
 
@@ -500,16 +530,30 @@ function filterResponseHeaders(headers: Record<string, string>): Record<string, 
   const filtered: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
     const lower = key.toLowerCase();
-    if (lower !== "transfer-encoding" && lower !== "content-length") {
+    if (lower !== "transfer-encoding" && lower !== "content-length" && lower !== "content-type") {
       filtered[key] = value;
     }
   }
   return filtered;
 }
 
-function sendJson(response: ServerResponse, statusCode: number, value: unknown): void {
-  response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(value));
+function sendJson(response: ServerResponse, statusCode: number, value: unknown, headers: Record<string, string> = {}): void {
+  const body = Buffer.from(JSON.stringify(value), "utf8");
+  response.writeHead(statusCode, {
+    ...filterResponseHeaders(headers),
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": String(body.byteLength)
+  });
+  response.end(body);
+}
+
+function sendText(response: ServerResponse, statusCode: number, value: string, contentType: string): void {
+  const body = Buffer.from(value, "utf8");
+  response.writeHead(statusCode, {
+    "Content-Type": contentType,
+    "Content-Length": String(body.byteLength)
+  });
+  response.end(body);
 }
 
 function setCorsHeaders(response: ServerResponse): void {

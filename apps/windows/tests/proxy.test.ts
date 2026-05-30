@@ -40,7 +40,7 @@ describe("local proxy", () => {
 
   it("forwards Responses requests through the selected account and cleans headers", async () => {
     const upstream = new FakeUpstreamClient([
-      successResult({ id: "resp-1" }, { "x-codex-turn-state": "next", "transfer-encoding": "chunked" })
+      completedResponseResult({ id: "resp-1" }, { "x-codex-turn-state": "next", "transfer-encoding": "chunked" })
     ]);
     const context = await makeProxyContext({ upstream });
 
@@ -53,6 +53,7 @@ describe("local proxy", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("x-codex-turn-state")).toBe("next");
     expect(response.headers.get("transfer-encoding")).not.toBe("chunked");
+    await expect(response.json()).resolves.toMatchObject({ id: "resp-1" });
     expect(upstream.requests[0]?.accountId).toBe("acct-1");
     expect(upstream.requests[0]?.accessToken).toBe("access-1");
     expect(upstream.requests[0]?.headers["x-api-key"]).toBeUndefined();
@@ -91,6 +92,33 @@ describe("local proxy", () => {
     expect(forwarded.stream).toBe(true);
   });
 
+  it("translates streaming Chat Completions responses to OpenAI chunks", async () => {
+    const upstream = new FakeUpstreamClient([sseResult("Hello")]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: true,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const events = parseDataEvents(await response.text());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(events.at(-1)).toBe("[DONE]");
+    expect(events[0]).toMatchObject({
+      object: "chat.completion.chunk",
+      choices: [{ delta: { role: "assistant" }, finish_reason: null }]
+    });
+    expect(events[1]).toMatchObject({
+      object: "chat.completion.chunk",
+      choices: [{ delta: { content: "Hello" }, finish_reason: null }]
+    });
+    expect(events[2]).toMatchObject({
+      choices: [{ delta: {}, finish_reason: "stop" }]
+    });
+  });
+
   it("translates Anthropic messages requests to Codex Responses", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });
@@ -105,11 +133,84 @@ describe("local proxy", () => {
     });
     const forwarded = JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}") as Record<string, unknown>;
     const tools = forwarded.tools as Array<Record<string, unknown>>;
+    const events = parseNamedEvents(await response.text());
 
     expect(response.status).toBe(200);
     expect(forwarded.reasoning).toEqual({ effort: "low", summary: "auto" });
     expect(JSON.stringify(forwarded.input)).toContain("You are concise");
     expect(tools[0]?.parameters).toEqual({ type: "object" });
+    expect(events.map((event) => event.event)).toContain("message_start");
+    expect(events).toContainEqual(expect.objectContaining({
+      event: "content_block_delta",
+      data: expect.objectContaining({
+        delta: { type: "text_delta", text: "Hello" }
+      })
+    }));
+    expect(events.at(-1)).toMatchObject({ event: "message_stop" });
+  });
+
+  it("translates non-streaming Anthropic responses to Anthropic message JSON", async () => {
+    const upstream = new FakeUpstreamClient([
+      completedResponseResult({
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: "Hello" }]
+          }
+        ],
+        usage: { input_tokens: 3, output_tokens: 2 }
+      })
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/messages", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json() as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      type: "message",
+      role: "assistant",
+      model: "gpt-5-codex",
+      stop_reason: "end_turn",
+      usage: { input_tokens: 3, output_tokens: 2 },
+      content: [{ type: "text", text: "Hello" }]
+    });
+  });
+
+  it("converts Anthropic tool calls and tool results in request history", async () => {
+    const upstream = new FakeUpstreamClient([sseResult("Done")]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/messages", {
+      model: "gpt-5-codex",
+      stream: true,
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "I will look it up." },
+            { type: "tool_use", id: "toolu_1", name: "lookup", input: { query: "codex" } }
+          ]
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_1", content: [{ type: "text", text: "result text" }] }
+          ]
+        }
+      ]
+    });
+    const forwarded = JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}") as { input?: unknown[] };
+
+    expect(response.status).toBe(200);
+    expect(forwarded.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "function_call", call_id: "toolu_1", name: "lookup", arguments: "{\"query\":\"codex\"}" }),
+      expect.objectContaining({ type: "function_call_output", call_id: "toolu_1", output: "result text" })
+    ]));
   });
 
   it("retries the next eligible account after a retryable upstream error", async () => {
@@ -457,4 +558,43 @@ function sseResult(text: string): CodexUpstreamResult {
       ].join("\n")
     )
   };
+}
+
+function completedResponseResult(response: Record<string, unknown>, headers: Record<string, string> = {}): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      ...headers
+    },
+    body: Buffer.from(
+      [
+        `data: ${JSON.stringify({ type: "response.completed", response })}`,
+        "",
+        ""
+      ].join("\n")
+    )
+  };
+}
+
+function parseDataEvents(text: string): unknown[] {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => {
+      const payload = line.slice("data: ".length).trim();
+      return payload === "[DONE]" ? payload : JSON.parse(payload) as unknown;
+    });
+}
+
+function parseNamedEvents(text: string): Array<{ event: string; data: unknown }> {
+  const chunks = text.split(/\n\n/).filter((chunk) => chunk.trim().length > 0);
+  return chunks.map((chunk) => {
+    const eventLine = chunk.split(/\r?\n/).find((line) => line.startsWith("event: "));
+    const dataLine = chunk.split(/\r?\n/).find((line) => line.startsWith("data: "));
+    return {
+      event: eventLine?.slice("event: ".length).trim() ?? "",
+      data: dataLine ? JSON.parse(dataLine.slice("data: ".length)) as unknown : undefined
+    };
+  });
 }
