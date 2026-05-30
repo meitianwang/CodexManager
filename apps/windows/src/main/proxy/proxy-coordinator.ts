@@ -111,7 +111,7 @@ export class ProxyCoordinator {
 
     try {
       if (request.method === "GET" && url.pathname === "/v1/models") {
-        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), true, "", true);
+        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), false, "", true, url.search);
         return;
       }
 
@@ -133,13 +133,13 @@ export class ProxyCoordinator {
           await this.forwardCodexJSON(request, response, "responses", json, true);
           return;
         case "/v1/responses/compact":
-          await this.forwardCodexJSON(request, response, "responses/compact", json, true);
+          await this.forwardCodexJSONPassthrough(request, response, "responses/compact", body, json);
           return;
         case "/v1/memories/trace_summarize":
-          await this.forwardCodexJSON(request, response, "memories/trace_summarize", json, true);
+          await this.forwardCodexJSONPassthrough(request, response, "memories/trace_summarize", body, json);
           return;
         case "/v1/alpha/search":
-          await this.forwardCodexJSON(request, response, "alpha/search", json, true);
+          await this.forwardCodexJSONPassthrough(request, response, "alpha/search", body, json, "");
           return;
         default:
           sendJson(response, 404, { error: { message: "Not Found" } });
@@ -244,6 +244,27 @@ export class ProxyCoordinator {
     sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
   }
 
+  private async forwardCodexJSONPassthrough(
+    request: IncomingMessage,
+    response: ServerResponse,
+    normalizedPath: string,
+    body: Buffer,
+    json: Record<string, unknown>,
+    defaultModel = "gpt-5"
+  ): Promise<void> {
+    const model = readOptionalString(json.model) ?? defaultModel;
+    const result = await this.forwardProxyRequest(
+      request,
+      response,
+      normalizedPath,
+      body,
+      false,
+      model,
+      false
+    );
+    sendUpstream(response, result, "application/json; charset=utf-8");
+  }
+
   private async forwardProxyRequest(
     request: IncomingMessage,
     response: ServerResponse,
@@ -251,11 +272,12 @@ export class ProxyCoordinator {
     body: Buffer,
     isStream: boolean,
     model: string,
-    writeResponse = true
+    writeResponse = true,
+    queryString = ""
   ): Promise<CodexUpstreamResult> {
     const store = await this.options.storeRepository.loadStore();
     const orderedAccounts = await this.orderedEligibleAccounts(store, model);
-    const url = await this.upstreamURL(normalizedPath);
+    const url = await this.upstreamURL(normalizedPath, queryString);
     let lastError: unknown;
 
     for (const account of orderedAccounts) {
@@ -461,14 +483,15 @@ export class ProxyCoordinator {
     expireMap(this.accountModelCooldowns, now);
   }
 
-  private async upstreamURL(normalizedPath: string): Promise<string> {
+  private async upstreamURL(normalizedPath: string, queryString = ""): Promise<string> {
     const baseOrigin = await resolveChatGPTBaseOrigin(this.options.codexConfigPath);
     const backendPrefix = "/backend-api";
     const originWithoutBackend = removeSuffix(baseOrigin, backendPrefix);
     const normalized = normalizedPath.replace(/^\/+/, "");
-    return originWithoutBackend
+    const baseURL = originWithoutBackend
       ? `${originWithoutBackend}${backendPrefix}/codex/${normalized}`
       : `${baseOrigin}${backendPrefix}/codex/${normalized}`;
+    return queryString ? `${baseURL}${queryString.startsWith("?") ? queryString : `?${queryString}`}` : baseURL;
   }
 }
 

@@ -63,6 +63,59 @@ describe("local proxy", () => {
     });
   });
 
+  it("forwards Models requests as non-streaming GET with query parameters", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ data: [] })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await fetch(`http://127.0.0.1:${context.port}/v1/models?limit=20`, {
+      headers: {
+        "x-api-key": "test-key"
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests[0]).toMatchObject({
+      method: "GET",
+      isStream: false
+    });
+    expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/models?limit=20");
+    expect(upstream.requests[0]?.body.byteLength).toBe(0);
+  });
+
+  it("preserves Codex JSON passthrough requests without forcing streaming", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ compacted: true })]);
+    const context = await makeProxyContext({ upstream });
+    const requestBody = {
+      model: "gpt-5-codex",
+      stream: false,
+      input: [{ role: "user", content: "compact this" }]
+    };
+
+    const response = await authorizedFetch(context.port, "/v1/responses/compact", requestBody);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ compacted: true });
+    expect(upstream.requests[0]).toMatchObject({
+      isStream: false,
+      url: "https://chatgpt.com/backend-api/codex/responses/compact"
+    });
+    expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toEqual(requestBody);
+  });
+
+  it("uses an empty default model for alpha search passthrough", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ results: [] })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/alpha/search", { query: "codex" });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests[0]).toMatchObject({
+      isStream: false,
+      url: "https://chatgpt.com/backend-api/codex/alpha/search"
+    });
+    expect(upstream.requests[0]?.body.toString("utf8")).toBe(JSON.stringify({ query: "codex" }));
+  });
+
   it("translates non-streaming Chat Completions requests", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });
