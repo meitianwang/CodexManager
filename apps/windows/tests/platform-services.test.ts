@@ -11,6 +11,7 @@ import { CodexCLIService } from "../src/main/platform/codex-cli-service";
 import { EditorAppService } from "../src/main/platform/editor-app-service";
 import { LaunchAtStartupService, type LoginItemSettings } from "../src/main/platform/launch-at-startup-service";
 import { TrayService, type TrayActionID, type TrayMenuItem } from "../src/main/platform/tray-service";
+import type { AccountSummary } from "../src/shared/models/accounts";
 import { appLocales } from "../src/shared/models/settings";
 
 describe("command runner", () => {
@@ -197,8 +198,8 @@ describe("tray service", () => {
       initialState: { proxyRunning: false }
     });
 
-    expect(adapter.tooltip).toBe("CodexManager");
-    expect(menuLabels(adapter.items)).toEqual([
+    expect(adapter.tooltip).toBe("CodexManager - 5h -- / 1w --");
+    expect(actionLabels(adapter.items)).toEqual([
       "Show Window",
       "Refresh Accounts",
       "Smart Switch",
@@ -223,10 +224,56 @@ describe("tray service", () => {
       initialState: { locale: "zh-Hans", proxyRunning: false }
     });
 
-    expect(menuLabels(adapter.items)).toEqual(["显示窗口", "刷新账号", "智能切换", "启动代理", "退出"]);
+    expect(menuLabels(adapter.items)).toContain("未选择账号");
+    expect(menuLabels(adapter.items)).toContain("0 个账号");
+    expect(actionLabels(adapter.items)).toEqual(["显示窗口", "刷新账号", "智能切换", "启动代理", "退出"]);
 
     service.updateState({ locale: "en", proxyRunning: true });
-    expect(menuLabels(adapter.items)).toEqual(["Show Window", "Refresh Accounts", "Smart Switch", "Stop Proxy", "Quit"]);
+    expect(menuLabels(adapter.items)).toContain("No account selected");
+    expect(menuLabels(adapter.items)).toContain("0 accounts");
+    expect(actionLabels(adapter.items)).toEqual(["Show Window", "Refresh Accounts", "Smart Switch", "Stop Proxy", "Quit"]);
+  });
+
+  it("renders account quota status and updates the tooltip", () => {
+    const adapter = new FakeTrayAdapter();
+    const currentAccount = accountSummary({
+      email: "user@example.com",
+      isCurrent: true,
+      usage: {
+        fetchedAt: 1,
+        fiveHour: { usedPercent: 12.4, windowSeconds: 18_000 },
+        oneWeek: { usedPercent: 45.2, windowSeconds: 604_800 }
+      }
+    });
+    const service = new TrayService({
+      adapter,
+      actions: trayActions([]),
+      initialState: { accounts: [currentAccount], proxyRunning: false }
+    });
+
+    expect(adapter.tooltip).toBe("CodexManager - 5h 88% / 1w 55%");
+    expect(menuLabels(adapter.items)).toEqual([
+      "Show Window",
+      "Using: user@example.com",
+      "1 accounts",
+      "88% remaining",
+      "Refresh Accounts",
+      "Smart Switch",
+      "Start Proxy",
+      "Quit"
+    ]);
+
+    service.updateState({
+      accounts: [
+        accountSummary({
+          id: "second",
+          label: "Second"
+        })
+      ]
+    });
+    expect(adapter.tooltip).toBe("CodexManager - 5h -- / 1w --");
+    expect(menuLabels(adapter.items)).toContain("No account selected");
+    expect(menuLabels(adapter.items)).toContain("1 accounts");
   });
 
   it("has non-empty tray menu labels for every supported locale", () => {
@@ -379,4 +426,24 @@ function trayActions(calls: TrayActionID[]) {
 
 function menuLabels(items: readonly TrayMenuItem[]): string[] {
   return items.flatMap((item) => (item.label ? [item.label] : []));
+}
+
+function actionLabels(items: readonly TrayMenuItem[]): string[] {
+  return items.flatMap((item) => (item.id && item.label ? [item.label] : []));
+}
+
+function accountSummary(patch: Partial<AccountSummary> = {}): AccountSummary {
+  return {
+    id: "account",
+    label: "Account",
+    accountId: "acct",
+    addedAt: 1,
+    updatedAt: 1,
+    isCurrent: false,
+    accountKey: "acct",
+    effectivePlanType: "pro",
+    normalizedPlanLabel: "Pro",
+    shouldDisplayWorkspaceTag: false,
+    ...patch
+  };
 }

@@ -10,6 +10,7 @@ import type {
   AccountsTransferPackage,
   AccountTransferSelectableItem
 } from "../../shared/models/account-transfer";
+import type { AccountSummary } from "../../shared/models/accounts";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import type { AppSettings } from "../../shared/models/settings";
 import {
@@ -27,6 +28,7 @@ import {
 } from "../../shared/ipc/schema";
 
 export interface IpcHandlerOptions {
+  onAccountsChanged?: (accounts: AccountSummary[]) => void;
   onProxyStateChanged?: (state: ProxyRuntimeState) => void;
   onSettingsChanged?: (settings: AppSettings) => void;
 }
@@ -43,36 +45,65 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
   });
 
   ipcMain.handle(ipcChannels.accountsList, () => context.accountsCoordinator.listAccounts());
-  ipcMain.handle(ipcChannels.accountsImportCurrentAuth, () => context.accountsCoordinator.importCurrentAuthAccount());
-  ipcMain.handle(ipcChannels.accountsAddViaLogin, () => context.accountsCoordinator.addAccountViaLogin());
-  ipcMain.handle(ipcChannels.accountsRefreshAllUsage, () => context.accountsCoordinator.refreshAllUsage());
-  ipcMain.handle(ipcChannels.accountsWarmUpWeeklyQuota, () => context.accountsCoordinator.warmUpResetWeeklyQuotaAccounts());
-
-  ipcMain.handle(ipcChannels.accountsRefreshUsage, (_event, input: unknown) => {
-    const { id } = parseIpcInput(accountIdSchema, input);
-    return context.accountsCoordinator.refreshAccountUsage(id);
+  ipcMain.handle(ipcChannels.accountsImportCurrentAuth, async () => {
+    const account = await context.accountsCoordinator.importCurrentAuthAccount();
+    await publishLatestAccounts(context, options);
+    return account;
+  });
+  ipcMain.handle(ipcChannels.accountsAddViaLogin, async () => {
+    const account = await context.accountsCoordinator.addAccountViaLogin();
+    await publishLatestAccounts(context, options);
+    return account;
+  });
+  ipcMain.handle(ipcChannels.accountsRefreshAllUsage, async () => {
+    const accounts = await context.accountsCoordinator.refreshAllUsage();
+    options.onAccountsChanged?.(accounts);
+    return accounts;
+  });
+  ipcMain.handle(ipcChannels.accountsWarmUpWeeklyQuota, async () => {
+    const result = await context.accountsCoordinator.warmUpResetWeeklyQuotaAccounts();
+    options.onAccountsChanged?.(result.accounts);
+    return result;
   });
 
-  ipcMain.handle(ipcChannels.accountsRefreshWorkspaceMetadata, (_event, input: unknown) => {
+  ipcMain.handle(ipcChannels.accountsRefreshUsage, async (_event, input: unknown) => {
+    const { id } = parseIpcInput(accountIdSchema, input);
+    const account = await context.accountsCoordinator.refreshAccountUsage(id);
+    await publishLatestAccounts(context, options);
+    return account;
+  });
+
+  ipcMain.handle(ipcChannels.accountsRefreshWorkspaceMetadata, async (_event, input: unknown) => {
     const { forceRemoteCheck } = parseIpcInput(refreshWorkspaceMetadataSchema, input);
-    return context.accountsCoordinator.refreshWorkspaceMetadata(forceRemoteCheck ?? false);
+    const accounts = await context.accountsCoordinator.refreshWorkspaceMetadata(forceRemoteCheck ?? false);
+    options.onAccountsChanged?.(accounts);
+    return accounts;
   });
 
-  ipcMain.handle(ipcChannels.accountsSwitch, (_event, input: unknown) => {
+  ipcMain.handle(ipcChannels.accountsSwitch, async (_event, input: unknown) => {
     const { id, workspacePath } = parseIpcInput(switchAccountSchema, input);
-    return context.accountsCoordinator.switchAccountAndApplySettings(id, workspacePath);
+    const result = await context.accountsCoordinator.switchAccountAndApplySettings(id, workspacePath);
+    await publishLatestAccounts(context, options);
+    return result;
   });
 
-  ipcMain.handle(ipcChannels.accountsSmartSwitch, () => context.accountsCoordinator.smartSwitch());
+  ipcMain.handle(ipcChannels.accountsSmartSwitch, async () => {
+    const result = await context.accountsCoordinator.smartSwitch();
+    await publishLatestAccounts(context, options);
+    return result;
+  });
 
-  ipcMain.handle(ipcChannels.accountsDelete, (_event, input: unknown) => {
+  ipcMain.handle(ipcChannels.accountsDelete, async (_event, input: unknown) => {
     const { id } = parseIpcInput(accountIdSchema, input);
-    return context.accountsCoordinator.deleteAccount(id);
+    await context.accountsCoordinator.deleteAccount(id);
+    await publishLatestAccounts(context, options);
   });
 
-  ipcMain.handle(ipcChannels.accountsUpdateTeamAlias, (_event, input: unknown) => {
+  ipcMain.handle(ipcChannels.accountsUpdateTeamAlias, async (_event, input: unknown) => {
     const { id, alias } = parseIpcInput(updateTeamAliasSchema, input);
-    return context.accountsCoordinator.updateTeamAlias(id, alias);
+    const account = await context.accountsCoordinator.updateTeamAlias(id, alias);
+    await publishLatestAccounts(context, options);
+    return account;
   });
 
   ipcMain.handle(ipcChannels.accountsImportAuthFile, async () => {
@@ -84,7 +115,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     if (result.canceled || !path) {
       return undefined;
     }
-    return context.accountsCoordinator.importAccountFile(path, undefined, false);
+    const account = await context.accountsCoordinator.importAccountFile(path, undefined, false);
+    await publishLatestAccounts(context, options);
+    return account;
   });
 
   ipcMain.handle(ipcChannels.accountsExportPackage, async (_event, input: unknown) => {
@@ -126,7 +159,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     }
 
     try {
-      return await context.accountsCoordinator.importAccountsTransferPackage(accountPackage, new Set(accountIds));
+      const result = await context.accountsCoordinator.importAccountsTransferPackage(accountPackage, new Set(accountIds));
+      await publishLatestAccounts(context, options);
+      return result;
     } finally {
       accountImportDrafts.delete(draftId);
     }
@@ -142,10 +177,12 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
       return undefined;
     }
     const accountPackage = await context.accountsCoordinator.loadAccountsTransferPackage(path);
-    return context.accountsCoordinator.importAccountsTransferPackage(
+    const importResult = await context.accountsCoordinator.importAccountsTransferPackage(
       accountPackage,
       new Set(accountPackage.accounts.map((account) => account.id))
     );
+    await publishLatestAccounts(context, options);
+    return importResult;
   });
 
   ipcMain.handle(ipcChannels.settingsGet, () => context.settingsCoordinator.currentSettings());
@@ -188,6 +225,13 @@ function rememberAccountImportDraft(drafts: Map<string, AccountsTransferPackage>
     drafts.delete(oldestDraftId);
   }
   return draftId;
+}
+
+async function publishLatestAccounts(context: WindowsAppContext, options: IpcHandlerOptions): Promise<void> {
+  if (!options.onAccountsChanged) {
+    return;
+  }
+  options.onAccountsChanged(await context.accountsCoordinator.listAccounts());
 }
 
 function accountTransferSelectableItem(account: AccountsTransferPackage["accounts"][number]): AccountTransferSelectableItem {

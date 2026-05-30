@@ -116,6 +116,7 @@ function showMainWindow(): void {
 }
 
 function publishAccounts(accounts: AccountSummary[]): void {
+  trayService?.updateState({ accounts });
   for (const browserWindow of BrowserWindow.getAllWindows()) {
     if (!browserWindow.isDestroyed()) {
       browserWindow.webContents.send(ipcChannels.accountsChanged, accounts);
@@ -141,10 +142,11 @@ async function createTray(context: WindowsAppContext): Promise<TrayService> {
   };
   const proxyState = await context.proxyRuntimeService.getState();
   const settings = await context.settingsCoordinator.currentSettings();
+  const accounts = await context.accountsCoordinator.listAccounts();
 
   return new TrayService({
     adapter,
-    initialState: { locale: settings.locale, proxyRunning: proxyState.isRunning },
+    initialState: { accounts, locale: settings.locale, proxyRunning: proxyState.isRunning },
     actions: {
       showWindow: showMainWindow,
       async refreshAccounts() {
@@ -199,6 +201,7 @@ function trayIconImage() {
 app.whenReady().then(async () => {
   const context = await createWindowsAppContext(app);
   registerIpcHandlers(ipcMain, context, {
+    onAccountsChanged: publishAccounts,
     onProxyStateChanged(state) {
       trayService?.updateState({ proxyRunning: state.isRunning });
     },
