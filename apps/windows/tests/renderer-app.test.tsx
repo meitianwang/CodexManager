@@ -24,6 +24,9 @@ describe("Windows renderer app", () => {
     expect(container.querySelector(".nav-list .accounts-nav-icon")).toBeTruthy();
     expect(container.querySelector(".nav-list .proxy-nav-icon")).toBeTruthy();
     expect(container.querySelector(".nav-list .settings-nav-icon")).toBeTruthy();
+    expect(container.querySelector(".sidebar-footer .sidebar-divider")).toBeTruthy();
+    expect(container.querySelector(".sidebar-footer .sidebar-status-row")?.textContent).toBe("Proxy: Stopped");
+    expect(container.querySelector(".sidebar-footer .app-version")?.textContent).toBe(`v${fallbackAppInfo.version}`);
     expect(screen.getByRole("heading", { level: 2, name: "Accounts" })).toBeTruthy();
     expect(screen.getByText("No accounts yet. Add or import an account to get started.")).toBeTruthy();
 
@@ -266,6 +269,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();
     expect(await screen.findByText("Proxy started")).toBeTruthy();
+    expect(document.querySelector(".sidebar-footer .sidebar-status-row")?.textContent).toBe("Proxy: Running");
     expect(directProxyControlButtonText()).toEqual(["Stop", "Copy URL"]);
     expect(proxyUsageText()).toContain("sk-local-test");
 

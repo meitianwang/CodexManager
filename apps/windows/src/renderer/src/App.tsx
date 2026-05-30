@@ -206,8 +206,14 @@ function App(): ReactElement {
         </nav>
 
         <div className="sidebar-footer">
-          <span className={proxyState.isRunning ? "status-dot running" : "status-dot"} />
-          <span>{proxyState.isRunning ? t("sidebar.proxy_running", { port: proxyState.port }) : t("sidebar.proxy_stopped")}</span>
+          <div className="sidebar-divider" />
+          <div className="sidebar-status-row">
+            <span className={proxyState.isRunning ? "status-dot running" : "status-dot"} />
+            <span>
+              {t("tab.proxy")}: {proxyState.isRunning ? t("proxy.status.running") : t("proxy.status.stopped")}
+            </span>
+          </div>
+          <span className="app-version">v{appInfo.version}</span>
         </div>
       </aside>
 

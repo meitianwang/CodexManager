@@ -240,23 +240,44 @@ select:focus {
 
 .sidebar-footer {
   display: flex;
-  align-items: center;
-  gap: 9px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
   margin-top: auto;
   color: #a3ab9a;
   font-size: 12px;
 }
 
+.sidebar-divider {
+  height: 1px;
+  background: #2b2e25;
+}
+
+.sidebar-status-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px;
+  color: #e7ebe1;
+  font-size: 11px;
+}
+
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  background: #6d7361;
+  background: #ff6b6b;
 }
 
 .status-dot.running {
   background: #52cc7a;
   box-shadow: 0 0 16px rgba(82, 204, 122, 0.38);
+}
+
+.app-version {
+  padding: 0 4px;
+  color: #9ea697;
+  font-size: 11px;
 }
 
 .workspace {
