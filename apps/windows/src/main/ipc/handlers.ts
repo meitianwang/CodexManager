@@ -11,6 +11,7 @@ import type {
   AccountTransferSelectableItem
 } from "../../shared/models/account-transfer";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
+import type { AppSettings } from "../../shared/models/settings";
 import {
   accountIdSchema,
   clipboardWriteTextSchema,
@@ -27,6 +28,7 @@ import {
 
 export interface IpcHandlerOptions {
   onProxyStateChanged?: (state: ProxyRuntimeState) => void;
+  onSettingsChanged?: (settings: AppSettings) => void;
 }
 
 const maxAccountImportDrafts = 8;
@@ -148,9 +150,11 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
 
   ipcMain.handle(ipcChannels.settingsGet, () => context.settingsCoordinator.currentSettings());
   ipcMain.handle(ipcChannels.settingsListEditors, () => context.editorAppService.listInstalledApps());
-  ipcMain.handle(ipcChannels.settingsUpdate, (_event, input: unknown) => {
+  ipcMain.handle(ipcChannels.settingsUpdate, async (_event, input: unknown) => {
     const patch = parseIpcInput(settingsPatchSchema, input);
-    return context.settingsCoordinator.updateSettings(patch);
+    const settings = await context.settingsCoordinator.updateSettings(patch);
+    options.onSettingsChanged?.(settings);
+    return settings;
   });
 
   ipcMain.handle(ipcChannels.proxyGetState, () => context.proxyRuntimeService.getState());

@@ -11,6 +11,7 @@ import { CodexCLIService } from "../src/main/platform/codex-cli-service";
 import { EditorAppService } from "../src/main/platform/editor-app-service";
 import { LaunchAtStartupService, type LoginItemSettings } from "../src/main/platform/launch-at-startup-service";
 import { TrayService, type TrayActionID, type TrayMenuItem } from "../src/main/platform/tray-service";
+import { appLocales } from "../src/shared/models/settings";
 
 describe("command runner", () => {
   it("throws promptly when a command times out", async () => {
@@ -212,6 +213,33 @@ describe("tray service", () => {
 
     service.updateState({ proxyRunning: true });
     expect(menuLabels(adapter.items)).toContain("Stop Proxy");
+  });
+
+  it("localizes tray menu labels and rerenders after locale changes", () => {
+    const adapter = new FakeTrayAdapter();
+    const service = new TrayService({
+      adapter,
+      actions: trayActions([]),
+      initialState: { locale: "zh-Hans", proxyRunning: false }
+    });
+
+    expect(menuLabels(adapter.items)).toEqual(["显示窗口", "刷新账号", "智能切换", "启动代理", "退出"]);
+
+    service.updateState({ locale: "en", proxyRunning: true });
+    expect(menuLabels(adapter.items)).toEqual(["Show Window", "Refresh Accounts", "Smart Switch", "Stop Proxy", "Quit"]);
+  });
+
+  it("has non-empty tray menu labels for every supported locale", () => {
+    for (const locale of appLocales) {
+      const adapter = new FakeTrayAdapter();
+      new TrayService({
+        adapter,
+        actions: trayActions([]),
+        initialState: { locale, proxyRunning: false }
+      });
+
+      expect(menuLabels(adapter.items).every((label) => label.trim().length > 0), locale).toBe(true);
+    }
   });
 
   it("disables non-quit actions while busy", () => {

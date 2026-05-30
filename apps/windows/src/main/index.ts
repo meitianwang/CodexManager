@@ -140,10 +140,11 @@ async function createTray(context: WindowsAppContext): Promise<TrayService> {
     }
   };
   const proxyState = await context.proxyRuntimeService.getState();
+  const settings = await context.settingsCoordinator.currentSettings();
 
   return new TrayService({
     adapter,
-    initialState: { proxyRunning: proxyState.isRunning },
+    initialState: { locale: settings.locale, proxyRunning: proxyState.isRunning },
     actions: {
       showWindow: showMainWindow,
       async refreshAccounts() {
@@ -200,6 +201,9 @@ app.whenReady().then(async () => {
   registerIpcHandlers(ipcMain, context, {
     onProxyStateChanged(state) {
       trayService?.updateState({ proxyRunning: state.isRunning });
+    },
+    onSettingsChanged(settings) {
+      trayService?.updateState({ locale: settings.locale });
     }
   });
   if (!isSmokeTest) {
