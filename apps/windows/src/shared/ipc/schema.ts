@@ -11,8 +11,10 @@ export const ipcChannels = {
   accountsExportPackage: "accounts:exportPackage",
   accountsImportAuthFile: "accounts:importAuthFile",
   accountsImportCurrentAuth: "accounts:importCurrentAuth",
+  accountsImportPreparedPackage: "accounts:importPreparedPackage",
   accountsImportPackage: "accounts:importPackage",
   accountsList: "accounts:list",
+  accountsPrepareImportPackage: "accounts:prepareImportPackage",
   accountsRefreshAllUsage: "accounts:refreshAllUsage",
   accountsRefreshUsage: "accounts:refreshUsage",
   accountsRefreshWorkspaceMetadata: "accounts:refreshWorkspaceMetadata",
@@ -53,6 +55,11 @@ export const updateTeamAliasSchema = z.object({
 });
 
 export const exportAccountsPackageSchema = z.object({
+  accountIds: z.array(accountId).min(1)
+});
+
+export const importPreparedAccountsPackageSchema = z.object({
+  draftId: z.string().trim().min(1),
   accountIds: z.array(accountId).min(1)
 });
 

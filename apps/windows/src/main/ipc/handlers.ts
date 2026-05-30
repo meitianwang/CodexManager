@@ -1,13 +1,21 @@
+import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import type { IpcMain } from "electron";
 import { app, clipboard, dialog, shell } from "electron";
 import type { WindowsAppContext } from "../app-context";
 import { appInfo } from "../../shared/app-info";
+import { toAccountSummary } from "../../shared/domain/accounts-store";
+import type {
+  AccountsImportDraftDescriptor,
+  AccountsTransferPackage,
+  AccountTransferSelectableItem
+} from "../../shared/models/account-transfer";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import {
   accountIdSchema,
   clipboardWriteTextSchema,
   exportAccountsPackageSchema,
+  importPreparedAccountsPackageSchema,
   ipcChannels,
   parseIpcInput,
   proxyStartSchema,
@@ -21,7 +29,11 @@ export interface IpcHandlerOptions {
   onProxyStateChanged?: (state: ProxyRuntimeState) => void;
 }
 
+const maxAccountImportDrafts = 8;
+
 export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext, options: IpcHandlerOptions = {}): void {
+  const accountImportDrafts = new Map<string, AccountsTransferPackage>();
+
   ipcMain.handle(ipcChannels.appInfo, () => appInfo);
   ipcMain.handle(ipcChannels.appOpenRepository, () => shell.openExternal("https://github.com/meitianwang/CodexManager"));
   ipcMain.handle(ipcChannels.appQuit, () => {
@@ -76,7 +88,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
   ipcMain.handle(ipcChannels.accountsExportPackage, async (_event, input: unknown) => {
     const { accountIds } = parseIpcInput(exportAccountsPackageSchema, input);
     const result = await dialog.showSaveDialog({
-      defaultPath: "codexmanager-accounts.json",
+      defaultPath: "CodexManager-accounts.json",
       filters: [{ name: "CodexManager account package", extensions: ["json"] }]
     });
     if (result.canceled || !result.filePath) {
@@ -84,6 +96,38 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     }
     await writeFile(result.filePath, await context.accountsCoordinator.encodeAccountsTransferPackage(new Set(accountIds)), "utf8");
     return { canceled: false, path: result.filePath };
+  });
+
+  ipcMain.handle(ipcChannels.accountsPrepareImportPackage, async (): Promise<AccountsImportDraftDescriptor | undefined> => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: "CodexManager account package", extensions: ["json"] }],
+      properties: ["openFile"]
+    });
+    const path = result.filePaths[0];
+    if (result.canceled || !path) {
+      return undefined;
+    }
+
+    const accountPackage = await context.accountsCoordinator.loadAccountsTransferPackage(path);
+    const draftId = rememberAccountImportDraft(accountImportDrafts, accountPackage);
+    return {
+      draftId,
+      accounts: accountPackage.accounts.map(accountTransferSelectableItem)
+    };
+  });
+
+  ipcMain.handle(ipcChannels.accountsImportPreparedPackage, async (_event, input: unknown) => {
+    const { draftId, accountIds } = parseIpcInput(importPreparedAccountsPackageSchema, input);
+    const accountPackage = accountImportDrafts.get(draftId);
+    if (!accountPackage) {
+      throw new Error("The selected account package has expired. Choose the package again.");
+    }
+
+    try {
+      return await context.accountsCoordinator.importAccountsTransferPackage(accountPackage, new Set(accountIds));
+    } finally {
+      accountImportDrafts.delete(draftId);
+    }
   });
 
   ipcMain.handle(ipcChannels.accountsImportPackage, async () => {
@@ -127,4 +171,30 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     const { text } = parseIpcInput(clipboardWriteTextSchema, input);
     clipboard.writeText(text);
   });
+}
+
+function rememberAccountImportDraft(drafts: Map<string, AccountsTransferPackage>, accountPackage: AccountsTransferPackage): string {
+  const draftId = randomUUID();
+  drafts.set(draftId, accountPackage);
+  while (drafts.size > maxAccountImportDrafts) {
+    const oldestDraftId = drafts.keys().next().value;
+    if (oldestDraftId === undefined) {
+      break;
+    }
+    drafts.delete(oldestDraftId);
+  }
+  return draftId;
+}
+
+function accountTransferSelectableItem(account: AccountsTransferPackage["accounts"][number]): AccountTransferSelectableItem {
+  const summary = toAccountSummary(account);
+  return {
+    id: summary.id,
+    label: summary.label,
+    email: summary.email,
+    accountId: summary.accountId,
+    planLabel: summary.normalizedPlanLabel,
+    teamName: summary.displayTeamName,
+    isCurrent: false
+  };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { appInfo as fallbackAppInfo, type AppInfo } from "@shared/app-info";
+import type { AccountsImportDraftDescriptor, AccountTransferSelectableItem } from "@shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "@shared/models/accounts";
 import type { InstalledEditorApp } from "@shared/models/app";
 import {
@@ -19,6 +20,9 @@ import "./styles/app.css";
 type PageID = "accounts" | "proxy" | "settings";
 type AccountViewMode = "grid" | "list";
 type NoticeTone = "success" | "error" | "info";
+type AccountTransferDialogState =
+  | { mode: "export"; accounts: AccountTransferSelectableItem[] }
+  | { mode: "import"; draft: AccountsImportDraftDescriptor };
 
 interface Notice {
   text: string;
@@ -30,7 +34,7 @@ function App(): ReactElement {
   const [activePage, setActivePage] = useState<PageID>("accounts");
   const [appInfo, setAppInfo] = useState<AppInfo>(fallbackAppInfo);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
+  const [transferDialog, setTransferDialog] = useState<AccountTransferDialogState | undefined>();
   const [settings, setSettings] = useState<AppSettings>(() => defaultAppSettings());
   const [installedEditors, setInstalledEditors] = useState<InstalledEditorApp[]>([]);
   const [proxyState, setProxyState] = useState<ProxyRuntimeState>(() => fallbackProxyState(settings));
@@ -97,6 +101,57 @@ function App(): ReactElement {
     }
     setAccounts(await api.accounts.list());
   }, [api]);
+
+  const confirmAccountTransferSelection = useCallback(
+    (selectedIds: Set<string>) => {
+      const currentDialog = transferDialog;
+      if (!currentDialog) {
+        return;
+      }
+
+      setTransferDialog(undefined);
+      if (currentDialog.mode === "export") {
+        const accountCount = selectedIds.size;
+        void runAction(
+          t("accounts.transfer.export.action"),
+          async () => {
+            if (!api) {
+              throw new Error(t("error.ipc_bridge_unavailable"));
+            }
+            const result = await api.accounts.exportPackage([...selectedIds]);
+            setNotice(
+              result.canceled
+                ? { tone: "info", text: t("notice.export_canceled") }
+                : { tone: "success", text: t("accounts.notice.exported_format", { count: accountCount }) }
+            );
+          },
+          { silentSuccess: true }
+        );
+        return;
+      }
+
+      const draftId = currentDialog.draft.draftId;
+      void runAction(
+        t("accounts.transfer.import.action"),
+        async () => {
+          if (!api) {
+            throw new Error(t("error.ipc_bridge_unavailable"));
+          }
+          const result = await api.accounts.importPreparedPackage(draftId, [...selectedIds]);
+          await reloadAccounts();
+          setNotice({
+            tone: "success",
+            text: t("accounts.notice.imported_accounts_format", {
+              inserted: result.insertedCount,
+              updated: result.updatedCount
+            })
+          });
+        },
+        { silentSuccess: true }
+      );
+    },
+    [api, reloadAccounts, runAction, t, transferDialog]
+  );
 
   useEffect(() => {
     if (!api) {
@@ -175,43 +230,22 @@ function App(): ReactElement {
                 await reloadAccounts();
               })
             }
-            onDeleteSelected={() =>
-              runAction(t("accounts.action.delete"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                for (const id of selectedAccountIds) {
-                  await api.accounts.delete(id);
-                }
-                setSelectedAccountIds(new Set());
-                await reloadAccounts();
-              })
-            }
             onDeleteAccount={(id) =>
               runAction(t("accounts.action.delete"), async () => {
                 if (!api) {
                   throw new Error(t("error.ipc_bridge_unavailable"));
                 }
                 await api.accounts.delete(id);
-                setSelectedAccountIds((current) => {
-                  const next = new Set(current);
-                  next.delete(id);
-                  return next;
-                });
                 await reloadAccounts();
               })
             }
-            onExportSelected={() =>
-              runAction(t("accounts.action.export"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                const result = await api.accounts.exportPackage([...selectedAccountIds]);
-                if (result.canceled) {
-                  setNotice({ tone: "info", text: t("notice.export_canceled") });
-                }
-              })
-            }
+            onExportSelected={() => {
+              setNotice(undefined);
+              setTransferDialog({
+                mode: "export",
+                accounts: accounts.map(accountSummaryToTransferSelectableItem)
+              });
+            }}
             onImportAuthFile={() =>
               runAction(t("accounts.action.import_file"), async () => {
                 if (!api) {
@@ -231,13 +265,19 @@ function App(): ReactElement {
               })
             }
             onImportPackage={() =>
-              runAction(t("accounts.action.import_package"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.importPackage();
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.import_package"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const draft = await api.accounts.prepareImportPackage();
+                  if (draft) {
+                    setTransferDialog({ mode: "import", draft });
+                  }
+                },
+                { silentSuccess: true }
+              )
             }
             onRefreshAll={() =>
               runAction(t("accounts.action.refresh_usage"), async () => {
@@ -288,7 +328,6 @@ function App(): ReactElement {
                 await reloadAccounts();
               })
             }
-            onToggleSelection={(id) => setSelectedAccountIds((current) => toggleSetValue(current, id))}
             onUpdateAlias={(id, alias) =>
               runAction(t("accounts.card.team_alias"), async () => {
                 if (!api) {
@@ -298,7 +337,6 @@ function App(): ReactElement {
                 setAccounts((current) => current.map((account) => (account.id === id ? updated : account)));
               })
             }
-            selectedAccountIds={selectedAccountIds}
             t={t}
           />
         )}
@@ -386,6 +424,21 @@ function App(): ReactElement {
           />
         )}
       </section>
+      {transferDialog && (
+        <AccountTransferSelectionDialog
+          key={accountTransferDialogKey(transferDialog)}
+          accounts={accountTransferDialogAccounts(transferDialog)}
+          actionTitle={t(
+            transferDialog.mode === "export" ? "accounts.transfer.export.action" : "accounts.transfer.import.action"
+          )}
+          initiallySelectedIds={new Set(accountTransferDialogAccounts(transferDialog).map((account) => account.id))}
+          isBusy={Boolean(busyAction)}
+          title={t(transferDialog.mode === "export" ? "accounts.transfer.export.title" : "accounts.transfer.import.title")}
+          onCancel={() => setTransferDialog(undefined)}
+          onConfirm={confirmAccountTransferSelection}
+          t={t}
+        />
+      )}
     </main>
   );
 }
@@ -395,7 +448,6 @@ interface AccountsPageProps {
   busyAction?: string;
   onAddViaLogin: () => void;
   onDeleteAccount: (id: string) => void;
-  onDeleteSelected: () => void;
   onExportSelected: () => void;
   onImportAuthFile: () => void;
   onImportCurrent: () => void;
@@ -404,15 +456,12 @@ interface AccountsPageProps {
   onRefreshUsage: (id: string) => void;
   onSmartSwitch: () => void;
   onSwitchAccount: (id: string) => void;
-  onToggleSelection: (id: string) => void;
   onUpdateAlias: (id: string, alias?: string) => void;
   onWarmUpWeeklyQuota: () => void;
-  selectedAccountIds: ReadonlySet<string>;
   t: Translator;
 }
 
 function AccountsPage(props: AccountsPageProps): ReactElement {
-  const hasSelection = props.selectedAccountIds.size > 0;
   const [viewMode, setViewMode] = useState<AccountViewMode>("grid");
   const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<string>>(new Set());
   const accountIds = useMemo(() => props.accounts.map((account) => account.id), [props.accounts]);
@@ -494,11 +543,8 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
           <button type="button" onClick={props.onSmartSwitch} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
             {props.t("accounts.action.smart_switch")}
           </button>
-          <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || !hasSelection}>
+          <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
             {props.t("accounts.action.export")}
-          </button>
-          <button className="danger" type="button" onClick={props.onDeleteSelected} disabled={Boolean(props.busyAction) || !hasSelection}>
-            {props.t("accounts.action.delete")}
           </button>
         </div>
 
@@ -514,12 +560,10 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
                 key={account.id}
                 account={account}
                 isCollapsed={collapsedAccountIds.has(account.id)}
-                isSelected={props.selectedAccountIds.has(account.id)}
                 viewMode={viewMode}
                 onDelete={() => props.onDeleteAccount(account.id)}
                 onRefresh={() => props.onRefreshUsage(account.id)}
                 onSwitch={() => props.onSwitchAccount(account.id)}
-                onToggleSelection={() => props.onToggleSelection(account.id)}
                 onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
                 t={props.t}
               />
@@ -531,7 +575,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
       <aside className="inspector">
         <h3>{props.t("accounts.status.title")}</h3>
         <MetricRow label={props.t("accounts.status.accounts")} value={String(props.accounts.length)} />
-        <MetricRow label={props.t("accounts.status.selected")} value={String(props.selectedAccountIds.size)} />
         <MetricRow label={props.t("accounts.status.current")} value={props.accounts.find((account) => account.isCurrent)?.label ?? props.t("common.none")} />
       </aside>
     </div>
@@ -541,17 +584,15 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
 interface AccountRowProps {
   account: AccountSummary;
   isCollapsed: boolean;
-  isSelected: boolean;
   onDelete: () => void;
   onRefresh: () => void;
   onSwitch: () => void;
-  onToggleSelection: () => void;
   onUpdateAlias: (alias?: string) => void;
   t: Translator;
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isCollapsed, isSelected, onDelete, onRefresh, onSwitch, onToggleSelection, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, isCollapsed, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
@@ -561,7 +602,6 @@ function AccountRow({ account, isCollapsed, isSelected, onDelete, onRefresh, onS
 
   return (
     <article className={accountCardClassName(account.isCurrent, isCollapsed, viewMode)}>
-      <input aria-label={`${t("accounts.status.selected")} ${account.label}`} checked={isSelected} type="checkbox" onChange={onToggleSelection} />
       <div className="account-main">
         <div className="account-title-line">
           <h3>{accountTitle}</h3>
@@ -613,6 +653,90 @@ function shortAccountName(account: AccountSummary): string {
     return displayValue.slice(0, atIndex);
   }
   return displayValue;
+}
+
+function AccountTransferSelectionDialog({
+  accounts,
+  actionTitle,
+  initiallySelectedIds,
+  isBusy,
+  onCancel,
+  onConfirm,
+  t,
+  title
+}: {
+  accounts: AccountTransferSelectableItem[];
+  actionTitle: string;
+  initiallySelectedIds: ReadonlySet<string>;
+  isBusy: boolean;
+  onCancel: () => void;
+  onConfirm: (selectedIds: Set<string>) => void;
+  t: Translator;
+  title: string;
+}): ReactElement {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initiallySelectedIds));
+  const allSelected = selectedIds.size === accounts.length && accounts.length > 0;
+
+  return (
+    <div className="transfer-backdrop">
+      <section className="transfer-dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-dialog-title">
+        <header className="transfer-header">
+          <button aria-label={t("common.cancel")} className="transfer-close" type="button" onClick={onCancel}>
+            x
+          </button>
+          <div>
+            <h3 id="transfer-dialog-title">{title}</h3>
+            <p>{t("accounts.transfer.account_count_format", { count: accounts.length })}</p>
+          </div>
+          <div className="transfer-header-actions">
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set(accounts.map((account) => account.id)))}
+              disabled={allSelected || isBusy}
+            >
+              {t("common.select_all")}
+            </button>
+            <button type="button" onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0 || isBusy}>
+              {t("common.deselect_all")}
+            </button>
+          </div>
+        </header>
+
+        <div className="transfer-list">
+          {accounts.map((account) => (
+            <label key={account.id} className="transfer-row">
+              <input
+                aria-label={`${t("accounts.status.selected")} ${account.label}`}
+                checked={selectedIds.has(account.id)}
+                type="checkbox"
+                onChange={() => setSelectedIds((current) => toggleSetValue(current, account.id))}
+              />
+              <span className="transfer-account">
+                <strong>{account.email ?? account.label}</strong>
+                <span>{account.teamName ?? account.accountId}</span>
+              </span>
+              <span className="transfer-plan">{account.planLabel}</span>
+              {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
+            </label>
+          ))}
+        </div>
+
+        <footer className="transfer-footer">
+          <button type="button" onClick={onCancel} disabled={isBusy}>
+            {t("common.cancel")}
+          </button>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => onConfirm(new Set(selectedIds))}
+            disabled={isBusy || selectedIds.size === 0}
+          >
+            {actionTitle}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
 }
 
 function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
@@ -894,6 +1018,26 @@ function fallbackProxyState(settings: AppSettings): ProxyRuntimeState {
     port: settings.proxyPort,
     proxyURL: `http://localhost:${settings.proxyPort}`
   };
+}
+
+function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {
+  return {
+    id: account.id,
+    label: account.label,
+    email: account.email,
+    accountId: account.accountId,
+    planLabel: account.normalizedPlanLabel,
+    teamName: account.displayTeamName,
+    isCurrent: account.isCurrent
+  };
+}
+
+function accountTransferDialogAccounts(dialog: AccountTransferDialogState): AccountTransferSelectableItem[] {
+  return dialog.mode === "export" ? dialog.accounts : dialog.draft.accounts;
+}
+
+function accountTransferDialogKey(dialog: AccountTransferDialogState): string {
+  return dialog.mode === "export" ? "export" : `import-${dialog.draft.draftId}`;
 }
 
 function toggleSetValue(values: ReadonlySet<string>, value: string): Set<string> {

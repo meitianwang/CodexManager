@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AppInfo } from "../shared/app-info";
-import type { AccountsImportResult } from "../shared/models/account-transfer";
+import type { AccountsImportDraftDescriptor, AccountsImportResult } from "../shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/accounts";
 import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../shared/models/app";
 import type { AppSettings, AppSettingsPatch } from "../shared/models/settings";
@@ -19,9 +19,11 @@ export interface CodexManagerAPI {
     exportPackage: (accountIds: string[]) => Promise<{ canceled: boolean; path?: string }>;
     importAuthFile: () => Promise<AccountSummary | undefined>;
     importCurrentAuth: () => Promise<AccountSummary>;
+    importPreparedPackage: (draftId: string, accountIds: string[]) => Promise<AccountsImportResult>;
     importPackage: () => Promise<AccountsImportResult | undefined>;
     list: () => Promise<AccountSummary[]>;
     onChanged: (listener: (accounts: AccountSummary[]) => void) => () => void;
+    prepareImportPackage: () => Promise<AccountsImportDraftDescriptor | undefined>;
     refreshAllUsage: () => Promise<AccountSummary[]>;
     refreshUsage: (id: string) => Promise<AccountSummary>;
     refreshWorkspaceMetadata: (forceRemoteCheck?: boolean) => Promise<AccountSummary[]>;
@@ -59,6 +61,8 @@ const api: CodexManagerAPI = {
       invoke<{ canceled: boolean; path?: string }>(ipcChannels.accountsExportPackage, { accountIds }),
     importAuthFile: () => invoke<AccountSummary | undefined>(ipcChannels.accountsImportAuthFile),
     importCurrentAuth: () => invoke<AccountSummary>(ipcChannels.accountsImportCurrentAuth),
+    importPreparedPackage: (draftId, accountIds) =>
+      invoke<AccountsImportResult>(ipcChannels.accountsImportPreparedPackage, { draftId, accountIds }),
     importPackage: () => invoke<AccountsImportResult | undefined>(ipcChannels.accountsImportPackage),
     list: () => invoke<AccountSummary[]>(ipcChannels.accountsList),
     onChanged: (listener) => {
@@ -68,6 +72,7 @@ const api: CodexManagerAPI = {
       ipcRenderer.on(ipcChannels.accountsChanged, handler);
       return () => ipcRenderer.off(ipcChannels.accountsChanged, handler);
     },
+    prepareImportPackage: () => invoke<AccountsImportDraftDescriptor | undefined>(ipcChannels.accountsPrepareImportPackage),
     refreshAllUsage: () => invoke<AccountSummary[]>(ipcChannels.accountsRefreshAllUsage),
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
     refreshWorkspaceMetadata: (forceRemoteCheck) =>

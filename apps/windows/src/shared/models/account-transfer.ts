@@ -15,6 +15,11 @@ export interface AccountsImportResult {
   updatedCount: number;
 }
 
+export interface AccountsImportDraftDescriptor {
+  draftId: string;
+  accounts: AccountTransferSelectableItem[];
+}
+
 export interface AccountTransferSelectableItem {
   id: string;
   label: string;

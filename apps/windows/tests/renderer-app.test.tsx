@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appInfo as fallbackAppInfo } from "../src/shared/app-info";
+import type { AccountTransferSelectableItem } from "../src/shared/models/account-transfer";
 import type { AccountSummary } from "../src/shared/models/accounts";
 import type { InstalledEditorApp, SmartSwitchResult } from "../src/shared/models/app";
 import { proxyAvailableModels, type ProxyRuntimeState } from "../src/shared/models/proxy";
@@ -40,6 +41,13 @@ describe("Windows renderer app", () => {
 
     expect(await screen.findByText("Work")).toBeTruthy();
 
+    expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    const exportDialog = await screen.findByRole("dialog", { name: "Choose accounts to export" });
+    expect((within(exportDialog).getByLabelText("Selected Work") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(within(exportDialog).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(api.accounts.exportPackage).toHaveBeenCalledWith(["a"]));
+
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(api.accounts.addViaLogin).toHaveBeenCalledOnce());
     await waitFor(() => expect(api.accounts.list).toHaveBeenCalledTimes(2));
@@ -51,13 +59,11 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.accounts.importAuthFile).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByRole("button", { name: "Import package" }));
-    await waitFor(() => expect(api.accounts.importPackage).toHaveBeenCalledOnce());
-
-    fireEvent.click(screen.getByLabelText("Selected Work"));
-    expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    await waitFor(() => expect(api.accounts.exportPackage).toHaveBeenCalledWith(["a"]));
+    await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
+    const importDialog = await screen.findByRole("dialog", { name: "Choose accounts to import" });
+    expect((within(importDialog).getByLabelText("Selected Package") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(within(importDialog).getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(api.accounts.importPreparedPackage).toHaveBeenCalledWith("draft-1", ["package"]));
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
@@ -79,7 +85,7 @@ describe("Windows renderer app", () => {
     fireEvent.blur(screen.getByLabelText("Team alias Work"));
     await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
 
-    const accountDeleteButton = screen.getAllByRole("button", { name: "Delete" })[1];
+    const accountDeleteButton = screen.getAllByRole("button", { name: "Delete" })[0];
     expect(accountDeleteButton).toBeDefined();
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
@@ -216,12 +222,22 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
       exportPackage: vi.fn(async () => ({ canceled: false, path: String.raw`C:\exports\accounts.codexmanager.json` })),
       importAuthFile: vi.fn(async () => appendAccount(accounts, "file", "Imported file")),
       importCurrentAuth: vi.fn(async () => appendAccount(accounts, "current", "Current auth")),
+      importPreparedPackage: vi.fn(async (_draftId, accountIds) => {
+        for (const id of accountIds) {
+          appendAccount(accounts, id, id === "package" ? "Package" : id);
+        }
+        return { insertedCount: accountIds.length, updatedCount: 0 };
+      }),
       importPackage: vi.fn(async () => {
         accounts = [...accounts, makeAccount("package", "Package")];
         return { insertedCount: 1, updatedCount: 0 };
       }),
       list: vi.fn(async () => accounts),
       onChanged: vi.fn(() => () => undefined),
+      prepareImportPackage: vi.fn(async () => ({
+        draftId: "draft-1",
+        accounts: [accountSummaryToTransferSelectableItem(makeAccount("package", "Package"))]
+      })),
       refreshAllUsage: vi.fn(async () => {
         accounts = accounts.map((account) => ({ ...account, usage: makeUsage(12, 34) }));
         return accounts;
@@ -313,6 +329,18 @@ function makeAccount(id: string, label: string): AccountSummary {
     normalizedPlanLabel: "Pro",
     shouldDisplayWorkspaceTag: true,
     updatedAt: 2
+  };
+}
+
+function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {
+  return {
+    id: account.id,
+    label: account.label,
+    email: account.email,
+    accountId: account.accountId,
+    planLabel: account.normalizedPlanLabel,
+    teamName: account.displayTeamName,
+    isCurrent: account.isCurrent
   };
 }
 

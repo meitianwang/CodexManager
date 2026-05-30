@@ -391,7 +391,7 @@ button.danger {
 
 .account-row {
   display: grid;
-  grid-template-columns: 24px minmax(220px, 1.3fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 152px;
+  grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 152px;
   gap: 14px;
   align-items: center;
   min-height: 112px;
@@ -402,13 +402,13 @@ button.danger {
 }
 
 .account-row.grid {
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .account-row.grid .usage-cell,
 .account-row.grid .account-actions {
-  grid-column: 2;
+  grid-column: 1;
 }
 
 .account-row.grid .account-actions {
@@ -433,11 +433,6 @@ button.danger {
 .account-row.current {
   border-color: rgba(214, 240, 95, 0.38);
   background: #1a1f13;
-}
-
-.account-row input[type="checkbox"] {
-  width: 16px;
-  min-height: 16px;
 }
 
 .account-title-line {
@@ -549,6 +544,151 @@ button.danger {
   overflow-wrap: anywhere;
   color: #f0f3ea;
   font-size: 13px;
+}
+
+.transfer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 9, 7, 0.62);
+}
+
+.transfer-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(506px, calc(100vw - 48px));
+  min-height: 388px;
+  max-height: min(620px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid #33372d;
+  border-radius: 8px;
+  background: #181b15;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.transfer-header {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 154px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px 11px;
+  border-bottom: 1px solid #282c22;
+}
+
+.transfer-header h3,
+.transfer-header p {
+  margin: 0;
+  text-align: center;
+}
+
+.transfer-header h3 {
+  color: #f0f3ea;
+  font-size: 15px;
+}
+
+.transfer-header p {
+  margin-top: 3px;
+  color: #9ea697;
+  font-size: 11px;
+}
+
+.transfer-close {
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 999px;
+  background: #25291f;
+  color: #aab2a0;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+}
+
+.transfer-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.transfer-header-actions button {
+  min-height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #d6f05f;
+  font-size: 12px;
+}
+
+.transfer-list {
+  min-height: 240px;
+  max-height: 294px;
+  overflow: auto;
+}
+
+.transfer-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border-bottom: 1px solid #282c22;
+  background: #181b15;
+  cursor: pointer;
+}
+
+.transfer-row:hover {
+  background: #1d2118;
+}
+
+.transfer-row input {
+  width: 16px;
+  min-height: 16px;
+  padding: 0;
+}
+
+.transfer-account {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.transfer-account strong,
+.transfer-account span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-account strong {
+  color: #f4f7ef;
+  font-size: 13px;
+}
+
+.transfer-account span {
+  color: #9ea697;
+  font-size: 11px;
+}
+
+.transfer-plan {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(240, 179, 90, 0.12);
+  color: #f0b35a;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.transfer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #282c22;
 }
 
 .proxy-layout {
@@ -725,11 +865,11 @@ button.danger {
   }
 
   .account-row {
-    grid-template-columns: 24px minmax(220px, 1fr) minmax(140px, 0.6fr) minmax(140px, 0.6fr);
+    grid-template-columns: minmax(220px, 1fr) minmax(140px, 0.6fr) minmax(140px, 0.6fr);
   }
 
   .account-actions {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
     grid-template-columns: 90px 1fr 1fr;
   }
 
