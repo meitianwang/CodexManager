@@ -492,7 +492,6 @@ button.danger {
   min-width: 0;
 }
 
-.account-identifier,
 .workspace-name {
   overflow: hidden;
   color: #a9b29f;
@@ -502,12 +501,8 @@ button.danger {
 }
 
 .workspace-name {
-  margin: 3px 0 0;
+  margin: 3px 0 8px;
   font-size: 11px;
-}
-
-.account-identifier {
-  margin: 4px 0 8px;
 }
 
 .alias-line input {

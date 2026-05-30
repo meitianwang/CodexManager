@@ -663,7 +663,7 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
     setAlias(account.teamAlias ?? "");
   }, [account.teamAlias]);
 
-  const accountTitle = isCollapsed ? shortAccountName(account) : account.label;
+  const accountTitle = isCollapsed ? shortAccountName(account) : fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
 
   return (
@@ -692,7 +692,6 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
               <h3>{accountTitle}</h3>
             </div>
             {workspaceTag && <p className="workspace-name">{workspaceTag}</p>}
-            <p className="account-identifier">{account.email ?? account.accountId}</p>
             <div className="alias-line">
               <input
                 aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
@@ -747,12 +746,16 @@ function accountCardClassName(isCurrent: boolean, isCollapsed: boolean, viewMode
 }
 
 function shortAccountName(account: AccountSummary): string {
-  const displayValue = account.email ?? account.label;
+  const displayValue = fullAccountName(account);
   const atIndex = displayValue.indexOf("@");
   if (atIndex > 0) {
     return displayValue.slice(0, atIndex);
   }
   return displayValue;
+}
+
+function fullAccountName(account: AccountSummary): string {
+  return (account.email ?? account.accountId).trim();
 }
 
 function AccountTransferSelectionDialog({

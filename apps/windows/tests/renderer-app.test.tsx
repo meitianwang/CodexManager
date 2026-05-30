@@ -39,9 +39,12 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByText("Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("a@example.com")).toBeTruthy();
     expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("Pro");
     expect(accountRow("Work").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
+    expect(accountRow("Work").querySelector(".account-identifier")).toBeNull();
     expect(accountRow("Work").querySelector(".account-actions")?.textContent).toBe("SwitchRefreshDelete");
     expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
     expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
@@ -128,7 +131,7 @@ describe("Windows renderer app", () => {
     api.accounts.prepareImportPackage = vi.fn(async () => undefined);
     render(<App />);
 
-    expect(await screen.findByText("Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
 
@@ -141,7 +144,7 @@ describe("Windows renderer app", () => {
     installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByText(account.label)).toBeTruthy();
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
     expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
     expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
 
