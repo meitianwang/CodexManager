@@ -214,6 +214,9 @@ describe("Windows renderer app", () => {
     expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
     expect(screen.getByText("cURL example:")).toBeTruthy();
     expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
+    expect(codeBlockCopyButtons()).toHaveLength(2);
+    expect(codeBlockCopyButtons().every((button) => button.textContent === "")).toBe(true);
+    expect(codeBlockCopyButtons().every((button) => button.querySelector(".copy-doc-icon"))).toBe(true);
     const apiKeyControl = screen.getByLabelText("API key").closest(".api-key-field")?.querySelector(".api-key-control");
     expect(apiKeyControl).toBeTruthy();
     expect(within(apiKeyControl as HTMLElement).getByRole("button", { name: "Regenerate API Key" })).toBeTruthy();
@@ -457,6 +460,10 @@ function proxyUsageText(): string {
 
 function directProxyControlButtonText(): string[] {
   return Array.from(document.querySelectorAll(".proxy-control > button")).map((element) => element.textContent ?? "");
+}
+
+function codeBlockCopyButtons(): HTMLButtonElement[] {
+  return Array.from(document.querySelectorAll(".code-block .code-copy-button"));
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {

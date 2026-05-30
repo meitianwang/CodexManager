@@ -1064,8 +1064,8 @@ function CodeBlock({ label, text, onCopy, t }: { label: string; text: string; on
     <section className="code-block">
       <div>
         <span>{label}</span>
-        <button type="button" onClick={onCopy}>
-          {t("common.copy")}
+        <button aria-label={t("common.copy")} className="code-copy-button" title={t("common.copy")} type="button" onClick={onCopy}>
+          <span className="copy-doc-icon" aria-hidden="true" />
         </button>
       </div>
       <pre>{text}</pre>

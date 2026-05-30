@@ -1005,6 +1005,51 @@ button.danger {
   font-size: 12px;
 }
 
+.code-copy-button {
+  display: grid;
+  width: 28px;
+  min-height: 28px;
+  place-items: center;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #d6f05f;
+}
+
+.code-copy-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgba(214, 240, 95, 0.1);
+}
+
+.copy-doc-icon {
+  position: relative;
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.copy-doc-icon::before,
+.copy-doc-icon::after {
+  position: absolute;
+  width: 9px;
+  height: 10px;
+  border: 1.8px solid currentColor;
+  border-radius: 2px;
+  content: "";
+}
+
+.copy-doc-icon::before {
+  right: 1px;
+  top: 1px;
+  background: #181b15;
+}
+
+.copy-doc-icon::after {
+  left: 1px;
+  bottom: 1px;
+  background: #10120d;
+}
+
 .code-block pre {
   overflow: auto;
   margin: 0;
