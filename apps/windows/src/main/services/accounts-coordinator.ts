@@ -6,19 +6,21 @@ import {
   accountsTransferCurrentVersion,
   accountsTransferFormatIdentifier
 } from "../../shared/models/account-transfer";
-import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
-import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
+import type { AccountSummary, AccountsStore, StoredAccount, WeeklyQuotaWarmupResult } from "../../shared/models/accounts";
+import type { ChatGPTOAuthTokens, ExtractedAuth, WorkspaceMetadata } from "../../shared/models/auth";
 import type { SmartSwitchResult, SwitchAccountExecutionResult } from "../../shared/models/app";
 import { idleSwitchAccountExecutionResult } from "../../shared/models/app";
 import type { AppSettings, EditorAppID } from "../../shared/models/settings";
 import type { UsageSnapshot } from "../../shared/models/usage";
-import { accountKeyForExtractedAuth, accountKeyForStoredAccount, preferredMatchIndex } from "../../shared/domain/account-identity";
+import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId, preferredMatchIndex } from "../../shared/domain/account-identity";
 import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
 import { accountSummaries, toAccountSummary } from "../../shared/domain/accounts-store";
 import { pickAutoSwitchTarget, sortByRemaining } from "../../shared/domain/account-ranking";
 import { applyAccountsTransferMerge } from "../../shared/domain/accounts-transfer-merge";
+import { tokenObjectFromAuth } from "../repositories/auth-parsing";
 import { stableStringify } from "../repositories/stable-json";
 import { parseAccountsTransferPackage } from "../repositories/store-parsers";
+import { UnauthorizedError } from "./network-errors";
 
 export interface AccountsStoreRepositoryLike {
   loadStore(): Promise<AccountsStore>;
@@ -45,6 +47,7 @@ export interface SettingsRepositoryLike {
 
 export interface ChatGPTOAuthLoginServiceLike {
   signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens>;
+  refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens>;
 }
 
 export interface CodexCLIServiceLike {
@@ -62,11 +65,21 @@ export interface DateProviderLike {
   unixMillisecondsNow(): number;
 }
 
+export interface WeeklyQuotaWarmupServiceLike {
+  warmUp(accessToken: string, accountId: string): Promise<void>;
+}
+
+export interface WorkspaceMetadataServiceLike {
+  fetchWorkspaceMetadata(accessToken: string): Promise<WorkspaceMetadata[]>;
+}
+
 export interface AccountsCoordinatorOptions {
   storeRepository: AccountsStoreRepositoryLike;
   authRepository: AuthRepositoryLike;
   settingsRepository?: SettingsRepositoryLike;
   usageService?: UsageServiceLike;
+  weeklyQuotaWarmupService?: WeeklyQuotaWarmupServiceLike;
+  workspaceMetadataService?: WorkspaceMetadataServiceLike;
   chatGPTOAuthLoginService?: ChatGPTOAuthLoginServiceLike;
   codexCLIService?: CodexCLIServiceLike;
   editorAppService?: EditorAppServiceLike;
@@ -79,6 +92,8 @@ export class AccountsCoordinator {
   private readonly authRepository: AuthRepositoryLike;
   private readonly settingsRepository?: SettingsRepositoryLike;
   private readonly usageService?: UsageServiceLike;
+  private readonly weeklyQuotaWarmupService?: WeeklyQuotaWarmupServiceLike;
+  private readonly workspaceMetadataService?: WorkspaceMetadataServiceLike;
   private readonly chatGPTOAuthLoginService?: ChatGPTOAuthLoginServiceLike;
   private readonly codexCLIService?: CodexCLIServiceLike;
   private readonly editorAppService?: EditorAppServiceLike;
@@ -90,6 +105,8 @@ export class AccountsCoordinator {
     this.authRepository = options.authRepository;
     this.settingsRepository = options.settingsRepository;
     this.usageService = options.usageService;
+    this.weeklyQuotaWarmupService = options.weeklyQuotaWarmupService;
+    this.workspaceMetadataService = options.workspaceMetadataService;
     this.chatGPTOAuthLoginService = options.chatGPTOAuthLoginService;
     this.codexCLIService = options.codexCLIService;
     this.editorAppService = options.editorAppService;
@@ -106,7 +123,8 @@ export class AccountsCoordinator {
     const store = await this.storeRepository.loadStore();
     const didReconcileCurrentAuth = await this.reconcileCurrentAuthSnapshot(store);
     const didReconcile = this.reconcileStoredAccountMetadata(store);
-    if (didReconcileCurrentAuth || didReconcile) {
+    const didEnrich = await this.enrichStoredWorkspaceMetadataIfNeeded(store, false);
+    if (didReconcileCurrentAuth || didReconcile || didEnrich) {
       await this.storeRepository.saveStore(store);
     }
     return accountSummaries(store, await this.currentAuthAccountKey());
@@ -169,14 +187,10 @@ export class AccountsCoordinator {
       throw new Error("Account was not found for usage refresh");
     }
 
-    const extracted = this.authRepository.extractAuth(account.authJson);
-    const { usage, usageError } = await this.fetchUsage(extracted);
-    account.usage = usage ?? account.usage;
-    account.usageError = usageError;
-    account.updatedAt = this.dateProvider.unixSecondsNow();
-    store.accounts[index] = account;
+    const refreshed = await this.refreshStoredAccountUsage(account);
+    store.accounts[index] = refreshed;
     await this.storeRepository.saveStore(store);
-    return toAccountSummary(account, await this.currentAuthAccountKey());
+    return toAccountSummary(refreshed, await this.currentAuthAccountKey());
   }
 
   async refreshAllUsage(): Promise<AccountSummary[]> {
@@ -185,6 +199,75 @@ export class AccountsCoordinator {
       await this.refreshAccountUsage(account.id);
     }
     return this.listAccounts();
+  }
+
+  async warmUpResetWeeklyQuotaAccounts(): Promise<WeeklyQuotaWarmupResult> {
+    const now = this.dateProvider.unixSecondsNow();
+    let store = await this.storeRepository.loadStore();
+    if (await this.reconcileCurrentAuthSnapshot(store)) {
+      await this.storeRepository.saveStore(store);
+    }
+
+    const targets = store.accounts.filter((account) => shouldWarmUpResetWeeklyQuota(account, now));
+    if (targets.length === 0) {
+      return {
+        accounts: accountSummaries(store, await this.currentAuthAccountKey()),
+        targetCount: 0,
+        succeededCount: 0,
+        failures: []
+      };
+    }
+
+    if (!this.weeklyQuotaWarmupService) {
+      throw new Error("Weekly quota warmup service is unavailable");
+    }
+
+    const succeededIds: string[] = [];
+    const failures: WeeklyQuotaWarmupResult["failures"] = [];
+    for (const target of targets) {
+      store = await this.storeRepository.loadStore();
+      const activeAccount = store.accounts.find((account) => account.id === target.id) ?? target;
+      try {
+        const extracted = this.authRepository.extractAuth(activeAccount.authJson);
+        await this.weeklyQuotaWarmupService.warmUp(extracted.accessToken, extracted.accountId);
+        succeededIds.push(activeAccount.id);
+      } catch (error) {
+        const message = errorMessage(error);
+        failures.push({
+          accountId: activeAccount.id,
+          label: activeAccount.label,
+          message
+        });
+        const index = store.accounts.findIndex((account) => account.id === activeAccount.id);
+        const failedAccount = store.accounts[index];
+        if (index >= 0 && failedAccount) {
+          failedAccount.usageError = message;
+          failedAccount.updatedAt = this.dateProvider.unixSecondsNow();
+          store.accounts[index] = failedAccount;
+          await this.storeRepository.saveStore(store);
+        }
+      }
+    }
+
+    for (const id of succeededIds) {
+      await this.refreshAccountUsage(id);
+    }
+
+    return {
+      accounts: await this.listAccounts(),
+      targetCount: targets.length,
+      succeededCount: succeededIds.length,
+      failures
+    };
+  }
+
+  async refreshWorkspaceMetadata(forceRemoteCheck: boolean): Promise<AccountSummary[]> {
+    const store = await this.storeRepository.loadStore();
+    const didChange = await this.enrichStoredWorkspaceMetadataIfNeeded(store, forceRemoteCheck);
+    if (didChange) {
+      await this.storeRepository.saveStore(store);
+    }
+    return accountSummaries(store, await this.currentAuthAccountKey());
   }
 
   async switchAccountAndApplySettings(id: string, workspacePath?: string): Promise<SwitchAccountExecutionResult> {
@@ -273,7 +356,11 @@ export class AccountsCoordinator {
   }
 
   async importAccount(authJson: JSONValue, customLabel?: string): Promise<AccountSummary> {
-    const extracted = this.authRepository.extractAuth(authJson);
+    let extracted = this.authRepository.extractAuth(authJson);
+    const remoteWorkspaceName = await this.resolveRemoteWorkspaceName(extracted, true);
+    if (remoteWorkspaceName) {
+      extracted = { ...extracted, teamName: remoteWorkspaceName };
+    }
     const { usage, usageError } = await this.fetchUsage(extracted);
     const now = this.dateProvider.unixSecondsNow();
     const trimmedLabel = customLabel?.trim();
@@ -372,6 +459,122 @@ export class AccountsCoordinator {
     }
 
     return result;
+  }
+
+  private async refreshStoredAccountUsage(account: StoredAccount): Promise<StoredAccount> {
+    const updated: StoredAccount = { ...account };
+    try {
+      const extracted = this.authRepository.extractAuth(updated.authJson);
+      const usage = await this.fetchUsageRequired(extracted);
+      updated.usage = usage;
+      updated.usageError = undefined;
+      updated.planType = preferredPlanType(extracted.planType, usage.planType, updated.planType);
+      updated.email = extracted.email ?? updated.email;
+      updated.principalId = extracted.principalId;
+      const teamName = normalizeTeamName(extracted.teamName);
+      if (teamName) {
+        updated.teamName = teamName;
+      }
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return this.refreshAccountAuthAndRetryUsage(updated, error, false);
+      }
+      updated.usageError = errorMessage(error);
+    }
+
+    updated.updatedAt = this.dateProvider.unixSecondsNow();
+    return updated;
+  }
+
+  private async refreshAccountAuthAndRetryUsage(
+    account: StoredAccount,
+    originalError: Error,
+    allowInteractiveAuthRepair: boolean
+  ): Promise<StoredAccount> {
+    const updated: StoredAccount = { ...account };
+    const currentAccountKey = await this.currentAuthAccountKey();
+    const wasCurrentAccount = accountMatchesCurrentAuth(updated, currentAccountKey);
+
+    try {
+      const tokens = await this.repairedTokens(updated, originalError, allowInteractiveAuthRepair);
+      const authJson = this.authRepository.replacingChatGPTTokens(updated.authJson, tokens);
+      const extracted = this.authRepository.extractAuth(authJson);
+      if (normalizedAccountId(extracted.accountId) !== normalizedAccountId(updated.accountId)) {
+        throw new Error(`OAuth workspace mismatch: expected ${updated.accountId}`);
+      }
+
+      updated.authJson = authJson;
+      updated.accountId = extracted.accountId;
+      updated.email = extracted.email ?? updated.email;
+      updated.principalId = extracted.principalId;
+      const teamName = normalizeTeamName(extracted.teamName);
+      if (teamName) {
+        updated.teamName = teamName;
+      }
+
+      try {
+        const usage = await this.fetchUsageRequired(extracted);
+        updated.usage = usage;
+        updated.usageError = undefined;
+        updated.planType = preferredPlanType(extracted.planType, usage.planType, updated.planType);
+      } catch (error) {
+        updated.usageError = errorMessage(error);
+        updated.planType = preferredPlanType(extracted.planType, updated.usage?.planType, updated.planType);
+      }
+
+      if (wasCurrentAccount || accountMatchesCurrentAuth(updated, currentAccountKey)) {
+        await this.authRepository.writeCurrentAuth(authJson);
+      }
+    } catch (error) {
+      updated.usageError = errorMessage(error);
+    }
+
+    updated.updatedAt = this.dateProvider.unixSecondsNow();
+    return updated;
+  }
+
+  private async repairedTokens(
+    account: StoredAccount,
+    originalError: Error,
+    allowInteractiveAuthRepair: boolean
+  ): Promise<ChatGPTOAuthTokens> {
+    if (!this.chatGPTOAuthLoginService) {
+      throw originalError;
+    }
+
+    const refreshToken = refreshTokenFromAuth(account.authJson);
+    if (refreshToken) {
+      try {
+        return await this.chatGPTOAuthLoginService.refreshChatGPTTokens(refreshToken);
+      } catch (error) {
+        if (!allowInteractiveAuthRepair) {
+          throw error;
+        }
+      }
+    } else if (!allowInteractiveAuthRepair) {
+      throw originalError;
+    }
+
+    return this.chatGPTOAuthLoginService.signInWithChatGPT(10 * 60, account.accountId);
+  }
+
+  private async resolveRemoteWorkspaceName(
+    extracted: ExtractedAuth,
+    forceRemoteCheck: boolean
+  ): Promise<string | undefined> {
+    if (!this.workspaceMetadataService) {
+      return undefined;
+    }
+    if (!shouldLookupRemoteWorkspaceName(extracted.teamName, extracted, forceRemoteCheck)) {
+      return extracted.teamName;
+    }
+
+    try {
+      const directory = await this.workspaceMetadataService.fetchWorkspaceMetadata(extracted.accessToken);
+      return remoteWorkspaceName(extracted.accountId, directory) ?? extracted.teamName;
+    } catch {
+      return extracted.teamName;
+    }
   }
 
   private async currentAuthAccountKey(): Promise<string | undefined> {
@@ -481,6 +684,52 @@ export class AccountsCoordinator {
     return didChange;
   }
 
+  private async enrichStoredWorkspaceMetadataIfNeeded(store: AccountsStore, forceRemoteCheck: boolean): Promise<boolean> {
+    if (!this.workspaceMetadataService) {
+      return false;
+    }
+
+    let didChange = false;
+    const cachedDirectories = new Map<string, WorkspaceMetadata[]>();
+    for (const account of store.accounts) {
+      let extracted: ExtractedAuth;
+      try {
+        extracted = this.authRepository.extractAuth(account.authJson);
+      } catch {
+        continue;
+      }
+
+      if (!shouldLookupRemoteWorkspaceName(account.teamName, extracted, forceRemoteCheck)) {
+        continue;
+      }
+
+      let directory = cachedDirectories.get(extracted.accessToken);
+      if (!directory) {
+        try {
+          directory = await this.workspaceMetadataService.fetchWorkspaceMetadata(extracted.accessToken);
+        } catch {
+          continue;
+        }
+        cachedDirectories.set(extracted.accessToken, directory);
+      }
+
+      const workspaceName = remoteWorkspaceName(extracted.accountId, directory);
+      if (workspaceName && account.teamName !== workspaceName) {
+        account.teamName = workspaceName;
+        didChange = true;
+      }
+    }
+
+    return didChange;
+  }
+
+  private async fetchUsageRequired(extracted: ExtractedAuth): Promise<UsageSnapshot> {
+    if (!this.usageService) {
+      throw new Error("Usage service is unavailable");
+    }
+    return this.usageService.fetchUsage(extracted.accessToken, extracted.accountId);
+  }
+
   private async fetchUsage(extracted: ExtractedAuth): Promise<{ usage?: UsageSnapshot; usageError?: string }> {
     if (!this.usageService) {
       return {};
@@ -522,4 +771,44 @@ export function validateAccountsTransferPackage(accountPackage: AccountsTransfer
 function normalizeTeamName(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function refreshTokenFromAuth(auth: JSONValue): string | undefined {
+  const tokens = tokenObjectFromAuth(auth);
+  const refreshToken = tokens?.refresh_token;
+  return typeof refreshToken === "string" && refreshToken.length > 0 ? refreshToken : undefined;
+}
+
+function accountMatchesCurrentAuth(account: StoredAccount, currentAccountKey: string | undefined): boolean {
+  return currentAccountKey !== undefined && accountKeyForStoredAccount(account) === currentAccountKey;
+}
+
+function shouldWarmUpResetWeeklyQuota(account: StoredAccount, now: number): boolean {
+  const oneWeek = account.usage?.oneWeek;
+  return oneWeek !== undefined && oneWeek.usedPercent >= 100 && oneWeek.resetAt !== undefined && oneWeek.resetAt <= now;
+}
+
+function shouldLookupRemoteWorkspaceName(
+  storedTeamName: string | undefined,
+  extracted: ExtractedAuth,
+  forceRemoteCheck: boolean
+): boolean {
+  const planType = extracted.planType?.trim().toLowerCase();
+  if (planType !== "team" && planType !== "business" && planType !== "enterprise") {
+    return false;
+  }
+  return forceRemoteCheck || normalizeTeamName(storedTeamName) === undefined;
+}
+
+function remoteWorkspaceName(accountId: string, metadata: readonly WorkspaceMetadata[]): string | undefined {
+  const match = metadata.find((item) => item.accountId === accountId);
+  const trimmed = match?.workspaceName?.trim();
+  if (!trimmed || match?.structure?.toLowerCase() === "personal") {
+    return undefined;
+  }
+  return trimmed;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

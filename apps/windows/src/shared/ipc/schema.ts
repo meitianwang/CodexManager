@@ -12,9 +12,11 @@ export const ipcChannels = {
   accountsList: "accounts:list",
   accountsRefreshAllUsage: "accounts:refreshAllUsage",
   accountsRefreshUsage: "accounts:refreshUsage",
+  accountsRefreshWorkspaceMetadata: "accounts:refreshWorkspaceMetadata",
   accountsSmartSwitch: "accounts:smartSwitch",
   accountsSwitch: "accounts:switch",
   accountsUpdateTeamAlias: "accounts:updateTeamAlias",
+  accountsWarmUpWeeklyQuota: "accounts:warmUpWeeklyQuota",
   clipboardWriteText: "clipboard:writeText",
   proxyGetState: "proxy:getState",
   proxyRegenerateApiKey: "proxy:regenerateApiKey",
@@ -31,6 +33,10 @@ const appLocale = z.enum(appLocales);
 
 export const accountIdSchema = z.object({
   id: accountId
+});
+
+export const refreshWorkspaceMetadataSchema = z.object({
+  forceRemoteCheck: z.boolean().optional()
 });
 
 export const switchAccountSchema = z.object({

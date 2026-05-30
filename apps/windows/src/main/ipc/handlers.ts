@@ -11,6 +11,7 @@ import {
   ipcChannels,
   parseIpcInput,
   proxyStartSchema,
+  refreshWorkspaceMetadataSchema,
   settingsPatchSchema,
   switchAccountSchema,
   updateTeamAliasSchema
@@ -27,10 +28,16 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
   ipcMain.handle(ipcChannels.accountsImportCurrentAuth, () => context.accountsCoordinator.importCurrentAuthAccount());
   ipcMain.handle(ipcChannels.accountsAddViaLogin, () => context.accountsCoordinator.addAccountViaLogin());
   ipcMain.handle(ipcChannels.accountsRefreshAllUsage, () => context.accountsCoordinator.refreshAllUsage());
+  ipcMain.handle(ipcChannels.accountsWarmUpWeeklyQuota, () => context.accountsCoordinator.warmUpResetWeeklyQuotaAccounts());
 
   ipcMain.handle(ipcChannels.accountsRefreshUsage, (_event, input: unknown) => {
     const { id } = parseIpcInput(accountIdSchema, input);
     return context.accountsCoordinator.refreshAccountUsage(id);
+  });
+
+  ipcMain.handle(ipcChannels.accountsRefreshWorkspaceMetadata, (_event, input: unknown) => {
+    const { forceRemoteCheck } = parseIpcInput(refreshWorkspaceMetadataSchema, input);
+    return context.accountsCoordinator.refreshWorkspaceMetadata(forceRemoteCheck ?? false);
   });
 
   ipcMain.handle(ipcChannels.accountsSwitch, (_event, input: unknown) => {

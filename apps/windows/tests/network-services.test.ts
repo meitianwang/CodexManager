@@ -9,6 +9,12 @@ import {
 } from "../src/main/services/oauth/openai-chatgpt-oauth-service";
 import { mapUsagePayload } from "../src/main/services/usage-service";
 import { mapWorkspaceMetadataPayload } from "../src/main/services/workspace-metadata-service";
+import { DefaultWeeklyQuotaWarmupService, makeWarmupBodyBuffer } from "../src/main/services/weekly-quota-warmup-service";
+import type {
+  CodexUpstreamClientLike,
+  CodexUpstreamRequest,
+  CodexUpstreamResult
+} from "../src/main/proxy/upstream-client";
 
 describe("OAuth helpers", () => {
   it("builds authorize URLs with PKCE, state, originator, and workspace constraints", () => {
@@ -178,6 +184,50 @@ describe("workspace metadata parsing", () => {
   });
 });
 
+describe("weekly quota warmup service", () => {
+  it("posts the warmup body through the Codex upstream client", async () => {
+    const upstream = new FakeWarmupUpstream(sseResult({ type: "response.completed" }));
+    const service = new DefaultWeeklyQuotaWarmupService(
+      { codexConfigPath: "/missing-config.toml" },
+      { upstreamClient: upstream }
+    );
+
+    await service.warmUp("access-token", "acct-1");
+
+    expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/responses");
+    expect(upstream.requests[0]?.accessToken).toBe("access-token");
+    expect(upstream.requests[0]?.accountId).toBe("acct-1");
+    expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toMatchObject({
+      model: "gpt-5",
+      stream: true,
+      input: [{ type: "message", role: "user" }]
+    });
+  });
+
+  it("surfaces SSE response errors from warmup calls", async () => {
+    const upstream = new FakeWarmupUpstream(
+      sseResult({
+        type: "response.error",
+        error: { message: "quota exceeded", code: "quota_exceeded" }
+      })
+    );
+    const service = new DefaultWeeklyQuotaWarmupService(
+      { codexConfigPath: "/missing-config.toml" },
+      { upstreamClient: upstream }
+    );
+
+    await expect(service.warmUp("access-token", "acct-1")).rejects.toThrow(/SSE 429: quota exceeded/);
+  });
+
+  it("keeps the warmup body stable", () => {
+    expect(JSON.parse(makeWarmupBodyBuffer().toString("utf8"))).toMatchObject({
+      model: "gpt-5",
+      instructions: "Reply with OK.",
+      reasoning: { effort: "low", summary: "auto" }
+    });
+  });
+});
+
 function queuedFetch(responses: Response[]) {
   const calls: Array<{ url: string; body?: string }> = [];
   const fetchImpl: FetchLike = async (input, init) => {
@@ -201,6 +251,27 @@ function jsonResponse(value: unknown, status = 200): Response {
       "Content-Type": "application/json"
     }
   });
+}
+
+class FakeWarmupUpstream implements CodexUpstreamClientLike {
+  public readonly requests: CodexUpstreamRequest[] = [];
+
+  constructor(private readonly result: CodexUpstreamResult) {}
+
+  async execute(request: CodexUpstreamRequest): Promise<CodexUpstreamResult> {
+    this.requests.push(request);
+    return this.result;
+  }
+}
+
+function sseResult(event: unknown): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8"
+    },
+    body: Buffer.from(`data: ${JSON.stringify(event)}\n\n`)
+  };
 }
 
 async function callbackURLFromOpenedAuthorizeURL(readOpenedURL: () => string | undefined): Promise<string> {

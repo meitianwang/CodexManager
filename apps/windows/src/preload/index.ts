@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { AppInfo } from "../shared/app-info";
 import type { AccountsImportResult } from "../shared/models/account-transfer";
-import type { AccountSummary } from "../shared/models/accounts";
+import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/accounts";
 import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../shared/models/app";
 import type { AppSettings, AppSettingsPatch } from "../shared/models/settings";
 import type { ProxyRuntimeState } from "../shared/models/proxy";
@@ -19,9 +19,11 @@ export interface CodexManagerAPI {
     list: () => Promise<AccountSummary[]>;
     refreshAllUsage: () => Promise<AccountSummary[]>;
     refreshUsage: (id: string) => Promise<AccountSummary>;
+    refreshWorkspaceMetadata: (forceRemoteCheck?: boolean) => Promise<AccountSummary[]>;
     smartSwitch: () => Promise<SmartSwitchResult | undefined>;
     switch: (id: string, workspacePath?: string) => Promise<SwitchAccountExecutionResult>;
     updateTeamAlias: (id: string, alias?: string) => Promise<AccountSummary>;
+    warmUpWeeklyQuota: () => Promise<WeeklyQuotaWarmupResult>;
   };
   clipboard: {
     writeText: (text: string) => Promise<void>;
@@ -52,9 +54,12 @@ const api: CodexManagerAPI = {
     list: () => invoke<AccountSummary[]>(ipcChannels.accountsList),
     refreshAllUsage: () => invoke<AccountSummary[]>(ipcChannels.accountsRefreshAllUsage),
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
+    refreshWorkspaceMetadata: (forceRemoteCheck) =>
+      invoke<AccountSummary[]>(ipcChannels.accountsRefreshWorkspaceMetadata, { forceRemoteCheck }),
     smartSwitch: () => invoke<SmartSwitchResult | undefined>(ipcChannels.accountsSmartSwitch),
     switch: (id, workspacePath) => invoke<SwitchAccountExecutionResult>(ipcChannels.accountsSwitch, { id, workspacePath }),
-    updateTeamAlias: (id, alias) => invoke<AccountSummary>(ipcChannels.accountsUpdateTeamAlias, { id, alias })
+    updateTeamAlias: (id, alias) => invoke<AccountSummary>(ipcChannels.accountsUpdateTeamAlias, { id, alias }),
+    warmUpWeeklyQuota: () => invoke<WeeklyQuotaWarmupResult>(ipcChannels.accountsWarmUpWeeklyQuota)
   },
   clipboard: {
     writeText: (text) => invoke<void>(ipcChannels.clipboardWriteText, { text })

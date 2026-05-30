@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { JSONValue } from "../src/shared/models/json-value";
 import type { AccountSummary, AccountsStore, StoredAccount } from "../src/shared/models/accounts";
-import type { ChatGPTOAuthTokens, ExtractedAuth } from "../src/shared/models/auth";
+import type { ChatGPTOAuthTokens, ExtractedAuth, WorkspaceMetadata } from "../src/shared/models/auth";
 import type { UsageSnapshot } from "../src/shared/models/usage";
 import type {
   AccountsStoreRepositoryLike,
   AuthRepositoryLike,
+  ChatGPTOAuthLoginServiceLike,
   CodexCLIServiceLike,
   EditorAppServiceLike,
   SettingsRepositoryLike,
-  UsageServiceLike
+  UsageServiceLike,
+  WeeklyQuotaWarmupServiceLike,
+  WorkspaceMetadataServiceLike
 } from "../src/main/services/accounts-coordinator";
 import { AccountsCoordinator } from "../src/main/services/accounts-coordinator";
 import { defaultAppSettings, type AppSettings, type EditorAppID } from "../src/shared/models/settings";
@@ -21,6 +24,7 @@ import {
 } from "../src/shared/domain/account-ranking";
 import { applyAccountsTransferMerge } from "../src/shared/domain/accounts-transfer-merge";
 import { pickNearestWindow } from "../src/shared/domain/usage-window-selector";
+import { UnauthorizedError } from "../src/main/services/network-errors";
 
 describe("account ranking", () => {
   it("picks the account with the most remaining quota", () => {
@@ -241,6 +245,123 @@ describe("accounts coordinator", () => {
     expect(restartTargets).toEqual(["cursor"]);
     expect(authRepository.currentAuth).toEqual(account.authJson);
   });
+
+  it("enriches missing workspace names from remote metadata when listing accounts", async () => {
+    const account = makeStoredAccount({
+      id: "team",
+      accountId: "acct-team",
+      email: "team@example.com",
+      teamName: undefined
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository: new FakeAuthRepository(undefined),
+      workspaceMetadataService: new FakeWorkspaceMetadataService([
+        { accountId: "acct-team", workspaceName: "Workspace Alpha", structure: "workspace" }
+      ]),
+      dateProvider: fixedDateProvider()
+    });
+
+    const summaries = await coordinator.listAccounts();
+
+    expect(summaries[0]?.teamName).toBe("Workspace Alpha");
+    expect(storeRepository.store.accounts[0]?.teamName).toBe("Workspace Alpha");
+  });
+
+  it("warms expired exhausted weekly quota accounts and refreshes usage", async () => {
+    const target = makeStoredAccount({
+      id: "target",
+      accountId: "acct-target",
+      usage: exhaustedWeeklyUsage(1_779_999_999)
+    });
+    const future = makeStoredAccount({
+      id: "future",
+      accountId: "acct-future",
+      usage: exhaustedWeeklyUsage(1_780_000_001)
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [target, future]
+    });
+    const warmupService = new FakeWeeklyQuotaWarmupService();
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository: new FakeAuthRepository(undefined),
+      usageService: new FakeUsageService("team"),
+      weeklyQuotaWarmupService: warmupService,
+      dateProvider: fixedDateProvider()
+    });
+
+    const result = await coordinator.warmUpResetWeeklyQuotaAccounts();
+
+    expect(result.targetCount).toBe(1);
+    expect(result.succeededCount).toBe(1);
+    expect(result.failures).toEqual([]);
+    expect(warmupService.calls).toEqual([{ accessToken: "access-acct-target", accountId: "acct-target" }]);
+    expect(storeRepository.store.accounts.find((account) => account.id === "target")?.usage?.oneWeek?.usedPercent).toBe(20);
+  });
+
+  it("stores weekly quota warmup failures on the account", async () => {
+    const target = makeStoredAccount({
+      id: "target",
+      label: "Team",
+      accountId: "acct-target",
+      usage: exhaustedWeeklyUsage(1_779_999_999)
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [target]
+    });
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository: new FakeAuthRepository(undefined),
+      usageService: new FakeUsageService("team"),
+      weeklyQuotaWarmupService: new FakeWeeklyQuotaWarmupService(new Map([["acct-target", new Error("warmup failed")]])),
+      dateProvider: fixedDateProvider()
+    });
+
+    const result = await coordinator.warmUpResetWeeklyQuotaAccounts();
+
+    expect(result.succeededCount).toBe(0);
+    expect(result.failures).toEqual([{ accountId: "target", label: "Team", message: "warmup failed" }]);
+    expect(storeRepository.store.accounts[0]?.usageError).toBe("warmup failed");
+  });
+
+  it("refreshes ChatGPT tokens and retries usage after an unauthorized response", async () => {
+    const account = makeStoredAccount({ id: "target", accountId: "acct-target" });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(account.authJson);
+    const usageService = new QueuedUsageService([
+      new UnauthorizedError("unauthorized"),
+      makeUsageSnapshot("team", 3, 4)
+    ]);
+    const loginService = new FakeChatGPTLoginService({
+      accessToken: "access-refreshed",
+      refreshToken: "refresh-new",
+      idToken: "id-new"
+    });
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      usageService,
+      chatGPTOAuthLoginService: loginService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.refreshAccountUsage("target");
+
+    expect(loginService.refreshes).toEqual(["refresh-acct-target"]);
+    expect(usageService.calls.map((call) => call.accessToken)).toEqual(["access-acct-target", "access-refreshed"]);
+    expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({ accessToken: "access-refreshed" });
+    expect(authRepository.currentAuth).toMatchObject({ accessToken: "access-refreshed" });
+  });
 });
 
 class MemoryStoreRepository implements AccountsStoreRepositoryLike {
@@ -296,8 +417,22 @@ class FakeAuthRepository implements AuthRepositoryLike {
     return fakeAuth("acct-login", "login@example.com", "plus", tokens.idToken);
   }
 
-  replacingChatGPTTokens(auth: JSONValue): JSONValue {
-    return auth;
+  replacingChatGPTTokens(auth: JSONValue, tokens: ChatGPTOAuthTokens): JSONValue {
+    const object = auth as Record<string, JSONValue>;
+    const tokenObject = typeof object.tokens === "object" && object.tokens !== null && !Array.isArray(object.tokens)
+      ? (object.tokens as Record<string, JSONValue>)
+      : {};
+    return {
+      ...object,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      tokens: {
+        ...tokenObject,
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+        id_token: tokens.idToken
+      }
+    };
   }
 
   extractAuth(auth: JSONValue): ExtractedAuth {
@@ -317,12 +452,62 @@ class FakeUsageService implements UsageServiceLike {
   constructor(private readonly planType: string) {}
 
   async fetchUsage(): Promise<UsageSnapshot> {
-    return {
-      fetchedAt: 1_780_000_000,
-      planType: this.planType,
-      fiveHour: { usedPercent: 10, windowSeconds: 5 * 60 * 60 },
-      oneWeek: { usedPercent: 20, windowSeconds: 7 * 24 * 60 * 60 }
-    };
+    return makeUsageSnapshot(this.planType, 10, 20);
+  }
+}
+
+class QueuedUsageService implements UsageServiceLike {
+  public readonly calls: Array<{ accessToken: string; accountId: string }> = [];
+
+  constructor(private readonly results: Array<UsageSnapshot | Error>) {}
+
+  async fetchUsage(accessToken: string, accountId: string): Promise<UsageSnapshot> {
+    this.calls.push({ accessToken, accountId });
+    const result = this.results.shift();
+    if (!result) {
+      throw new Error("missing queued usage result");
+    }
+    if (result instanceof Error) {
+      throw result;
+    }
+    return result;
+  }
+}
+
+class FakeWeeklyQuotaWarmupService implements WeeklyQuotaWarmupServiceLike {
+  public readonly calls: Array<{ accessToken: string; accountId: string }> = [];
+
+  constructor(private readonly failuresByAccountId = new Map<string, Error>()) {}
+
+  async warmUp(accessToken: string, accountId: string): Promise<void> {
+    this.calls.push({ accessToken, accountId });
+    const failure = this.failuresByAccountId.get(accountId);
+    if (failure) {
+      throw failure;
+    }
+  }
+}
+
+class FakeWorkspaceMetadataService implements WorkspaceMetadataServiceLike {
+  constructor(private readonly metadata: WorkspaceMetadata[]) {}
+
+  async fetchWorkspaceMetadata(): Promise<WorkspaceMetadata[]> {
+    return structuredClone(this.metadata);
+  }
+}
+
+class FakeChatGPTLoginService implements ChatGPTOAuthLoginServiceLike {
+  public readonly refreshes: string[] = [];
+
+  constructor(private readonly tokens: ChatGPTOAuthTokens) {}
+
+  async signInWithChatGPT(): Promise<ChatGPTOAuthTokens> {
+    return this.tokens;
+  }
+
+  async refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens> {
+    this.refreshes.push(refreshToken);
+    return this.tokens;
   }
 }
 
@@ -330,6 +515,24 @@ function fixedDateProvider() {
   return {
     unixSecondsNow: () => 1_780_000_000,
     unixMillisecondsNow: () => 1_780_000_000_000
+  };
+}
+
+function makeUsageSnapshot(planType: string, fiveHourUsed: number, oneWeekUsed: number): UsageSnapshot {
+  return {
+    fetchedAt: 1_780_000_000,
+    planType,
+    fiveHour: { usedPercent: fiveHourUsed, windowSeconds: 5 * 60 * 60 },
+    oneWeek: { usedPercent: oneWeekUsed, windowSeconds: 7 * 24 * 60 * 60 }
+  };
+}
+
+function exhaustedWeeklyUsage(resetAt: number): UsageSnapshot {
+  return {
+    fetchedAt: 1_779_999_000,
+    planType: "team",
+    fiveHour: { usedPercent: 10, windowSeconds: 5 * 60 * 60, resetAt: 1_780_001_000 },
+    oneWeek: { usedPercent: 100, windowSeconds: 7 * 24 * 60 * 60, resetAt }
   };
 }
 
@@ -379,8 +582,14 @@ function fakeAuth(accountId: string, email: string, planType: string, principalI
   return {
     accountId,
     accessToken: `access-${accountId}`,
+    refreshToken: `refresh-${accountId}`,
     email,
     planType,
-    principalId
+    principalId,
+    tokens: {
+      access_token: `access-${accountId}`,
+      refresh_token: `refresh-${accountId}`,
+      id_token: `id-${accountId}`
+    }
   };
 }

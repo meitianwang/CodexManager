@@ -63,6 +63,19 @@ export interface AccountsCloudSyncPullResult {
   remoteSyncedAt?: number;
 }
 
+export interface WeeklyQuotaWarmupFailure {
+  accountId: string;
+  label: string;
+  message: string;
+}
+
+export interface WeeklyQuotaWarmupResult {
+  accounts: AccountSummary[];
+  targetCount: number;
+  succeededCount: number;
+  failures: WeeklyQuotaWarmupFailure[];
+}
+
 export function emptyAccountsStore(): AccountsStore {
   return {
     version: 1,

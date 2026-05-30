@@ -10,6 +10,8 @@ import { OpenAIChatGPTOAuthLoginService } from "./services/oauth/openai-chatgpt-
 import { ProxyRuntimeService } from "./services/proxy-runtime-service";
 import { SettingsCoordinator } from "./services/settings-coordinator";
 import { DefaultUsageService } from "./services/usage-service";
+import { DefaultWeeklyQuotaWarmupService } from "./services/weekly-quota-warmup-service";
+import { DefaultWorkspaceMetadataService } from "./services/workspace-metadata-service";
 import { CodexCLIService } from "./platform/codex-cli-service";
 import { EditorAppService } from "./platform/editor-app-service";
 import { LaunchAtStartupService } from "./platform/launch-at-startup-service";
@@ -33,6 +35,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     new LaunchAtStartupService(electronApp)
   );
   const usageService = new DefaultUsageService(paths);
+  const weeklyQuotaWarmupService = new DefaultWeeklyQuotaWarmupService(paths);
+  const workspaceMetadataService = new DefaultWorkspaceMetadataService(paths);
   const chatGPTOAuthLoginService = new OpenAIChatGPTOAuthLoginService(paths);
   const editorAppService = new EditorAppService();
   const accountsCoordinator = new AccountsCoordinator({
@@ -40,6 +44,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     settingsRepository,
     authRepository,
     usageService,
+    weeklyQuotaWarmupService,
+    workspaceMetadataService,
     chatGPTOAuthLoginService,
     codexCLIService: new CodexCLIService(),
     editorAppService

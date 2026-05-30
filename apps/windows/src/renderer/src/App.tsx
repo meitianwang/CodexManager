@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { appInfo as fallbackAppInfo, type AppInfo } from "@shared/app-info";
-import type { AccountSummary } from "@shared/models/accounts";
+import type { AccountSummary, WeeklyQuotaWarmupResult } from "@shared/models/accounts";
 import type { InstalledEditorApp } from "@shared/models/app";
 import {
   defaultAppSettings,
@@ -236,6 +236,20 @@ function App(): ReactElement {
                 setAccounts(await api.accounts.refreshAllUsage());
               })
             }
+            onWarmUpWeeklyQuota={() =>
+              runAction(
+                "Warm up weekly quota",
+                async () => {
+                  if (!api) {
+                    throw new Error("IPC bridge is unavailable");
+                  }
+                  const result = await api.accounts.warmUpWeeklyQuota();
+                  setAccounts(result.accounts);
+                  setNotice({ tone: result.failures.length > 0 ? "info" : "success", text: weeklyWarmupNotice(result) });
+                },
+                { silentSuccess: true }
+              )
+            }
             onRefreshUsage={(id) =>
               runAction("Refresh account", async () => {
                 if (!api) {
@@ -352,6 +366,7 @@ interface AccountsPageProps {
   onSwitchAccount: (id: string) => void;
   onToggleSelection: (id: string) => void;
   onUpdateAlias: (id: string, alias?: string) => void;
+  onWarmUpWeeklyQuota: () => void;
   selectedAccountIds: ReadonlySet<string>;
 }
 
@@ -375,6 +390,9 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
           </button>
           <button type="button" onClick={props.onRefreshAll} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
             Refresh usage
+          </button>
+          <button type="button" onClick={props.onWarmUpWeeklyQuota} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
+            Warm weekly quota
           </button>
           <button type="button" onClick={props.onSmartSwitch} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
             Smart switch
@@ -429,10 +447,10 @@ interface AccountRowProps {
 }
 
 function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelection, onUpdateAlias }: AccountRowProps): ReactElement {
-  const [alias, setAlias] = useState(account.teamName ?? "");
+  const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
-    setAlias(account.teamName ?? "");
-  }, [account.teamName]);
+    setAlias(account.teamAlias ?? "");
+  }, [account.teamAlias]);
 
   return (
     <article className={account.isCurrent ? "account-row current" : "account-row"}>
@@ -441,7 +459,7 @@ function AccountRow({ account, isSelected, onRefresh, onSwitch, onToggleSelectio
         <div className="account-title-line">
           <h3>{account.label}</h3>
           {account.isCurrent && <span className="badge">Current</span>}
-          {account.shouldDisplayWorkspaceTag && <span className="badge muted">Workspace</span>}
+          {account.shouldDisplayWorkspaceTag && <span className="badge muted">{account.displayTeamName}</span>}
         </div>
         <p>{account.email ?? account.accountId}</p>
         <div className="alias-line">
@@ -765,6 +783,16 @@ function proxyConfigText(baseURL: string, endpoint: ProxyEndpointID, apiKey: str
     return `ANTHROPIC_BASE_URL=${baseURL}\nANTHROPIC_API_KEY=${apiKey}`;
   }
   return `OPENAI_BASE_URL=${baseURL}/v1\nOPENAI_API_KEY=${apiKey}`;
+}
+
+function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult): string {
+  if (result.targetCount === 0) {
+    return "No weekly quota accounts need warmup";
+  }
+  if (result.failures.length === 0) {
+    return `Weekly quota warmup complete: ${result.succeededCount} succeeded`;
+  }
+  return `Weekly quota warmup finished: ${result.succeededCount} succeeded, ${result.failures.length} failed`;
 }
 
 export default App;
