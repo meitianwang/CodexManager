@@ -391,7 +391,7 @@ button.danger {
 
 .account-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 152px;
+  grid-template-columns: minmax(200px, 1.2fr) minmax(120px, 0.62fr) minmax(120px, 0.62fr) minmax(150px, 0.8fr) 152px;
   gap: 14px;
   align-items: center;
   min-height: 112px;
@@ -407,6 +407,7 @@ button.danger {
 }
 
 .account-row.grid .usage-cell,
+.account-row.grid .reset-cell,
 .account-row.grid .account-actions {
   grid-column: 1;
 }
@@ -426,6 +427,7 @@ button.danger {
 .account-row.collapsed .account-main p,
 .account-row.collapsed .alias-line,
 .account-row.collapsed .usage-cell,
+.account-row.collapsed .reset-cell,
 .account-row.collapsed .account-actions {
   display: none;
 }
@@ -521,6 +523,42 @@ button.danger {
   height: 100%;
   border-radius: inherit;
   background: #d6f05f;
+}
+
+.reset-cell {
+  display: grid;
+  gap: 5px;
+}
+
+.reset-title {
+  color: #9ea697;
+  font-size: 12px;
+}
+
+.reset-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 6px;
+  align-items: baseline;
+}
+
+.reset-row span,
+.reset-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reset-row span {
+  color: #9ea697;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.reset-row strong {
+  color: #f0f3ea;
+  font-size: 11px;
+  font-weight: 520;
 }
 
 .account-actions {

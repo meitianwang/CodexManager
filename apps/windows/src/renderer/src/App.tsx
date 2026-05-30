@@ -12,6 +12,7 @@ import {
   resolveAppLocale,
   type AppSettings,
   type AppSettingsPatch,
+  type AppLocaleID,
   type EditorAppID
 } from "@shared/models/settings";
 import { proxyAvailableModels, proxyEndpoints, type ProxyEndpointID, type ProxyRuntimeState } from "@shared/models/proxy";
@@ -385,6 +386,7 @@ function App(): ReactElement {
                 { silentSuccess: true }
               )
             }
+            locale={settings.locale}
             t={t}
           />
         )}
@@ -521,6 +523,7 @@ interface AccountsPageProps {
   onSwitchAccount: (id: string) => void;
   onUpdateAlias: (id: string, alias?: string) => void;
   onWarmUpWeeklyQuota: () => void;
+  locale: AppLocaleID;
   t: Translator;
 }
 
@@ -625,6 +628,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
                 onRefresh={() => props.onRefreshUsage(account.id)}
                 onSwitch={() => props.onSwitchAccount(account.id)}
                 onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
+                locale={props.locale}
                 t={props.t}
               />
             ))}
@@ -648,11 +652,12 @@ interface AccountRowProps {
   onRefresh: () => void;
   onSwitch: () => void;
   onUpdateAlias: (alias?: string) => void;
+  locale: AppLocaleID;
   t: Translator;
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isCollapsed, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
@@ -681,6 +686,12 @@ function AccountRow({ account, isCollapsed, onDelete, onRefresh, onSwitch, onUpd
       </div>
       <UsageCell title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
       <UsageCell title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+      <ResetCell
+        fiveHourResetAt={account.usage?.fiveHour?.resetAt}
+        locale={locale}
+        oneWeekResetAt={account.usage?.oneWeek?.resetAt}
+        t={t}
+      />
       <div className="account-actions">
         <span className="plan-label">{account.normalizedPlanLabel}</span>
         <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
@@ -800,8 +811,9 @@ function AccountTransferSelectionDialog({
 }
 
 function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
-  const used = clampPercent(usedPercent);
-  const remaining = Math.max(0, 100 - used);
+  const hasUsage = usedPercent !== undefined && Number.isFinite(usedPercent);
+  const used = hasUsage ? clampPercent(usedPercent) : 0;
+  const remaining = hasUsage ? Math.max(0, 100 - used) : 0;
   return (
     <div className="usage-cell">
       <div>
@@ -814,6 +826,36 @@ function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: num
       <div className="usage-track">
         <span style={{ width: `${remaining}%` }} />
       </div>
+    </div>
+  );
+}
+
+function ResetCell({
+  fiveHourResetAt,
+  locale,
+  oneWeekResetAt,
+  t
+}: {
+  fiveHourResetAt?: number;
+  locale: AppLocaleID;
+  oneWeekResetAt?: number;
+  t: Translator;
+}): ReactElement {
+  return (
+    <div className="reset-cell">
+      <span className="reset-title">{t("accounts.window.reset_header")}</span>
+      <ResetRow resetAt={fiveHourResetAt} title={t("accounts.window.five_hour")} locale={locale} t={t} />
+      <ResetRow resetAt={oneWeekResetAt} title={t("accounts.window.weekly")} locale={locale} t={t} />
+    </div>
+  );
+}
+
+function ResetRow({ locale, resetAt, t, title }: { locale: AppLocaleID; resetAt?: number; t: Translator; title: string }): ReactElement {
+  const value = formatResetAt(resetAt, locale);
+  return (
+    <div className="reset-row" title={t("accounts.window.reset_at_format", { value })}>
+      <span>{title}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -1119,6 +1161,13 @@ function clampPercent(value: number | undefined): number {
     return 0;
   }
   return Math.max(0, Math.min(100, value));
+}
+
+function formatResetAt(epochSeconds: number | undefined, locale: AppLocaleID): string {
+  if (epochSeconds === undefined || !Number.isFinite(epochSeconds)) {
+    return "--";
+  }
+  return new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "medium" }).format(new Date(epochSeconds * 1000));
 }
 
 function proxyCurlExample(baseURL: string, endpoint: ProxyEndpointID, model: string, apiKey: string): string {

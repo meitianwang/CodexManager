@@ -40,8 +40,8 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(await screen.findByText("Work")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("5h")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("1 week")).toBeTruthy();
+    expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
+    expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
     expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([
       "Export accounts",
       "Import file",
@@ -84,6 +84,13 @@ describe("Windows renderer app", () => {
     expect(within(accountRow("Work")).getByText("66%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 34%")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("Reset")).toBeTruthy();
+    const resetRows = Array.from(accountRow("Work").querySelectorAll(".reset-row")).map((row) => row.textContent ?? "");
+    expect(resetRows).toHaveLength(2);
+    expect(resetRows[0]).toContain("5h");
+    expect(resetRows[0]).not.toContain("--");
+    expect(resetRows[1]).toContain("1 week");
+    expect(resetRows[1]).not.toContain("--");
 
     const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh" });
     expect(accountRefreshButton).toBeDefined();
