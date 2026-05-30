@@ -4,8 +4,8 @@ export const accountsTransferFormatIdentifier = "com.nik.mei.codexmanager.accoun
 export const accountsTransferCurrentVersion = 1;
 
 export interface AccountsTransferPackage {
-  format: typeof accountsTransferFormatIdentifier;
-  version: typeof accountsTransferCurrentVersion;
+  format: string;
+  version: number;
   exportedAt: number;
   accounts: StoredAccount[];
 }

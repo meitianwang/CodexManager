@@ -1,5 +1,6 @@
 import type { AccountsStore, CurrentAccountSelection, StoredAccount } from "../../shared/models/accounts";
 import { emptyAccountsStore } from "../../shared/models/accounts";
+import type { AccountsTransferPackage } from "../../shared/models/account-transfer";
 import type { AppSettings, EditorAppID } from "../../shared/models/settings";
 import { defaultAppSettings, isEditorAppID, resolveAppLocale } from "../../shared/models/settings";
 import type { UsageSnapshot } from "../../shared/models/usage";
@@ -23,6 +24,16 @@ export function parseLegacyAccountsStore(value: unknown): LegacyAccountsStore {
   return {
     ...parseAccountsStore(value),
     settings: parseAppSettings(readRequired(object, "settings"))
+  };
+}
+
+export function parseAccountsTransferPackage(value: unknown): AccountsTransferPackage {
+  const object = asRecord(value, "accounts transfer package");
+  return {
+    format: readString(object, "format"),
+    version: readInteger(object, "version"),
+    exportedAt: readInteger(object, "exportedAt"),
+    accounts: readArray(object, "accounts").map(parseStoredAccount)
   };
 }
 
@@ -64,7 +75,7 @@ export function serializeAppSettings(settings: AppSettings): AppSettings {
   };
 }
 
-function parseStoredAccount(value: unknown): StoredAccount {
+export function parseStoredAccount(value: unknown): StoredAccount {
   const object = asRecord(value, "stored account");
   return {
     id: readString(object, "id"),
