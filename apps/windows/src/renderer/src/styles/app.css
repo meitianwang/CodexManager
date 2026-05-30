@@ -421,15 +421,20 @@ button.danger {
 }
 
 .account-row.collapsed {
-  min-height: 82px;
+  min-height: 120px;
 }
 
-.account-row.collapsed .account-main p,
-.account-row.collapsed .alias-line,
-.account-row.collapsed .usage-cell,
-.account-row.collapsed .reset-cell,
-.account-row.collapsed .account-actions {
-  display: none;
+.account-row.collapsed:not(.grid) {
+  grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.account-row.grid.collapsed {
+  gap: 10px;
+}
+
+.account-row.grid.collapsed .account-main,
+.account-row.grid.collapsed .compact-usage-row {
+  grid-column: 1;
 }
 
 .account-row.current {
@@ -444,7 +449,8 @@ button.danger {
   min-width: 0;
 }
 
-.account-title-line h3 {
+.account-title-line h3,
+.account-compact-header h3 {
   overflow: hidden;
   margin: 0;
   color: #f4f7ef;
@@ -452,6 +458,18 @@ button.danger {
   font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-compact-header {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.account-tag-line {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
 }
 
 .account-main p {
@@ -477,9 +495,22 @@ button.danger {
   font-weight: 700;
 }
 
+.badge.plan {
+  min-width: 0;
+  background: rgba(240, 179, 90, 0.11);
+  color: #f0b35a;
+}
+
 .badge.muted {
   background: rgba(96, 166, 255, 0.13);
   color: #b9d7ff;
+}
+
+.badge.plan.muted {
+  overflow: hidden;
+  color: #f0b35a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .usage-cell span,
@@ -503,11 +534,18 @@ button.danger {
   min-width: 58px;
 }
 
+.compact-usage-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  min-width: 108px;
+}
+
 .quota-ring {
   position: relative;
   display: grid;
-  width: 54px;
-  height: 54px;
+  width: var(--quota-ring-size, 54px);
+  height: var(--quota-ring-size, 54px);
   place-items: center;
   border-radius: 999px;
   background:
@@ -521,6 +559,11 @@ button.danger {
 
 .quota-ring-card.info {
   --quota-tint: #60a6ff;
+}
+
+.quota-ring-card.compact {
+  --quota-ring-size: 48px;
+  gap: 0;
 }
 
 .quota-ring::after {
@@ -553,6 +596,16 @@ button.danger {
   font-size: 10px;
   font-weight: 700;
   line-height: 1.1;
+}
+
+.quota-ring-card.compact .quota-ring-center span {
+  color: #9ea697;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.quota-ring-card.compact .quota-ring-center strong {
+  font-size: 10px;
 }
 
 .reset-cell {

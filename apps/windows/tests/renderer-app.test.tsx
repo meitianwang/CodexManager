@@ -148,6 +148,10 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
     expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(true);
+    expect(container.querySelector(".account-row.collapsed .compact-usage-row")).toBeTruthy();
+    expect(container.querySelectorAll(".account-row.collapsed .quota-ring")).toHaveLength(2);
+    expect(container.querySelector(".account-row.collapsed .reset-cell")).toBeNull();
+    expect(container.querySelector(".account-row.collapsed .account-actions")).toBeNull();
     expect(screen.getByRole("button", { name: "Expand all cards" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Expand all cards" }));

@@ -664,46 +664,68 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
   }, [account.teamAlias]);
 
   const accountTitle = isCollapsed ? shortAccountName(account) : account.label;
+  const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
 
   return (
     <article className={accountCardClassName(account.isCurrent, isCollapsed, viewMode)}>
       <div className="account-main">
-        <div className="account-title-line">
-          <h3>{accountTitle}</h3>
-          {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
-          {account.shouldDisplayWorkspaceTag && <span className="badge muted">{account.displayTeamName}</span>}
+        {isCollapsed ? (
+          <div className="account-compact-header">
+            <div className="account-tag-line">
+              <span className="badge plan">{account.normalizedPlanLabel}</span>
+              {workspaceTag && <span className="badge plan muted">{workspaceTag}</span>}
+            </div>
+            <h3>{accountTitle}</h3>
+          </div>
+        ) : (
+          <>
+            <div className="account-title-line">
+              <h3>{accountTitle}</h3>
+              {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
+              {workspaceTag && <span className="badge muted">{workspaceTag}</span>}
+            </div>
+            <p>{account.email ?? account.accountId}</p>
+            <div className="alias-line">
+              <input
+                aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
+                placeholder={t("accounts.card.team_alias")}
+                value={alias}
+                onChange={(event) => setAlias(event.target.value)}
+                onBlur={() => onUpdateAlias(alias)}
+              />
+            </div>
+          </>
+        )}
+      </div>
+      {isCollapsed ? (
+        <div className="compact-usage-row">
+          <UsageCell compact tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+          <UsageCell compact tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
         </div>
-        <p>{account.email ?? account.accountId}</p>
-        <div className="alias-line">
-          <input
-            aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
-            placeholder={t("accounts.card.team_alias")}
-            value={alias}
-            onChange={(event) => setAlias(event.target.value)}
-            onBlur={() => onUpdateAlias(alias)}
+      ) : (
+        <>
+          <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+          <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+          <ResetCell
+            fiveHourResetAt={account.usage?.fiveHour?.resetAt}
+            locale={locale}
+            oneWeekResetAt={account.usage?.oneWeek?.resetAt}
+            t={t}
           />
-        </div>
-      </div>
-      <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
-      <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
-      <ResetCell
-        fiveHourResetAt={account.usage?.fiveHour?.resetAt}
-        locale={locale}
-        oneWeekResetAt={account.usage?.oneWeek?.resetAt}
-        t={t}
-      />
-      <div className="account-actions">
-        <span className="plan-label">{account.normalizedPlanLabel}</span>
-        <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
-          {t("accounts.action.switch")}
-        </button>
-        <button type="button" onClick={onRefresh}>
-          {t("common.refresh")}
-        </button>
-        <button className="danger" type="button" onClick={onDelete}>
-          {t("accounts.action.delete")}
-        </button>
-      </div>
+          <div className="account-actions">
+            <span className="plan-label">{account.normalizedPlanLabel}</span>
+            <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
+              {t("accounts.action.switch")}
+            </button>
+            <button type="button" onClick={onRefresh}>
+              {t("common.refresh")}
+            </button>
+            <button className="danger" type="button" onClick={onDelete}>
+              {t("accounts.action.delete")}
+            </button>
+          </div>
+        </>
+      )}
     </article>
   );
 }
@@ -815,11 +837,13 @@ type QuotaRingStyle = CSSProperties & {
 };
 
 function UsageCell({
+  compact = false,
   title,
   tone,
   usedPercent,
   t
 }: {
+  compact?: boolean;
   title: string;
   tone: "success" | "info";
   usedPercent?: number;
@@ -831,14 +855,23 @@ function UsageCell({
   const remainingText = hasUsage ? `${Math.round(remaining)}%` : "--";
   const usedText = hasUsage ? t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` }) : t("accounts.usage.no_data");
   return (
-    <div className={`usage-cell quota-ring-card ${tone}`}>
+    <div className={`usage-cell quota-ring-card ${tone}${compact ? " compact" : ""}`}>
       <div className="quota-ring" style={quotaRingStyle(remaining)}>
         <div className="quota-ring-center">
-          <span>{compactWindowTitle(title)}</span>
-          <strong>{remainingText}</strong>
+          {compact ? (
+            <>
+              <strong>{remainingText}</strong>
+              <span>{compactWindowTitle(title)}</span>
+            </>
+          ) : (
+            <>
+              <span>{compactWindowTitle(title)}</span>
+              <strong>{remainingText}</strong>
+            </>
+          )}
         </div>
       </div>
-      <small>{usedText}</small>
+      {!compact && <small>{usedText}</small>}
     </div>
   );
 }
