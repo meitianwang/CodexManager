@@ -20,6 +20,7 @@ module.exports = {
       name: "CodexManager",
       authors: "NikMei",
       description: "CodexManager for Windows",
+      setupExe: "CodexManagerSetup.exe",
       setupIcon: windowsIconPath
     }),
     new MakerZIP({}, ["darwin", "linux"])

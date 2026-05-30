@@ -45,5 +45,11 @@
   },
   "config": {
     "forge": "./forge.config.cjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ]
   }
 }
