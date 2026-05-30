@@ -681,9 +681,14 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
             {props.t("proxy.api_key.regenerate")}
           </button>
           {props.proxyState.isRunning ? (
-            <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
-              {props.t("common.stop")}
-            </button>
+            <>
+              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL)}>
+                {props.t("proxy.copy_url")}
+              </button>
+              <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
+                {props.t("common.stop")}
+              </button>
+            </>
           ) : (
             <button
               className="primary-action"

@@ -119,6 +119,9 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
+    await waitFor(() => expect(api.clipboard.writeText).toHaveBeenCalledWith("http://localhost:17888"));
+
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
 
