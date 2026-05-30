@@ -70,15 +70,27 @@ describe("Windows renderer app", () => {
     expect(accountRow("Work").querySelector(".account-actions .trash-icon")).toBeTruthy();
     expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
     expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
-    expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([
+    const toolbar = container.querySelector(".toolbar") as HTMLElement;
+    expect(Array.from(toolbar.querySelectorAll("button")).map((button) => button.textContent)).toEqual([
       "Export accounts",
       "Import file",
       "Import current auth",
       "Add account",
       "Smart switch",
       "Warm up weekly quota",
-      "Refresh usage"
+      ""
     ]);
+    expect(toolbar.querySelectorAll(".toolbar-action-icon")).toHaveLength(7);
+    expect(toolbar.querySelector(".export-accounts-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".import-package-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".import-current-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".add-account-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".smart-switch-action-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".warmup-action-icon")).toBeTruthy();
+    expect(toolbar.querySelector(".toolbar-action-button.primary-action")?.textContent).toBe("Add account");
+    const refreshUsageButton = within(toolbar).getByRole("button", { name: "Refresh usage" });
+    expect(refreshUsageButton.textContent).toBe("");
+    expect(refreshUsageButton.querySelector(".refresh-icon")).toBeTruthy();
 
     expect((screen.getByRole("button", { name: "Export accounts" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Export accounts" }));

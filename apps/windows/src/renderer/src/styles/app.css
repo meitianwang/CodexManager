@@ -375,6 +375,143 @@ select:focus {
   margin-bottom: 14px;
 }
 
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.toolbar .icon-button {
+  flex: 0 0 auto;
+}
+
+.toolbar-action-button {
+  min-width: 0;
+}
+
+.toolbar-action-button > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-action-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+}
+
+.toolbar-action-icon::before,
+.toolbar-action-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.export-accounts-icon,
+.import-package-icon,
+.import-current-icon {
+  background: linear-gradient(currentColor 0 0) 7px 2px / 2px 8px no-repeat;
+}
+
+.import-package-icon,
+.import-current-icon {
+  background-position: 7px 1px;
+}
+
+.export-accounts-icon::before,
+.import-package-icon::before {
+  right: 2px;
+  bottom: 1px;
+  left: 2px;
+  height: 5px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+}
+
+.import-current-icon::before {
+  inset: 2px 2px 1px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.export-accounts-icon::after {
+  top: 1px;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.import-package-icon::after,
+.import-current-icon::after {
+  top: 4px;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.add-account-icon::before {
+  top: 6px;
+  right: 2px;
+  left: 2px;
+  border-top: 2px solid currentColor;
+}
+
+.add-account-icon::after {
+  top: 2px;
+  bottom: 2px;
+  left: 6px;
+  border-left: 2px solid currentColor;
+}
+
+.smart-switch-action-icon::before {
+  top: 9px;
+  left: 1px;
+  width: 13px;
+  height: 2px;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+.smart-switch-action-icon::after {
+  top: 1px;
+  right: 1px;
+  width: 5px;
+  height: 5px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.warmup-action-icon::before {
+  top: 1px;
+  left: 4px;
+  width: 8px;
+  height: 12px;
+  border-radius: 8px 8px 8px 2px;
+  background: currentColor;
+  transform: rotate(35deg);
+}
+
+.warmup-action-icon::after {
+  bottom: 2px;
+  left: 6px;
+  width: 4px;
+  height: 6px;
+  border-radius: 999px;
+  background: #20231c;
+}
+
 .accounts-view-header {
   display: flex;
   align-items: center;

@@ -31,6 +31,15 @@ interface Notice {
   tone: NoticeTone;
 }
 
+function ToolbarActionContent({ iconClassName, label }: { iconClassName: string; label: string }): ReactElement {
+  return (
+    <>
+      <span className={`toolbar-action-icon ${iconClassName}`} aria-hidden="true" />
+      <span>{label}</span>
+    </>
+  );
+}
+
 function App(): ReactElement {
   const api = window.codexManager;
   const [activePage, setActivePage] = useState<PageID>("accounts");
@@ -591,26 +600,48 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
           </div>
         </div>
         <div className="toolbar">
-          <button type="button" onClick={props.onExportSelected} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.export")}
+          <button
+            className="toolbar-action-button"
+            type="button"
+            onClick={props.onExportSelected}
+            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+          >
+            <ToolbarActionContent iconClassName="export-accounts-icon" label={props.t("accounts.action.export")} />
           </button>
-          <button type="button" onClick={props.onImportPackage} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.import_package")}
+          <button className="toolbar-action-button" type="button" onClick={props.onImportPackage} disabled={Boolean(props.busyAction)}>
+            <ToolbarActionContent iconClassName="import-package-icon" label={props.t("accounts.action.import_package")} />
           </button>
-          <button type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.import_current")}
+          <button className="toolbar-action-button" type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
+            <ToolbarActionContent iconClassName="import-current-icon" label={props.t("accounts.action.import_current")} />
           </button>
-          <button type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
-            {props.t("accounts.action.sign_in")}
+          <button className="toolbar-action-button primary-action" type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
+            <ToolbarActionContent iconClassName="add-account-icon" label={props.t("accounts.action.sign_in")} />
           </button>
-          <button type="button" onClick={props.onSmartSwitch} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.smart_switch")}
+          <button
+            className="toolbar-action-button"
+            type="button"
+            onClick={props.onSmartSwitch}
+            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+          >
+            <ToolbarActionContent iconClassName="smart-switch-action-icon" label={props.t("accounts.action.smart_switch")} />
           </button>
-          <button type="button" onClick={props.onWarmUpWeeklyQuota} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.warm_weekly_quota")}
+          <button
+            className="toolbar-action-button"
+            type="button"
+            onClick={props.onWarmUpWeeklyQuota}
+            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+          >
+            <ToolbarActionContent iconClassName="warmup-action-icon" label={props.t("accounts.action.warm_weekly_quota")} />
           </button>
-          <button type="button" onClick={props.onRefreshAll} disabled={Boolean(props.busyAction) || props.accounts.length === 0}>
-            {props.t("accounts.action.refresh_usage")}
+          <button
+            aria-label={props.t("accounts.action.refresh_usage")}
+            className="icon-button"
+            title={props.t("accounts.action.refresh_usage")}
+            type="button"
+            onClick={props.onRefreshAll}
+            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+          >
+            <span className="toolbar-action-icon refresh-icon" aria-hidden="true" />
           </button>
         </div>
 
