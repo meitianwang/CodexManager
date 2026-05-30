@@ -8,7 +8,7 @@ import {
 } from "../../shared/models/account-transfer";
 import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
-import type { SwitchAccountExecutionResult } from "../../shared/models/app";
+import type { SmartSwitchResult, SwitchAccountExecutionResult } from "../../shared/models/app";
 import { idleSwitchAccountExecutionResult } from "../../shared/models/app";
 import type { AppSettings, EditorAppID } from "../../shared/models/settings";
 import type { UsageSnapshot } from "../../shared/models/usage";
@@ -72,11 +72,6 @@ export interface AccountsCoordinatorOptions {
   editorAppService?: EditorAppServiceLike;
   dateProvider?: DateProviderLike;
   sourceDeviceID?: string;
-}
-
-export interface SmartSwitchResult {
-  account: AccountSummary;
-  execution: SwitchAccountExecutionResult;
 }
 
 export class AccountsCoordinator {
@@ -160,6 +155,36 @@ export class AccountsCoordinator {
   async switchAccount(id: string): Promise<void> {
     const account = await this.prepareStoredAccountForSwitch(id);
     await this.updateCurrentAccountProjection(account.authJson);
+  }
+
+  async refreshAccountUsage(id: string): Promise<AccountSummary> {
+    if (!this.usageService) {
+      throw new Error("Usage service is unavailable");
+    }
+
+    const store = await this.storeRepository.loadStore();
+    const index = store.accounts.findIndex((account) => account.id === id);
+    const account = store.accounts[index];
+    if (index < 0 || !account) {
+      throw new Error("Account was not found for usage refresh");
+    }
+
+    const extracted = this.authRepository.extractAuth(account.authJson);
+    const { usage, usageError } = await this.fetchUsage(extracted);
+    account.usage = usage ?? account.usage;
+    account.usageError = usageError;
+    account.updatedAt = this.dateProvider.unixSecondsNow();
+    store.accounts[index] = account;
+    await this.storeRepository.saveStore(store);
+    return toAccountSummary(account, await this.currentAuthAccountKey());
+  }
+
+  async refreshAllUsage(): Promise<AccountSummary[]> {
+    const accounts = await this.listAccounts();
+    for (const account of accounts) {
+      await this.refreshAccountUsage(account.id);
+    }
+    return this.listAccounts();
   }
 
   async switchAccountAndApplySettings(id: string, workspacePath?: string): Promise<SwitchAccountExecutionResult> {
