@@ -20,6 +20,9 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
+    expect(container.querySelector(".brand-block .brand-mark")?.textContent).toBe("</>");
+    expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
+    expect(container.querySelector(".brand-block p")).toBeNull();
     expect(container.querySelectorAll(".nav-list .nav-icon")).toHaveLength(3);
     expect(container.querySelector(".nav-list .accounts-nav-icon")).toBeTruthy();
     expect(container.querySelector(".nav-list .proxy-nav-icon")).toBeTruthy();

@@ -184,11 +184,8 @@ function App(): ReactElement {
     <main className="app-shell" data-active-page={activePage}>
       <aside className="sidebar" aria-label={t("aria.primary")}>
         <div className="brand-block">
-          <div className="brand-mark">CM</div>
-          <div>
-            <h1>{appInfo.displayName}</h1>
-            <p>{t("app.platform")}</p>
-          </div>
+          <div className="brand-mark" aria-hidden="true">&lt;/&gt;</div>
+          <h1>{appInfo.displayName}</h1>
         </div>
 
         <nav className="nav-list">

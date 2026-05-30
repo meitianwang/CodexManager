@@ -2,7 +2,6 @@ import { resolveAppLocale, type AppLocaleID } from "@shared/models/settings";
 
 const enMessages = {
   "app.eyebrow": "CodexManager for Windows",
-  "app.platform": "Windows",
   "aria.primary": "Primary",
   "tab.accounts": "Accounts",
   "tab.proxy": "Proxy",
@@ -125,7 +124,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   en: enMessages,
   "zh-Hans": {
     "app.eyebrow": "CodexManager Windows 版",
-    "app.platform": "Windows",
     "aria.primary": "主导航",
     "tab.accounts": "账号",
     "tab.proxy": "代理",
@@ -242,7 +240,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   "zh-Hant": {
     "app.eyebrow": "CodexManager Windows 版",
-    "app.platform": "Windows",
     "aria.primary": "主導覽",
     "tab.accounts": "帳號",
     "tab.proxy": "代理",
@@ -359,7 +356,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   ja: {
     "app.eyebrow": "CodexManager for Windows",
-    "app.platform": "Windows",
     "aria.primary": "メイン",
     "tab.accounts": "アカウント",
     "tab.proxy": "プロキシ",
@@ -476,7 +472,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   ko: {
     "app.eyebrow": "Windows용 CodexManager",
-    "app.platform": "Windows",
     "aria.primary": "기본",
     "tab.accounts": "계정",
     "tab.proxy": "프록시",
@@ -593,7 +588,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   fr: {
     "app.eyebrow": "CodexManager pour Windows",
-    "app.platform": "Windows",
     "aria.primary": "Principal",
     "tab.accounts": "Comptes",
     "tab.proxy": "Proxy",
@@ -710,7 +704,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   de: {
     "app.eyebrow": "CodexManager für Windows",
-    "app.platform": "Windows",
     "aria.primary": "Primär",
     "tab.accounts": "Konten",
     "tab.proxy": "Proxy",
@@ -827,7 +820,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   it: {
     "app.eyebrow": "CodexManager per Windows",
-    "app.platform": "Windows",
     "aria.primary": "Principale",
     "tab.accounts": "Account",
     "tab.proxy": "Proxy",
@@ -944,7 +936,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   es: {
     "app.eyebrow": "CodexManager para Windows",
-    "app.platform": "Windows",
     "aria.primary": "Principal",
     "tab.accounts": "Cuentas",
     "tab.proxy": "Proxy",
@@ -1061,7 +1052,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   ru: {
     "app.eyebrow": "CodexManager для Windows",
-    "app.platform": "Windows",
     "aria.primary": "Основной",
     "tab.accounts": "Аккаунты",
     "tab.proxy": "Прокси",
@@ -1178,7 +1168,6 @@ const localizedMessages: Record<AppLocaleID, Record<MessageKey, string>> = {
   },
   nl: {
     "app.eyebrow": "CodexManager voor Windows",
-    "app.platform": "Windows",
     "aria.primary": "Primair",
     "tab.accounts": "Accounts",
     "tab.proxy": "Proxy",
