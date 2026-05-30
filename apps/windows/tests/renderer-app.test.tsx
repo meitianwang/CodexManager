@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appInfo as fallbackAppInfo } from "../src/shared/app-info";
@@ -20,6 +21,9 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
+    expect(rendererStyles()).toContain("grid-template-columns: 162px minmax(0, 1fr);");
+    expect(rendererStyles()).toContain("gap: 18px;");
+    expect(rendererStyles()).toContain("padding: 18px 14px 14px;");
     expect(container.querySelector(".brand-block .brand-mark")?.textContent).toBe("</>");
     expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
     expect(container.querySelector(".brand-block p")).toBeNull();
@@ -504,6 +508,10 @@ function directProxyControlButtonText(): string[] {
 
 function codeBlockCopyButtons(): HTMLButtonElement[] {
   return Array.from(document.querySelectorAll(".code-block .code-copy-button"));
+}
+
+function rendererStyles(): string {
+  return readFileSync("src/renderer/src/styles/app.css", "utf8");
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {
