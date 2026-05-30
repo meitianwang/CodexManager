@@ -679,12 +679,20 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
           </div>
         ) : (
           <>
+            <div className="account-card-header">
+              <span className="badge plan">{account.normalizedPlanLabel}</span>
+              <span className="header-spacer" />
+              {account.isCurrent ? (
+                <span className="badge">{t("accounts.card.current")}</span>
+              ) : (
+                <span className="ellipsis-icon" aria-hidden="true">...</span>
+              )}
+            </div>
             <div className="account-title-line">
               <h3>{accountTitle}</h3>
-              {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
-              {workspaceTag && <span className="badge muted">{workspaceTag}</span>}
             </div>
-            <p>{account.email ?? account.accountId}</p>
+            {workspaceTag && <p className="workspace-name">{workspaceTag}</p>}
+            <p className="account-identifier">{account.email ?? account.accountId}</p>
             <div className="alias-line">
               <input
                 aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
@@ -713,7 +721,6 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
             t={t}
           />
           <div className="account-actions">
-            <span className="plan-label">{account.normalizedPlanLabel}</span>
             <button type="button" onClick={onSwitch} disabled={account.isCurrent}>
               {t("accounts.action.switch")}
             </button>

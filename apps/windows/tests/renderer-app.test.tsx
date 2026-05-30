@@ -40,6 +40,9 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(await screen.findByText("Work")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("Pro");
+    expect(accountRow("Work").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
+    expect(accountRow("Work").querySelector(".account-actions")?.textContent).toBe("SwitchRefreshDelete");
     expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
     expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
     expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([

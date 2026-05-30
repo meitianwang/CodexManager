@@ -416,10 +416,6 @@ button.danger {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.account-row.grid .plan-label {
-  grid-column: 1 / -1;
-}
-
 .account-row.collapsed {
   min-height: 120px;
 }
@@ -440,6 +436,30 @@ button.danger {
 .account-row.current {
   border-color: rgba(214, 240, 95, 0.38);
   background: #1a1f13;
+}
+
+.account-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.header-spacer {
+  flex: 1 1 auto;
+}
+
+.ellipsis-icon {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: #f4f7ef;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .account-title-line {
@@ -472,13 +492,22 @@ button.danger {
   min-width: 0;
 }
 
-.account-main p {
+.account-identifier,
+.workspace-name {
   overflow: hidden;
-  margin: 4px 0 8px;
   color: #a9b29f;
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspace-name {
+  margin: 3px 0 0;
+  font-size: 11px;
+}
+
+.account-identifier {
+  margin: 4px 0 8px;
 }
 
 .alias-line input {
@@ -647,12 +676,6 @@ button.danger {
 .account-actions {
   display: grid;
   gap: 7px;
-}
-
-.plan-label {
-  color: #f0b35a;
-  font-size: 12px;
-  font-weight: 760;
 }
 
 .metric-row {
