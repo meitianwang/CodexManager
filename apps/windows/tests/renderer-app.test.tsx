@@ -325,9 +325,14 @@ describe("Windows renderer app", () => {
         { id: "vscode", label: "VS Code" }
       ]
     });
-    render(<App />);
+    const { container } = render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+
+    expect(container.querySelectorAll(".settings-section .toggle-row")).toHaveLength(5);
+    expect(container.querySelectorAll(".settings-section .select-row")).toHaveLength(2);
+    expect(rendererStyles()).toContain(".toggle-row input:checked");
+    expect(rendererStyles()).toContain("transform: translateX(18px);");
 
     fireEvent.click(screen.getByLabelText("Launch at startup"));
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ launchAtStartup: true }));
@@ -357,7 +362,9 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "GitHub Star" }));
+    const githubButton = screen.getByRole("button", { name: "GitHub Star" });
+    expect(githubButton.querySelector(".github-star-icon")).toBeTruthy();
+    fireEvent.click(githubButton);
     await waitFor(() => expect(api.app.openRepository).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByRole("button", { name: "Quit" }));

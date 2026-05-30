@@ -1456,24 +1456,76 @@ button.danger {
   max-width: 760px;
 }
 
+.settings-section {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-section h3 {
+  margin-bottom: 2px;
+}
+
 .toggle-row,
 .select-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 44px;
-  border-top: 1px solid #282c22;
-}
-
-.toggle-row:first-of-type,
-.select-row:first-of-type {
-  border-top: 0;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #282c22;
+  border-radius: 8px;
+  background: #20231c;
 }
 
 .toggle-row input {
-  width: 18px;
-  min-height: 18px;
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid #3d4235;
+  border-radius: 999px;
+  appearance: none;
+  background: #11140f;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.toggle-row input::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #9ea697;
+  content: "";
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.toggle-row input:checked {
+  border-color: #d6f05f;
+  background: #d6f05f;
+}
+
+.toggle-row input:checked::before {
+  background: #11130d;
+  transform: translateX(18px);
+}
+
+.toggle-row input:focus-visible {
+  outline: 2px solid rgba(214, 240, 95, 0.5);
+  outline-offset: 2px;
+}
+
+.select-row select {
+  min-width: 210px;
+  max-width: 100%;
 }
 
 .settings-footer {
@@ -1481,6 +1533,35 @@ button.danger {
   justify-content: space-between;
   gap: 12px;
   padding: 6px 0 10px;
+}
+
+.settings-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-footer-link > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-footer-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+}
+
+.github-star-icon::before {
+  position: absolute;
+  inset: 1px;
+  background: currentColor;
+  clip-path: polygon(50% 0, 61% 34%, 98% 34%, 68% 55%, 80% 91%, 50% 69%, 20% 91%, 32% 55%, 2% 34%, 39% 34%);
+  content: "";
 }
 
 @media (max-width: 1080px) {
@@ -1491,6 +1572,15 @@ button.danger {
 
   .inspector {
     order: -1;
+  }
+
+  .toggle-row,
+  .select-row {
+    flex-wrap: wrap;
+  }
+
+  .select-row select {
+    width: 100%;
   }
 
   .account-row {

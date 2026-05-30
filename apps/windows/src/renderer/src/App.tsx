@@ -1254,8 +1254,9 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
       </section>
 
       <footer className="settings-footer">
-        <button type="button" onClick={onOpenRepository}>
-          {t("settings.star_on_github")}
+        <button className="settings-footer-link" type="button" onClick={onOpenRepository}>
+          <span className="settings-footer-icon github-star-icon" aria-hidden="true" />
+          <span>{t("settings.star_on_github")}</span>
         </button>
         <button className="danger" type="button" onClick={onQuit}>
           {t("common.quit")}
