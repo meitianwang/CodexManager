@@ -10,6 +10,7 @@ import {
 import { CodexCLIService } from "../src/main/platform/codex-cli-service";
 import { EditorAppService } from "../src/main/platform/editor-app-service";
 import { LaunchAtStartupService, type LoginItemSettings } from "../src/main/platform/launch-at-startup-service";
+import { TrayService, type TrayActionID, type TrayMenuItem } from "../src/main/platform/tray-service";
 
 describe("command runner", () => {
   it("throws promptly when a command times out", async () => {
@@ -185,6 +186,71 @@ describe("launch at startup service", () => {
   });
 });
 
+describe("tray service", () => {
+  it("renders tray actions and dispatches the selected command", async () => {
+    const calls: TrayActionID[] = [];
+    const adapter = new FakeTrayAdapter();
+    const service = new TrayService({
+      adapter,
+      actions: trayActions(calls),
+      initialState: { proxyRunning: false }
+    });
+
+    expect(adapter.tooltip).toBe("CodexManager");
+    expect(menuLabels(adapter.items)).toEqual([
+      "Show Window",
+      "Refresh Accounts",
+      "Smart Switch",
+      "Start Proxy",
+      "Quit"
+    ]);
+
+    adapter.click("startProxy");
+    adapter.primaryClick();
+    await Promise.resolve();
+    expect(calls).toEqual(["startProxy", "showWindow"]);
+
+    service.updateState({ proxyRunning: true });
+    expect(menuLabels(adapter.items)).toContain("Stop Proxy");
+  });
+
+  it("disables non-quit actions while busy", () => {
+    const adapter = new FakeTrayAdapter();
+    new TrayService({
+      adapter,
+      actions: trayActions([]),
+      initialState: { busy: true, proxyRunning: true }
+    });
+
+    expect(adapter.enabledState("refreshAccounts")).toBe(false);
+    expect(adapter.enabledState("smartSwitch")).toBe(false);
+    expect(adapter.enabledState("stopProxy")).toBe(false);
+    expect(adapter.enabledState("quit")).toBe(true);
+  });
+
+  it("reports asynchronous action failures", async () => {
+    const errors: Array<{ action: TrayActionID; message: string }> = [];
+    const adapter = new FakeTrayAdapter();
+    new TrayService({
+      adapter,
+      actions: {
+        ...trayActions([]),
+        async smartSwitch() {
+          throw new Error("switch failed");
+        }
+      },
+      onActionError(action, error) {
+        errors.push({ action, message: error instanceof Error ? error.message : String(error) });
+      }
+    });
+
+    adapter.click("smartSwitch");
+    await Promise.resolve();
+
+    expect(errors).toEqual([{ action: "smartSwitch", message: "switch failed" }]);
+  });
+});
+
 interface CommandCall {
   launchPath: string;
   argumentsList: string[];
@@ -224,4 +290,65 @@ function recordingLauncher(launched: DetachedLaunchCall[]) {
       environmentPath: options?.environment?.PATH ?? options?.environment?.Path
     });
   };
+}
+
+class FakeTrayAdapter {
+  public items: readonly TrayMenuItem[] = [];
+  public tooltip = "";
+  private primaryClickHandler: (() => void) | undefined;
+
+  setToolTip(value: string): void {
+    this.tooltip = value;
+  }
+
+  setContextMenu(items: readonly TrayMenuItem[]): void {
+    this.items = items;
+  }
+
+  onPrimaryClick(handler: () => void): void {
+    this.primaryClickHandler = handler;
+  }
+
+  click(id: TrayActionID): void {
+    const item = this.items.find((candidate) => candidate.id === id);
+    if (!item || item.enabled === false) {
+      throw new Error(`Tray item ${id} is not clickable`);
+    }
+    item.click?.();
+  }
+
+  enabledState(id: TrayActionID): boolean | undefined {
+    return this.items.find((candidate) => candidate.id === id)?.enabled;
+  }
+
+  primaryClick(): void {
+    this.primaryClickHandler?.();
+  }
+}
+
+function trayActions(calls: TrayActionID[]) {
+  return {
+    showWindow() {
+      calls.push("showWindow");
+    },
+    refreshAccounts() {
+      calls.push("refreshAccounts");
+    },
+    smartSwitch() {
+      calls.push("smartSwitch");
+    },
+    startProxy() {
+      calls.push("startProxy");
+    },
+    stopProxy() {
+      calls.push("stopProxy");
+    },
+    quit() {
+      calls.push("quit");
+    }
+  };
+}
+
+function menuLabels(items: readonly TrayMenuItem[]): string[] {
+  return items.flatMap((item) => (item.label ? [item.label] : []));
 }
