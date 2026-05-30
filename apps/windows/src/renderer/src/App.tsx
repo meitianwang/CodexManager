@@ -1053,11 +1053,11 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
             <span />
             {props.proxyState.isRunning ? props.t("proxy.status.running") : props.t("proxy.status.stopped")}
           </div>
-          <label>
+          <label className="proxy-form-row proxy-port-row">
             <span>{props.t("proxy.port")}</span>
             <input disabled={props.proxyState.isRunning} inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value)} />
           </label>
-          <div className="api-key-field">
+          <div className="proxy-form-row api-key-field">
             <label htmlFor="proxy-api-key">{props.t("proxy.api_key")}</label>
             <span className="api-key-control">
               <input
@@ -1078,25 +1078,27 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
               </button>
             </span>
           </div>
-          {props.proxyState.isRunning ? (
-            <>
-              <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
-                {props.t("common.stop")}
+          <div className="proxy-actions">
+            {props.proxyState.isRunning ? (
+              <>
+                <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
+                  {props.t("common.stop")}
+                </button>
+                <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL, props.t("proxy.notice.url_copied"))}>
+                  {props.t("proxy.copy_url")}
+                </button>
+              </>
+            ) : (
+              <button
+                className="primary-action"
+                type="button"
+                disabled={isBusy}
+                onClick={() => props.onStart(Number(port), apiKey)}
+              >
+                {props.t("common.start")}
               </button>
-              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL, props.t("proxy.notice.url_copied"))}>
-                {props.t("proxy.copy_url")}
-              </button>
-            </>
-          ) : (
-            <button
-              className="primary-action"
-              type="button"
-              disabled={isBusy}
-              onClick={() => props.onStart(Number(port), apiKey)}
-            >
-              {props.t("common.start")}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </section>
 

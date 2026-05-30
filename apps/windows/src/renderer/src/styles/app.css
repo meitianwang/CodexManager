@@ -1230,15 +1230,27 @@ button.danger {
 
 .proxy-control {
   display: grid;
-  grid-template-columns: 120px 110px minmax(280px, 1fr) auto auto;
-  gap: 10px;
-  align-items: end;
+  gap: 12px;
+  align-items: start;
 }
 
-.proxy-control label,
-.api-key-field {
-  display: grid;
-  gap: 5px;
+.proxy-form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #20231c;
+}
+
+.proxy-form-row > span:first-child,
+.api-key-field > label {
+  flex: 0 0 68px;
+}
+
+.proxy-port-row input {
+  width: 108px;
 }
 
 .api-key-control {
@@ -1246,6 +1258,7 @@ button.danger {
   grid-template-columns: minmax(0, 1fr) 34px;
   gap: 8px;
   align-items: center;
+  width: min(380px, 100%);
 }
 
 .api-key-control input {
@@ -1300,11 +1313,14 @@ button.danger {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid #33362d;
-  border-radius: 7px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #282c22;
+  border-radius: 8px;
+  background: #20231c;
   color: #b8c0ad;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .status-pill span {
@@ -1316,6 +1332,13 @@ button.danger {
 
 .status-pill.running span {
   background: #52cc7a;
+}
+
+.proxy-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-top: 2px;
 }
 
 .split-region {
@@ -1603,7 +1626,11 @@ button.danger {
     margin-top: 0;
   }
 
-  .proxy-control {
-    grid-template-columns: 1fr;
+  .proxy-form-row {
+    flex-wrap: wrap;
+  }
+
+  .api-key-control {
+    width: 100%;
   }
 }

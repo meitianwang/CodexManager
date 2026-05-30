@@ -274,6 +274,12 @@ describe("Windows renderer app", () => {
     expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
     expect(screen.getByText("cURL example:")).toBeTruthy();
     expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
+    const proxyControl = document.querySelector(".proxy-control") as HTMLElement;
+    expect(proxyControl.querySelector(".status-pill")).toBeTruthy();
+    expect(proxyControl.querySelectorAll(".proxy-form-row")).toHaveLength(2);
+    expect(proxyControl.querySelector(".proxy-actions")).toBeTruthy();
+    expect(rendererStyles()).toContain(".proxy-form-row");
+    expect(rendererStyles()).toContain("flex: 0 0 68px;");
     expect(codeBlockCopyButtons()).toHaveLength(2);
     expect(codeBlockCopyButtons().every((button) => button.textContent === "")).toBe(true);
     expect(codeBlockCopyButtons().every((button) => button.querySelector(".copy-doc-icon"))).toBe(true);
@@ -527,7 +533,7 @@ function proxyUsageText(): string {
 }
 
 function directProxyControlButtonText(): string[] {
-  return Array.from(document.querySelectorAll(".proxy-control > button")).map((element) => element.textContent ?? "");
+  return Array.from(document.querySelectorAll(".proxy-actions > button")).map((element) => element.textContent ?? "");
 }
 
 function codeBlockCopyButtons(): HTMLButtonElement[] {
