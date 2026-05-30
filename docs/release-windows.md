@@ -82,5 +82,5 @@ Treat the CI artifact as the installable Windows verification build. It is not c
 
 ## Notes
 
-- `apps/windows/assets/icon.svg` is the source icon. Before a production Windows installer, convert it to a multi-size `.ico` and wire it into Electron Forge `packagerConfig.icon` / Squirrel setup icon settings.
+- `apps/windows/assets/icon.svg` is the source icon. `apps/windows/assets/icon.ico` is the multi-size Windows icon wired into Electron Forge `packagerConfig.icon`, BrowserWindow, and the Squirrel setup executable.
 - Signing and auto-update publishing are intentionally not configured yet. Add them only after a Windows CI runner and certificate strategy are selected.

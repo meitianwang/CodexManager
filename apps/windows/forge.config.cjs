@@ -1,12 +1,17 @@
+const path = require("node:path");
 const { MakerSquirrel } = require("@electron-forge/maker-squirrel");
 const { MakerZIP } = require("@electron-forge/maker-zip");
 const { AutoUnpackNativesPlugin } = require("@electron-forge/plugin-auto-unpack-natives");
+
+const iconPath = path.resolve(__dirname, "assets", "icon");
+const windowsIconPath = `${iconPath}.ico`;
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
   packagerConfig: {
     asar: true,
     executableName: "CodexManager",
+    icon: iconPath,
     name: "CodexManager"
   },
   rebuildConfig: {},
@@ -14,7 +19,8 @@ module.exports = {
     new MakerSquirrel({
       name: "CodexManager",
       authors: "NikMei",
-      description: "CodexManager for Windows"
+      description: "CodexManager for Windows",
+      setupIcon: windowsIconPath
     }),
     new MakerZIP({}, ["darwin", "linux"])
   ],

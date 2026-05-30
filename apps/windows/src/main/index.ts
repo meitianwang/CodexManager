@@ -26,6 +26,10 @@ function preloadEntry(): string {
   return path.join(__dirname, "../preload/index.js");
 }
 
+function appIconPath(): string {
+  return path.join(__dirname, "../../assets/icon.ico");
+}
+
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1120,
@@ -33,6 +37,7 @@ function createMainWindow(): void {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: "#111318",
+    icon: appIconPath(),
     show: false,
     title: appInfo.displayName,
     webPreferences: {
