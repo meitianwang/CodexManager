@@ -133,12 +133,74 @@ select:focus {
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
   justify-content: flex-start;
   border-color: transparent;
   background: transparent;
   color: #b4bbaa;
   text-align: left;
+}
+
+.nav-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.accounts-nav-icon {
+  background:
+    radial-gradient(circle at 6px 6px, currentColor 0 3px, transparent 3.5px),
+    radial-gradient(circle at 12px 7px, currentColor 0 2.7px, transparent 3.2px),
+    radial-gradient(ellipse at 6px 14px, currentColor 0 5px, transparent 5.5px),
+    radial-gradient(ellipse at 12px 14px, currentColor 0 4.2px, transparent 4.7px);
+}
+
+.proxy-nav-icon::before,
+.settings-nav-icon::before,
+.settings-nav-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.proxy-nav-icon::before {
+  inset: 2px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  box-shadow:
+    0 5px 0 -2px #171913,
+    0 5px 0 0 currentColor,
+    0 10px 0 -2px #171913,
+    0 10px 0 0 currentColor;
+}
+
+.settings-nav-icon {
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  box-shadow:
+    0 -4px 0 -2px currentColor,
+    0 4px 0 -2px currentColor,
+    4px 0 0 -2px currentColor,
+    -4px 0 0 -2px currentColor;
+}
+
+.settings-nav-icon::before {
+  inset: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.settings-nav-icon::after {
+  inset: 7px;
+  border-radius: 999px;
+  background: #171913;
 }
 
 .nav-item:hover {
@@ -150,6 +212,30 @@ select:focus {
   border-color: rgba(214, 240, 95, 0.24);
   background: rgba(214, 240, 95, 0.12);
   color: #f8ffd7;
+}
+
+.nav-item:hover .proxy-nav-icon::before {
+  box-shadow:
+    0 5px 0 -2px #21251c,
+    0 5px 0 0 currentColor,
+    0 10px 0 -2px #21251c,
+    0 10px 0 0 currentColor;
+}
+
+.nav-item.active .proxy-nav-icon::before {
+  box-shadow:
+    0 5px 0 -2px #222718,
+    0 5px 0 0 currentColor,
+    0 10px 0 -2px #222718,
+    0 10px 0 0 currentColor;
+}
+
+.nav-item:hover .settings-nav-icon::after {
+  background: #21251c;
+}
+
+.nav-item.active .settings-nav-icon::after {
+  background: #222718;
 }
 
 .sidebar-footer {

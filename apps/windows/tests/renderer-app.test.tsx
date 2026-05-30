@@ -20,6 +20,10 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
+    expect(container.querySelectorAll(".nav-list .nav-icon")).toHaveLength(3);
+    expect(container.querySelector(".nav-list .accounts-nav-icon")).toBeTruthy();
+    expect(container.querySelector(".nav-list .proxy-nav-icon")).toBeTruthy();
+    expect(container.querySelector(".nav-list .settings-nav-icon")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 2, name: "Accounts" })).toBeTruthy();
     expect(screen.getByText("No accounts yet. Add or import an account to get started.")).toBeTruthy();
 

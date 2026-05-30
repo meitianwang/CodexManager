@@ -199,6 +199,7 @@ function App(): ReactElement {
               type="button"
               onClick={() => setActivePage(page.id)}
             >
+              <span className={`nav-icon ${page.id}-nav-icon`} aria-hidden="true" />
               <span>{page.label}</span>
             </button>
           ))}
