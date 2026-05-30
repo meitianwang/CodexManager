@@ -22,6 +22,7 @@ export interface WindowsAppContext {
   editorAppService: EditorAppService;
   paths: FileSystemPaths;
   proxyRuntimeService: ProxyRuntimeService;
+  storeRepository: AccountsStoreRepository;
   settingsCoordinator: SettingsCoordinator;
 }
 
@@ -77,11 +78,25 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     editorAppService,
     paths,
     proxyRuntimeService,
+    storeRepository,
     settingsCoordinator
   };
 }
 
 function resolveRuntimeFileSystemPaths(electronApp: Pick<App, "getPath">): FileSystemPaths {
+  const smokeRoot = process.env.CODEX_MANAGER_ELECTRON_SMOKE_ROOT;
+  if (smokeRoot) {
+    const applicationSupportDirectory = join(smokeRoot, "app-data", "CodexManager");
+    const codexDirectory = join(smokeRoot, "user", ".codex");
+    return {
+      applicationSupportDirectory,
+      accountStorePath: join(applicationSupportDirectory, "accounts.json"),
+      settingsStorePath: join(applicationSupportDirectory, "settings.json"),
+      codexAuthPath: join(codexDirectory, "auth.json"),
+      codexConfigPath: join(codexDirectory, "config.toml")
+    };
+  }
+
   if (process.platform === "win32") {
     return resolveWindowsFileSystemPaths(process.env);
   }

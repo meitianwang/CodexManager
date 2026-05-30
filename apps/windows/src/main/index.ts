@@ -5,6 +5,8 @@ import started from "electron-squirrel-startup";
 import { appInfo } from "../shared/app-info";
 import { ipcChannels } from "../shared/ipc/schema";
 import type { AccountSummary } from "../shared/models/accounts";
+import type { StoredAccount } from "../shared/models/accounts";
+import type { JSONValue } from "../shared/models/json-value";
 import { createWindowsAppContext, type WindowsAppContext } from "./app-context";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { TrayService, type TrayMenuItem } from "./platform/tray-service";
@@ -30,6 +32,14 @@ interface SmokeRendererState {
   bodyLength: number;
   hasBridge: boolean;
   pageTitle: string | null;
+}
+
+interface SmokeWorkflowState {
+  proxyHealthOK: boolean;
+  proxyPort: number;
+  proxyUnauthorizedStatus: number;
+  settingsLocale: string;
+  switchedAccountId: string;
 }
 
 function rendererEntry(): string {
@@ -195,7 +205,7 @@ app.whenReady().then(async () => {
   if (!isSmokeTest) {
     trayService = await createTray(context);
   }
-  const smokeTest = isSmokeTest ? createSmokeTestController() : undefined;
+  const smokeTest = isSmokeTest ? createSmokeTestController(context) : undefined;
   createMainWindow({
     beforeLoad(browserWindow) {
       smokeTest?.attach(browserWindow);
@@ -232,7 +242,7 @@ app.on("window-all-closed", () => {
   }
 });
 
-function createSmokeTestController(): { attach: (browserWindow: BrowserWindow) => void } {
+function createSmokeTestController(context: WindowsAppContext): { attach: (browserWindow: BrowserWindow) => void } {
   let completed = false;
   const timeout = setTimeout(() => {
     failSmokeTest(new Error(`Smoke test timed out after ${smokeTestTimeoutMs}ms`));
@@ -276,8 +286,9 @@ function createSmokeTestController(): { attach: (browserWindow: BrowserWindow) =
       if (!state.pageTitle || state.bodyLength < 100) {
         throw new Error(`Renderer did not finish painting the workspace: ${JSON.stringify(state)}`);
       }
-      writeSmokeResult({ state, status: "passed" });
-      console.log(`CodexManager Windows smoke test passed: ${JSON.stringify(state)}`);
+      const workflows = await verifySmokeWorkflows(context);
+      writeSmokeResult({ state, workflows, status: "passed" });
+      console.log(`CodexManager Windows smoke test passed: ${JSON.stringify({ state, workflows })}`);
       complete(0);
     } catch (error) {
       failSmokeTest(error);
@@ -345,6 +356,105 @@ function isSmokeRendererState(value: unknown): value is SmokeRendererState {
   );
 }
 
+async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWorkflowState> {
+  const smokeAccountId = "smoke-account";
+  const smokeChatGPTAccountId = "acct-smoke";
+  const smokeEmail = "smoke@example.com";
+  const authJson = makeSmokeAuth(smokeChatGPTAccountId, smokeEmail);
+  const now = Math.floor(Date.now() / 1000);
+  const account: StoredAccount = {
+    id: smokeAccountId,
+    label: "Smoke account",
+    email: smokeEmail,
+    accountId: smokeChatGPTAccountId,
+    planType: "plus",
+    teamName: "Smoke Team",
+    authJson,
+    addedAt: now,
+    updatedAt: now,
+    principalId: smokeEmail
+  };
+
+  await context.storeRepository.saveStore({
+    version: 1,
+    accounts: [account]
+  });
+  await context.accountsCoordinator.switchAccount(smokeAccountId);
+
+  const currentAuth = context.authRepository.extractAuth(await context.authRepository.readCurrentAuth());
+  if (currentAuth.accountId !== smokeChatGPTAccountId) {
+    throw new Error(`Smoke account switch wrote ${currentAuth.accountId}, expected ${smokeChatGPTAccountId}`);
+  }
+
+  await context.settingsCoordinator.updateSettings({
+    locale: "en",
+    proxyPort: 0,
+    proxyApiKey: "sk-local-smoke"
+  });
+  const settings = await context.settingsCoordinator.currentSettings();
+  if (settings.locale !== "en" || settings.proxyApiKey !== "sk-local-smoke") {
+    throw new Error(`Smoke settings did not persist: ${JSON.stringify(settings)}`);
+  }
+
+  const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
+  try {
+    const healthResponse = await fetch(`${proxyState.proxyURL}/health`);
+    const healthBody = await healthResponse.json() as { ok?: unknown };
+    if (!healthResponse.ok || healthBody.ok !== true) {
+      throw new Error(`Smoke proxy health failed with ${healthResponse.status}: ${JSON.stringify(healthBody)}`);
+    }
+
+    const unauthorizedResponse = await fetch(`${proxyState.proxyURL}/v1/responses`, {
+      body: JSON.stringify({ input: [], model: "gpt-5" }),
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    });
+    if (unauthorizedResponse.status !== 401) {
+      throw new Error(`Smoke proxy auth expected 401, got ${unauthorizedResponse.status}`);
+    }
+
+    return {
+      proxyHealthOK: true,
+      proxyPort: proxyState.port,
+      proxyUnauthorizedStatus: unauthorizedResponse.status,
+      settingsLocale: settings.locale,
+      switchedAccountId: currentAuth.accountId
+    };
+  } finally {
+    await context.proxyRuntimeService.stop();
+  }
+}
+
+function makeSmokeAuth(accountId: string, email: string): JSONValue {
+  return {
+    auth_mode: "chatgpt",
+    last_refresh: new Date(0).toISOString(),
+    tokens: {
+      access_token: "smoke-access-token",
+      account_id: accountId,
+      id_token: makeSmokeJwt({
+        email,
+        sub: email,
+        "https://api.openai.com/auth": {
+          chatgpt_account_id: accountId,
+          chatgpt_plan_type: "plus",
+          chatgpt_team_name: "Smoke Team"
+        }
+      }),
+      principal_id: email,
+      refresh_token: "smoke-refresh-token"
+    }
+  };
+}
+
+function makeSmokeJwt(payload: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${header}.${body}.signature`;
+}
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (value === undefined) {
     return fallback;
@@ -359,7 +469,12 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-function writeSmokeResult(result: { error?: string; state?: SmokeRendererState; status: "failed" | "passed" }): void {
+function writeSmokeResult(result: {
+  error?: string;
+  state?: SmokeRendererState;
+  status: "failed" | "passed";
+  workflows?: SmokeWorkflowState;
+}): void {
   const resultPath = process.env.CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH;
   if (!resultPath) {
     return;

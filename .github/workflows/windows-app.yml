@@ -65,6 +65,7 @@ jobs:
           $ResultPath = Join-Path $SmokeRoot "smoke-result.json"
 
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TEST = "1"
+          $env:CODEX_MANAGER_ELECTRON_SMOKE_ROOT = $SmokeRoot
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS = "45000"
           $env:CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH = $ResultPath
           $env:ELECTRON_ENABLE_LOGGING = "1"
@@ -77,7 +78,17 @@ jobs:
           }
 
           $Result = Get-Content -Raw $ResultPath | ConvertFrom-Json
-          if ($Result.status -ne "passed" -or -not $Result.state.hasBridge -or $Result.state.activePage -ne "accounts") {
+          $InvalidSmokeResult = @(
+            $Result.status -ne "passed"
+            -not ([bool]$Result.state.hasBridge)
+            $Result.state.activePage -ne "accounts"
+            -not ([bool]$Result.workflows.proxyHealthOK)
+            $Result.workflows.proxyPort -le 0
+            $Result.workflows.proxyUnauthorizedStatus -ne 401
+            $Result.workflows.settingsLocale -ne "en"
+            $Result.workflows.switchedAccountId -ne "acct-smoke"
+          ) -contains $true
+          if ($InvalidSmokeResult) {
             throw "Packaged app smoke test returned an invalid result: $(Get-Content -Raw $ResultPath)"
           }
           Write-Host "CodexManager Windows smoke test passed: $(Get-Content -Raw $ResultPath)"
