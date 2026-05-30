@@ -291,6 +291,43 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
 
+  it("retries the next eligible account after a preflight SSE error before output", async () => {
+    const upstream = new FakeUpstreamClient([
+      sseErrorResult({ code: "model_restricted", message: "model is not available", status: 403 }),
+      sseResult("Recovered"),
+      sseResult("Again")
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const second = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi again" }]
+    });
+
+    await expect(first.json()).resolves.toMatchObject({
+      choices: [{ message: { content: "Recovered" } }]
+    });
+    await expect(second.json()).resolves.toMatchObject({
+      choices: [{ message: { content: "Again" } }]
+    });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+  });
+
   it("refreshes an expired access token and retries the same account before moving on", async () => {
     const upstream = new FakeUpstreamClient([
       new CodexUpstreamError(401, "HTTP 401", "authentication failed"),
@@ -606,6 +643,22 @@ function sseResult(text: string): CodexUpstreamResult {
         `data: ${JSON.stringify({ type: "response.output_text.delta", delta: text })}`,
         "",
         `data: ${JSON.stringify({ type: "response.completed", response: { usage: { output_tokens: 1 } } })}`,
+        "",
+        ""
+      ].join("\n")
+    )
+  };
+}
+
+function sseErrorResult(error: { code: string; message: string; status: number }): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8"
+    },
+    body: Buffer.from(
+      [
+        `data: ${JSON.stringify({ type: "response.failed", response: { error } })}`,
         "",
         ""
       ].join("\n")

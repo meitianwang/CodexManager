@@ -10,6 +10,9 @@ export interface ParsedCodexSSEError {
   statusCode: number;
 }
 
+const maxPreflightBytes = 64 * 1024;
+const maxPreflightLines = 128;
+
 export function parseCodexSSEEvents(text: string): ParsedCodexSSEEvent[] {
   const events: ParsedCodexSSEEvent[] = [];
   for (const line of text.split(/\r?\n/)) {
@@ -34,6 +37,32 @@ export function parseCodexSSEEvents(text: string): ParsedCodexSSEEvent[] {
     }
   }
   return events;
+}
+
+export function firstPreflightCodexSSEError(text: string): ParsedCodexSSEError | undefined {
+  let lines = 0;
+  let bytes = 0;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.endsWith("\n") ? rawLine : `${rawLine}\n`;
+    lines += 1;
+    bytes += Buffer.byteLength(line);
+
+    const event = parseCodexSSEEventLine(rawLine);
+    if (event) {
+      const error = codexSSEErrorFromEvent(event);
+      if (error) {
+        return error;
+      }
+      if (isReadyForClient(event)) {
+        return undefined;
+      }
+    }
+
+    if (lines >= maxPreflightLines || bytes >= maxPreflightBytes) {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 export function codexSSEErrorFromEvent(event: ParsedCodexSSEEvent): ParsedCodexSSEError | undefined {
@@ -122,6 +151,42 @@ function statusCodeForError(errorObject: Record<string, unknown> | undefined, me
     return 403;
   }
   return 502;
+}
+
+function parseCodexSSEEventLine(line: string): ParsedCodexSSEEvent | undefined {
+  if (!line.startsWith("data: ")) {
+    return undefined;
+  }
+  const payload = line.slice("data: ".length).trim();
+  if (!payload || payload === "[DONE]") {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (isRecord(parsed) && typeof parsed.type === "string") {
+      return {
+        object: parsed,
+        rawText: payload,
+        type: parsed.type
+      };
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function isReadyForClient(event: ParsedCodexSSEEvent): boolean {
+  switch (event.type) {
+    case "response.output_text.delta":
+    case "response.reasoning_summary_text.delta":
+    case "response.output_item.added":
+    case "response.function_call_arguments.delta":
+    case "response.completed":
+      return true;
+    default:
+      return false;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

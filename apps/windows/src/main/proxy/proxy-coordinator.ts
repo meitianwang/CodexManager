@@ -22,7 +22,7 @@ import {
 } from "./anthropic-to-codex-translator";
 import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamRequest, type CodexUpstreamResult } from "./upstream-client";
 import { modelCatalogPlanKey } from "../services/remote-model-catalog-service";
-import { collectCompletedResponseFromSSE } from "./codex-sse";
+import { collectCompletedResponseFromSSE, firstPreflightCodexSSEError } from "./codex-sse";
 
 const maxRequestBytes = 50 * 1024 * 1024;
 const accountCooldownSeconds = 60;
@@ -316,21 +316,27 @@ export class ProxyCoordinator {
     model: string
   ): Promise<CodexUpstreamResult> {
     try {
-      return await this.upstreamClient.execute({
-        ...request,
-        accessToken: extracted.accessToken,
-        accountId: extracted.accountId
-      });
+      return this.preflightUpstreamResult(
+        await this.upstreamClient.execute({
+          ...request,
+          accessToken: extracted.accessToken,
+          accountId: extracted.accountId
+        }),
+        request.isStream
+      );
     } catch (error) {
       if (error instanceof CodexUpstreamError && isAuthenticationFailure(error)) {
         const refreshed = await this.refreshProxyAccountAuth(account);
         if (refreshed) {
           try {
-            return await this.upstreamClient.execute({
-              ...request,
-              accessToken: refreshed.extracted.accessToken,
-              accountId: refreshed.extracted.accountId
-            });
+            return this.preflightUpstreamResult(
+              await this.upstreamClient.execute({
+                ...request,
+                accessToken: refreshed.extracted.accessToken,
+                accountId: refreshed.extracted.accountId
+              }),
+              request.isStream
+            );
           } catch (refreshedError) {
             this.recordCooldown(refreshed.account, model, refreshedError);
             throw refreshedError;
@@ -341,6 +347,17 @@ export class ProxyCoordinator {
       this.recordCooldown(account, model, error);
       throw error;
     }
+  }
+
+  private preflightUpstreamResult(result: CodexUpstreamResult, isStream: boolean): CodexUpstreamResult {
+    if (!isStream) {
+      return result;
+    }
+    const error = firstPreflightCodexSSEError(result.body.toString("utf8"));
+    if (!error) {
+      return result;
+    }
+    throw new CodexUpstreamError(error.statusCode, `SSE ${error.statusCode}`, error.body);
   }
 
   private async orderedEligibleAccounts(store: AccountsStore, model: string): Promise<StoredAccount[]> {
@@ -635,7 +652,8 @@ function refreshTokenFromAuth(auth: StoredAccount["authJson"]): string | undefin
 }
 
 function isAuthenticationFailure(error: CodexUpstreamError): boolean {
-  return error.statusCode === 401 || error.body.toLowerCase().includes("authentication");
+  const body = error.body.toLowerCase();
+  return error.statusCode === 401 || body.includes("authentication") || body.includes("unauthorized") || body.includes("invalid_api_key");
 }
 
 function isRateLimited(error: CodexUpstreamError): boolean {
