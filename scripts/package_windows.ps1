@@ -13,6 +13,16 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $WindowsApp = Join-Path $RepoRoot "apps/windows"
 
+function Write-LimitedTree {
+  param(
+    [string] $Path
+  )
+
+  if (Test-Path $Path) {
+    Get-ChildItem -Path $Path -Recurse | Select-Object -First 200 -ExpandProperty FullName
+  }
+}
+
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
   throw "pnpm is required. Install it with Corepack or npm before packaging."
 }
@@ -30,14 +40,25 @@ try {
     pnpm run package
   } else {
     pnpm run build
-    pnpm exec electron-forge make --platform win32 --arch $Arch
+
+    pnpm exec electron-forge package --platform win32 --arch $Arch
+    $PackageOutput = Join-Path $WindowsApp "out/CodexManager-win32-$Arch"
+    $PackageExe = Join-Path $PackageOutput "CodexManager.exe"
+    $PackageDeadline = (Get-Date).AddSeconds(60)
+    while (-not (Test-Path $PackageExe) -and (Get-Date) -lt $PackageDeadline) {
+      Start-Sleep -Seconds 1
+    }
+    if (-not (Test-Path $PackageExe)) {
+      Write-LimitedTree -Path (Join-Path $WindowsApp "out")
+      throw "Packaged Windows app was not created: $PackageExe"
+    }
+
+    pnpm exec electron-forge make --skip-package --targets squirrel --platform win32 --arch $Arch
 
     $MakeRoot = Join-Path $WindowsApp "out/make"
     $SquirrelOutput = Join-Path (Join-Path $MakeRoot "squirrel.windows") $Arch
     if (-not (Test-Path $SquirrelOutput)) {
-      if (Test-Path (Join-Path $WindowsApp "out")) {
-        Get-ChildItem -Path (Join-Path $WindowsApp "out") -Recurse | Select-Object -First 200 -ExpandProperty FullName
-      }
+      Write-LimitedTree -Path (Join-Path $WindowsApp "out")
       throw "Squirrel.Windows output directory was not created: $SquirrelOutput"
     }
 
@@ -45,7 +66,7 @@ try {
     $ReleasesFile = Join-Path $SquirrelOutput "RELEASES"
     $NugetPackages = @(Get-ChildItem -Path $SquirrelOutput -Filter "*.nupkg" -File)
     if (-not (Test-Path $SetupExe) -or -not (Test-Path $ReleasesFile) -or $NugetPackages.Count -eq 0) {
-      Get-ChildItem -Path $SquirrelOutput -Recurse | Select-Object -First 200 -ExpandProperty FullName
+      Write-LimitedTree -Path $SquirrelOutput
       throw "Squirrel.Windows artifacts are incomplete in $SquirrelOutput"
     }
   }
