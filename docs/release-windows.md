@@ -61,7 +61,7 @@ The workflow uploads one artifact named `CodexManager-Windows-x64-Squirrel` cont
 - `RELEASES`
 
 Before upload, CI also runs the packaged `CodexManager.exe` with `CODEX_MANAGER_ELECTRON_SMOKE_TEST=1`.
-The smoke test verifies that the real packaged app starts, exposes the preload IPC bridge, renders the default Accounts page, and exits cleanly.
+The smoke test waits for the process to exit, checks its result JSON, and verifies that the real packaged app starts, exposes the preload IPC bridge, renders the default Accounts page, and exits cleanly.
 
 Treat the CI artifact as the installable Windows verification build. It is not code signed yet.
 

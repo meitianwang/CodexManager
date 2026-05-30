@@ -62,11 +62,25 @@ jobs:
           $env:APPDATA = Join-Path $SmokeRoot "AppDataRoaming"
           $env:USERPROFILE = Join-Path $SmokeRoot "UserProfile"
           New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:USERPROFILE | Out-Null
+          $ResultPath = Join-Path $SmokeRoot "smoke-result.json"
 
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TEST = "1"
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS = "45000"
+          $env:CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH = $ResultPath
           $env:ELECTRON_ENABLE_LOGGING = "1"
-          & $ExePath
+          $Process = Start-Process -FilePath $ExePath -ArgumentList "--user-data-dir=$SmokeRoot\UserData" -Wait -PassThru
+          if ($Process.ExitCode -ne 0) {
+            throw "Packaged app smoke test exited with code $($Process.ExitCode)"
+          }
+          if (-not (Test-Path $ResultPath)) {
+            throw "Packaged app smoke test did not write a result file: $ResultPath"
+          }
+
+          $Result = Get-Content -Raw $ResultPath | ConvertFrom-Json
+          if ($Result.status -ne "passed" -or -not $Result.state.hasBridge -or $Result.state.activePage -ne "accounts") {
+            throw "Packaged app smoke test returned an invalid result: $(Get-Content -Raw $ResultPath)"
+          }
+          Write-Host "CodexManager Windows smoke test passed: $(Get-Content -Raw $ResultPath)"
 
       - name: Upload Squirrel.Windows artifacts
         uses: actions/upload-artifact@v4

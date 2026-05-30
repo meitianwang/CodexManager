@@ -1,4 +1,5 @@
 import path from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions } from "electron";
 import started from "electron-squirrel-startup";
 import { appInfo } from "../shared/app-info";
@@ -256,6 +257,10 @@ function createSmokeTestController(): { attach: (browserWindow: BrowserWindow) =
 
   function failSmokeTest(error: unknown): void {
     console.error("CodexManager Windows smoke test failed", error);
+    writeSmokeResult({
+      error: error instanceof Error ? error.message : String(error),
+      status: "failed"
+    });
     complete(1);
   }
 
@@ -271,6 +276,7 @@ function createSmokeTestController(): { attach: (browserWindow: BrowserWindow) =
       if (!state.pageTitle || state.bodyLength < 100) {
         throw new Error(`Renderer did not finish painting the workspace: ${JSON.stringify(state)}`);
       }
+      writeSmokeResult({ state, status: "passed" });
       console.log(`CodexManager Windows smoke test passed: ${JSON.stringify(state)}`);
       complete(0);
     } catch (error) {
@@ -351,4 +357,13 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+function writeSmokeResult(result: { error?: string; state?: SmokeRendererState; status: "failed" | "passed" }): void {
+  const resultPath = process.env.CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH;
+  if (!resultPath) {
+    return;
+  }
+  mkdirSync(path.dirname(resultPath), { recursive: true });
+  writeFileSync(resultPath, `${JSON.stringify(result)}\n`, "utf8");
 }
