@@ -40,6 +40,8 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
 
     expect(await screen.findByText("Work")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("5h")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("1 week")).toBeTruthy();
     expect(Array.from(container.querySelectorAll(".toolbar button")).map((button) => button.textContent)).toEqual([
       "Export accounts",
       "Import file",
@@ -56,7 +58,7 @@ describe("Windows renderer app", () => {
     expect((within(exportDialog).getByLabelText("Selected Work") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(exportDialog).getByRole("button", { name: "Export" }));
     await waitFor(() => expect(api.accounts.exportPackage).toHaveBeenCalledWith(["a"]));
-    expect(await screen.findByText("Exported 1 accounts")).toBeTruthy();
+    expect(await screen.findByText("1 accounts exported")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Add account" }));
     await waitFor(() => expect(api.accounts.addViaLogin).toHaveBeenCalledOnce());
@@ -78,6 +80,8 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
     expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("Used 34%")).toBeTruthy();
 
     const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh" });
     expect(accountRefreshButton).toBeDefined();
@@ -185,7 +189,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Proxy" }));
     expect(screen.getByRole("heading", { name: "Proxy Control" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Endpoints" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Models" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Available Models" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
     expect(screen.getByText("cURL example:")).toBeTruthy();
     expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
@@ -206,7 +210,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
     expect(await screen.findByText("Proxy stopped", { selector: ".notice" })).toBeTruthy();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Regenerate" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Regenerate API Key" }));
     await waitFor(() => expect(api.proxy.regenerateApiKey).toHaveBeenCalledOnce());
     expect(screen.queryByText("Regenerate complete")).toBeNull();
 

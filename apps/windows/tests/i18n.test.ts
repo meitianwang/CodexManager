@@ -17,7 +17,10 @@ describe("renderer i18n", () => {
 
     expect(t("tab.accounts")).toBe("账号");
     expect(t("accounts.action.warm_weekly_quota")).toBe("一键预热");
+    expect(t("accounts.window.five_hour")).toBe("5h");
+    expect(t("accounts.window.weekly")).toBe("1 周");
     expect(t("settings.language")).toBe("语言");
     expect(t("language.japanese")).toBe("日本語");
+    expect(t("proxy.section.models")).toBe("可用模型");
   });
 });

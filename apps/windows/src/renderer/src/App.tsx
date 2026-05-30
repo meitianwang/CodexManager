@@ -805,7 +805,9 @@ function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: num
     <div className="usage-cell">
       <div>
         <span>{title}</span>
-        <strong>{usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: Math.round(percent) })}</strong>
+        <strong>
+          {usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: `${Math.round(percent)}%` })}
+        </strong>
       </div>
       <div className="usage-track">
         <span style={{ width: `${percent}%` }} />
@@ -1158,7 +1160,7 @@ function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult, t: Translator): str
     return t("accounts.notice.weekly_no_targets");
   }
   if (result.failures.length === 0) {
-    return t("accounts.notice.weekly_complete", { succeeded: result.succeededCount });
+    return t("accounts.notice.weekly_complete", { succeeded: result.succeededCount, failed: result.failures.length });
   }
   return t("accounts.notice.weekly_partial", { succeeded: result.succeededCount, failed: result.failures.length });
 }
