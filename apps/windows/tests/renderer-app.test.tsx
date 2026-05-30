@@ -214,6 +214,10 @@ describe("Windows renderer app", () => {
     expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
     expect(screen.getByText("cURL example:")).toBeTruthy();
     expect(screen.getByText("Environment variables for CLI tools:")).toBeTruthy();
+    const apiKeyControl = screen.getByLabelText("API key").closest(".api-key-field")?.querySelector(".api-key-control");
+    expect(apiKeyControl).toBeTruthy();
+    expect(within(apiKeyControl as HTMLElement).getByRole("button", { name: "Regenerate API Key" })).toBeTruthy();
+    expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
     expect(proxyUsageText()).not.toContain("sk-local-test");
 
@@ -226,6 +230,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();
     expect(await screen.findByText("Proxy started")).toBeTruthy();
+    expect(directProxyControlButtonText()).toEqual(["Stop", "Copy URL"]);
     expect(proxyUsageText()).toContain("sk-local-test");
 
     fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
@@ -235,6 +240,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
     expect(await screen.findByText("Proxy stopped", { selector: ".notice" })).toBeTruthy();
+    expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
 
     fireEvent.click(await screen.findByRole("button", { name: "Regenerate API Key" }));
@@ -447,6 +453,10 @@ function accountRow(label: string): HTMLElement {
 
 function proxyUsageText(): string {
   return Array.from(document.querySelectorAll(".code-block pre")).map((element) => element.textContent ?? "").join("\n");
+}
+
+function directProxyControlButtonText(): string[] {
+  return Array.from(document.querySelectorAll(".proxy-control > button")).map((element) => element.textContent ?? "");
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {

@@ -540,6 +540,7 @@ button.danger {
 .usage-cell span,
 .metric-row span,
 .proxy-control label span,
+.api-key-field > label,
 .select-row span,
 .toggle-row span {
   color: #9ea697;
@@ -847,13 +848,65 @@ button.danger {
   align-items: end;
 }
 
-.proxy-control label {
+.proxy-control label,
+.api-key-field {
   display: grid;
   gap: 5px;
 }
 
-.api-key-field input {
+.api-key-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+}
+
+.api-key-control input {
   width: 100%;
+}
+
+.api-key-field .api-key-control {
+  color: inherit;
+  font-size: inherit;
+}
+
+.regenerate-api-key-button {
+  align-self: stretch;
+}
+
+.regenerate-api-key-button .regenerate-icon {
+  color: inherit;
+  font-size: inherit;
+}
+
+.regenerate-icon {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.regenerate-icon::before,
+.regenerate-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.regenerate-icon::before {
+  inset: 2px;
+  border: 2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 999px;
+}
+
+.regenerate-icon::after {
+  right: 1px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-8deg);
 }
 
 .status-pill {

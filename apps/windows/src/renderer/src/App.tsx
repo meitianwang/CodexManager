@@ -971,20 +971,34 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
             <span>{props.t("proxy.port")}</span>
             <input disabled={props.proxyState.isRunning} inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value)} />
           </label>
-          <label className="api-key-field">
-            <span>{props.t("proxy.api_key")}</span>
-            <input disabled={props.proxyState.isRunning} value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
-          </label>
-          <button type="button" disabled={props.proxyState.isRunning || isBusy} onClick={props.onRegenerateApiKey}>
-            {props.t("proxy.api_key.regenerate")}
-          </button>
+          <div className="api-key-field">
+            <label htmlFor="proxy-api-key">{props.t("proxy.api_key")}</label>
+            <span className="api-key-control">
+              <input
+                disabled={props.proxyState.isRunning}
+                id="proxy-api-key"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+              />
+              <button
+                aria-label={props.t("proxy.api_key.regenerate")}
+                className="icon-button regenerate-api-key-button"
+                disabled={props.proxyState.isRunning || isBusy}
+                title={props.t("proxy.api_key.regenerate")}
+                type="button"
+                onClick={props.onRegenerateApiKey}
+              >
+                <span className="regenerate-icon" aria-hidden="true" />
+              </button>
+            </span>
+          </div>
           {props.proxyState.isRunning ? (
             <>
-              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL, props.t("proxy.notice.url_copied"))}>
-                {props.t("proxy.copy_url")}
-              </button>
               <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
                 {props.t("common.stop")}
+              </button>
+              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL, props.t("proxy.notice.url_copied"))}>
+                {props.t("proxy.copy_url")}
               </button>
             </>
           ) : (
