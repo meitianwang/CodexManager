@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Importiere...";
 "accounts.action.add_account" = "Konto hinzufügen";
 "accounts.action.waiting_for_login" = "Warte auf Anmeldung...";
+"accounts.action.warm_up_weekly_quota" = "Wochenlimit vorwärmen";
+"accounts.action.warming_up_weekly_quota" = "Wärme vor...";
 "accounts.loading.message" = "Konten werden geladen...";
 "accounts.action.quick_actions" = "Schnellaktionen";
 "accounts.action.collapse_all" = "Alle Karten einklappen";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Nutzung aktualisiert";
+"accounts.notice.weekly_quota_warmup_no_targets" = "Keine Konten benötigen ein Vorwärmen des Wochenlimits";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Vorwärmen des Wochenlimits abgeschlossen: %@ erfolgreich, %@ fehlgeschlagen";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Vorwärmen des Wochenlimits mit Fehlern abgeschlossen: %@ erfolgreich, %@ fehlgeschlagen";
 "accounts.notice.accounts_refreshed" = "Konten aktualisiert";
 "accounts.notice.account_deleted" = "Konto gelöscht";
 "accounts.notice.team_name_updated" = "Teamname aktualisiert";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "Vorwärmen des Wochenlimits ist nicht verfügbar";
+"error.weekly_quota_warmup.request_failed_format" = "Anfrage zum Vorwärmen des Wochenlimits fehlgeschlagen: %@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

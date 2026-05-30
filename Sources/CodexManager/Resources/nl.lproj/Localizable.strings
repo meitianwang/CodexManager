@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Importeren...";
 "accounts.action.add_account" = "Account toevoegen";
 "accounts.action.waiting_for_login" = "Wachten op inloggen...";
+"accounts.action.warm_up_weekly_quota" = "Weeklimiet voorverwarmen";
+"accounts.action.warming_up_weekly_quota" = "Voorverwarmen...";
 "accounts.loading.message" = "Accounts laden...";
 "accounts.action.quick_actions" = "Snelle acties";
 "accounts.action.collapse_all" = "Alle kaarten inklappen";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Verbruik vernieuwd";
+"accounts.notice.weekly_quota_warmup_no_targets" = "Geen accounts hoeven het weeklimiet voor te verwarmen";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Voorverwarmen van weeklimiet voltooid: %@ gelukt, %@ mislukt";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Voorverwarmen van weeklimiet voltooid met fouten: %@ gelukt, %@ mislukt";
 "accounts.notice.accounts_refreshed" = "Accounts vernieuwd";
 "accounts.notice.account_deleted" = "Account verwijderd";
 "accounts.notice.team_name_updated" = "Teamnaam bijgewerkt";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "Voorverwarmen van weeklimiet is niet beschikbaar";
+"error.weekly_quota_warmup.request_failed_format" = "Aanvraag voor voorverwarmen van weeklimiet mislukt: %@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

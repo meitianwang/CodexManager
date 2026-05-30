@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Импорт...";
 "accounts.action.add_account" = "Добавить аккаунт";
 "accounts.action.waiting_for_login" = "Ожидание входа...";
+"accounts.action.warm_up_weekly_quota" = "Прогреть недельный лимит";
+"accounts.action.warming_up_weekly_quota" = "Прогрев...";
 "accounts.loading.message" = "Загрузка аккаунтов...";
 "accounts.action.quick_actions" = "Быстрые действия";
 "accounts.action.collapse_all" = "Свернуть все карточки";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Использование обновлено";
+"accounts.notice.weekly_quota_warmup_no_targets" = "Нет аккаунтов, которым нужен прогрев недельного лимита";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Прогрев недельного лимита завершен: %@ успешно, %@ с ошибкой";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Прогрев недельного лимита завершен с ошибками: %@ успешно, %@ с ошибкой";
 "accounts.notice.accounts_refreshed" = "Аккаунты обновлены";
 "accounts.notice.account_deleted" = "Аккаунт удален";
 "accounts.notice.team_name_updated" = "Имя команды обновлено";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "Прогрев недельного лимита недоступен";
+"error.weekly_quota_warmup.request_failed_format" = "Запрос прогрева недельного лимита не выполнен: %@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

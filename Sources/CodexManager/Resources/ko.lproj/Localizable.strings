@@ -73,6 +73,8 @@
 "accounts.action.importing" = "가져오는 중...";
 "accounts.action.add_account" = "계정 추가";
 "accounts.action.waiting_for_login" = "로그인 대기 중...";
+"accounts.action.warm_up_weekly_quota" = "주간 한도 예열";
+"accounts.action.warming_up_weekly_quota" = "예열 중...";
 "accounts.loading.message" = "계정을 불러오는 중...";
 "accounts.action.quick_actions" = "빠른 동작";
 "accounts.action.collapse_all" = "모든 카드 접기";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@개 계정을 내보냈습니다";
 "accounts.notice.imported_accounts_format" = "%@개 계정을 가져오고 %@개를 업데이트했습니다";
 "accounts.notice.usage_refreshed" = "사용량을 새로고침했습니다";
+"accounts.notice.weekly_quota_warmup_no_targets" = "주간 한도 예열이 필요한 계정이 없습니다";
+"accounts.notice.weekly_quota_warmup_completed_format" = "주간 한도 예열 완료: 성공 %@개, 실패 %@개";
+"accounts.notice.weekly_quota_warmup_partial_format" = "주간 한도 예열이 오류와 함께 완료되었습니다: 성공 %@개, 실패 %@개";
 "accounts.notice.accounts_refreshed" = "계정을 새로고침했습니다";
 "accounts.notice.account_deleted" = "계정을 삭제했습니다";
 "accounts.notice.team_name_updated" = "Team 이름을 업데이트했습니다";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "CodexManager 계정 내보내기 파일이 아닙니다";
 "error.accounts.import_file_unsupported_version_format" = "지원하지 않는 계정 내보내기 버전: %@";
 "error.accounts.import_file_empty" = "가져오기 파일에 계정이 없습니다";
+"error.accounts.weekly_quota_warmup_unavailable" = "주간 한도 예열을 사용할 수 없습니다";
+"error.weekly_quota_warmup.request_failed_format" = "주간 한도 예열 요청 실패: %@";
 "error.store.read_failed_format" = "계정 저장소를 읽지 못했습니다: %@";
 "error.store.serialize_failed_format" = "계정 저장소 직렬화에 실패했습니다: %@";
 "error.store.invalid_format_format" = "계정 저장소 형식이 잘못되었습니다: %@";

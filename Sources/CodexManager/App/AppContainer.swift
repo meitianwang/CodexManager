@@ -54,6 +54,7 @@ final class AppContainer {
                 settingsRepository: settingsRepository,
                 authRepository: authRepository,
                 usageService: usageService,
+                weeklyQuotaWarmupService: DefaultWeeklyQuotaWarmupService(configPath: paths.codexConfigPath),
                 workspaceMetadataService: workspaceMetadataService,
                 chatGPTOAuthLoginService: chatGPTOAuthLoginService,
                 codexCLIService: codexCLIService,

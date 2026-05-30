@@ -25,6 +25,7 @@ final class AccountsPageModel: ObservableObject {
     }
     @Published var isManualRefreshing = false
     @Published var isRemoteUsageRefreshing = false
+    @Published var isWeeklyQuotaWarmingUp = false
     @Published var isImporting = false
     @Published var isFileImporting = false
     @Published var isExporting = false
@@ -59,7 +60,11 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var canRefreshUsageAction: Bool {
-        !isAdding
+        !isAdding && !isWeeklyQuotaWarmingUp
+    }
+
+    var canWarmUpWeeklyQuotaAction: Bool {
+        !isAdding && !isRefreshing
     }
 
     var areAllAccountsCollapsed: Bool {
@@ -77,7 +82,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var isRefreshing: Bool {
-        isManualRefreshing || isRemoteUsageRefreshing || !refreshingAccountIDs.isEmpty
+        isManualRefreshing || isRemoteUsageRefreshing || isWeeklyQuotaWarmingUp || !refreshingAccountIDs.isEmpty
     }
 
     var exportSelectableAccounts: [AccountTransferSelectableItem] {
@@ -97,7 +102,9 @@ final class AccountsPageModel: ObservableObject {
             isAdding: isAdding,
             switchingAccountID: switchingAccountID,
             canRefreshUsage: canRefreshUsageAction,
-            isRefreshSpinnerActive: isRefreshSpinnerActive
+            isRefreshSpinnerActive: isRefreshSpinnerActive,
+            canWarmUpWeeklyQuota: canWarmUpWeeklyQuotaAction,
+            isWeeklyQuotaWarmupActive: isWeeklyQuotaWarmingUp
         )
     }
 
@@ -142,6 +149,8 @@ final class AccountsPageModel: ObservableObject {
             await addAccountViaLogin()
         case .smartSwitch:
             await smartSwitch()
+        case .warmUpWeeklyQuota:
+            await warmUpWeeklyQuota()
         case .refreshUsage:
             await refreshUsage()
         case .toggleCollapse:

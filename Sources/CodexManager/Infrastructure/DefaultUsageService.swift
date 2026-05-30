@@ -1,7 +1,7 @@
 import Foundation
 
 final class DefaultUsageService: UsageService, @unchecked Sendable {
-private enum RequestPolicy {
+    private enum RequestPolicy {
         static let timeout: TimeInterval = 18
         static let scope = "usage"
     }
@@ -126,6 +126,143 @@ private enum RequestPolicy {
             windowSeconds: raw.limitWindowSeconds,
             resetAt: raw.resetAt
         )
+    }
+}
+
+final class DefaultWeeklyQuotaWarmupService: WeeklyQuotaWarmupService, @unchecked Sendable {
+    private enum RequestPolicy {
+        static let scope = "weekly-quota-warmup"
+        static let model = "gpt-5"
+    }
+
+    private let configPath: URL
+    private let upstreamClient: CodexUpstreamClientProtocol
+    private let endpointPreferenceStore: EndpointPreferenceStore
+
+    init(
+        configPath: URL,
+        upstreamClient: CodexUpstreamClientProtocol = CodexUpstreamClient(),
+        endpointPreferenceStore: EndpointPreferenceStore = .shared
+    ) {
+        self.configPath = configPath
+        self.upstreamClient = upstreamClient
+        self.endpointPreferenceStore = endpointPreferenceStore
+    }
+
+    func warmUp(accessToken: String, accountID: String) async throws {
+        let bodyData = try Self.makeWarmupBodyData()
+        let candidates = resolveWarmupURLs()
+        let orderedCandidates = await endpointPreferenceStore.prioritizedCandidates(
+            scope: RequestPolicy.scope,
+            candidates: candidates
+        )
+
+        var failures: [String] = []
+        for endpointString in orderedCandidates {
+            guard let endpoint = URL(string: endpointString) else {
+                failures.append("\(endpointString) -> invalid URL")
+                continue
+            }
+
+            do {
+                let result = try await upstreamClient.execute(
+                    request: CodexUpstreamRequest(
+                        method: "POST",
+                        url: endpoint,
+                        body: bodyData,
+                        headers: [:],
+                        accessToken: accessToken,
+                        accountID: accountID,
+                        isStream: true
+                    )
+                )
+                try await Self.drainWarmupResponse(result)
+                await endpointPreferenceStore.recordSuccess(
+                    scope: RequestPolicy.scope,
+                    endpoint: endpointString
+                )
+                return
+            } catch {
+                failures.append("\(endpointString) -> \(error.localizedDescription)")
+            }
+        }
+
+        throw AppError.network(
+            L10n.tr("error.weekly_quota_warmup.request_failed_format", failures.joined(separator: " | "))
+        )
+    }
+
+    private func resolveWarmupURLs() -> [String] {
+        let baseOrigin = ChatGPTBaseOriginResolver.resolve(configPath: configPath)
+        let backendPrefix = "/backend-api"
+        let codexResponsesPath = "/codex/responses"
+        let backendCodexResponsesPath = "/backend-api/codex/responses"
+
+        var candidates: [String] = []
+        if let originWithoutBackend = baseOrigin.removingSuffix(backendPrefix) {
+            candidates.append("\(baseOrigin)\(codexResponsesPath)")
+            candidates.append("\(originWithoutBackend)\(backendCodexResponsesPath)")
+        } else {
+            candidates.append("\(baseOrigin)\(backendCodexResponsesPath)")
+        }
+
+        candidates.append("https://chatgpt.com/backend-api/codex/responses")
+
+        var deduped: [String] = []
+        for candidate in candidates where !deduped.contains(candidate) {
+            deduped.append(candidate)
+        }
+        return deduped
+    }
+
+    private static func makeWarmupBodyData() throws -> Data {
+        let body: [String: Any] = [
+            "model": RequestPolicy.model,
+            "stream": true,
+            "store": false,
+            "instructions": "Reply with OK.",
+            "tools": [] as [Any],
+            "tool_choice": "auto",
+            "parallel_tool_calls": false,
+            "include": [] as [Any],
+            "reasoning": [
+                "effort": "low",
+                "summary": "auto"
+            ],
+            "input": [[
+                "type": "message",
+                "role": "user",
+                "content": [[
+                    "type": "input_text",
+                    "text": "ping"
+                ]]
+            ]]
+        ]
+        return try JSONSerialization.data(withJSONObject: body, options: [])
+    }
+
+    private static func drainWarmupResponse(_ result: CodexUpstreamResult) async throws {
+        switch result {
+        case .stream(_, let lines, _):
+            for await line in lines {
+                try inspectWarmupLine(line)
+                if let event = CodexUpstreamSSEInspector.event(fromSSELine: line),
+                   event.type == "response.completed" {
+                    return
+                }
+            }
+        case .complete(_, let data, _):
+            for line in data.split(separator: UInt8(ascii: "\n")) {
+                try inspectWarmupLine(Data(line))
+            }
+        }
+    }
+
+    private static func inspectWarmupLine(_ line: Data) throws {
+        guard let error = CodexUpstreamSSEInspector.error(fromSSELine: line) else {
+            return
+        }
+        throw AppError.network("SSE \(error.statusCode): \(error.message)")
     }
 }
 

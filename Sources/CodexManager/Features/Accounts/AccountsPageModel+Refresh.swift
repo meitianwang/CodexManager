@@ -63,4 +63,48 @@ extension AccountsPageModel {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }
+
+    func warmUpWeeklyQuota() async {
+        guard !isRefreshing else { return }
+        isWeeklyQuotaWarmingUp = true
+        defer { isWeeklyQuotaWarmingUp = false }
+
+        do {
+            let result = try await coordinator.warmUpResetWeeklyQuotaAccounts(
+                onPartialUpdate: { [weak self] accounts in
+                    guard let self else { return }
+                    await MainActor.run {
+                        self.applyAccounts(accounts)
+                        self.publishLocalAccounts(accounts)
+                    }
+                }
+            )
+            applyAccounts(result.accounts)
+            publishAndSyncLocalAccountsMutation(result.accounts)
+            notice = Self.weeklyQuotaWarmupNotice(for: result)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    private static func weeklyQuotaWarmupNotice(for result: WeeklyQuotaWarmupResult) -> NoticeMessage {
+        guard result.targetCount > 0 else {
+            return NoticeMessage(
+                style: .info,
+                text: L10n.tr("accounts.notice.weekly_quota_warmup_no_targets")
+            )
+        }
+
+        let key = result.failedCount == 0
+            ? "accounts.notice.weekly_quota_warmup_completed_format"
+            : "accounts.notice.weekly_quota_warmup_partial_format"
+        return NoticeMessage(
+            style: result.failedCount == 0 ? .success : .error,
+            text: L10n.tr(
+                key,
+                "\(result.succeededCount)",
+                "\(result.failedCount)"
+            )
+        )
+    }
 }

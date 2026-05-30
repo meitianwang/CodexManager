@@ -25,6 +25,10 @@ protocol UsageService: Sendable {
     func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot
 }
 
+protocol WeeklyQuotaWarmupService: Sendable {
+    func warmUp(accessToken: String, accountID: String) async throws
+}
+
 protocol WorkspaceMetadataService: Sendable {
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata]
 }

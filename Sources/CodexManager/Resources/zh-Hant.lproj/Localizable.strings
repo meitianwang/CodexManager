@@ -73,6 +73,8 @@
 "accounts.action.importing" = "匯入中...";
 "accounts.action.add_account" = "新增帳號";
 "accounts.action.waiting_for_login" = "等待登入完成...";
+"accounts.action.warm_up_weekly_quota" = "一鍵預熱";
+"accounts.action.warming_up_weekly_quota" = "預熱中...";
 "accounts.loading.message" = "正在載入帳號...";
 "accounts.action.quick_actions" = "快捷操作";
 "accounts.action.collapse_all" = "收起全部卡片";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "用量已重新整理";
+"accounts.notice.weekly_quota_warmup_no_targets" = "沒有需要預熱週額度的帳號";
+"accounts.notice.weekly_quota_warmup_completed_format" = "週額度預熱完成：成功 %@ 個，失敗 %@ 個";
+"accounts.notice.weekly_quota_warmup_partial_format" = "週額度預熱完成但有錯誤：成功 %@ 個，失敗 %@ 個";
 "accounts.notice.accounts_refreshed" = "帳號已重新整理";
 "accounts.notice.account_deleted" = "帳號已刪除";
 "accounts.notice.team_name_updated" = "團隊名稱已更新";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "週額度預熱服務不可用";
+"error.weekly_quota_warmup.request_failed_format" = "週額度預熱請求失敗：%@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

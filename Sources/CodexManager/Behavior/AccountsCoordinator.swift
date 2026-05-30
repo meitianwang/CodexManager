@@ -14,6 +14,7 @@ actor AccountsCoordinator {
     let settingsRepository: SettingsRepository
     let authRepository: AuthRepository
     let usageService: UsageService
+    let weeklyQuotaWarmupService: WeeklyQuotaWarmupService?
     let workspaceMetadataService: WorkspaceMetadataService?
     let chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol
     let codexCLIService: CodexCLIServiceProtocol
@@ -26,6 +27,7 @@ actor AccountsCoordinator {
         settingsRepository: SettingsRepository,
         authRepository: AuthRepository,
         usageService: UsageService,
+        weeklyQuotaWarmupService: WeeklyQuotaWarmupService? = nil,
         workspaceMetadataService: WorkspaceMetadataService? = nil,
         chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol,
         codexCLIService: CodexCLIServiceProtocol,
@@ -37,6 +39,7 @@ actor AccountsCoordinator {
         self.settingsRepository = settingsRepository
         self.authRepository = authRepository
         self.usageService = usageService
+        self.weeklyQuotaWarmupService = weeklyQuotaWarmupService
         self.workspaceMetadataService = workspaceMetadataService
         self.chatGPTOAuthLoginService = chatGPTOAuthLoginService
         self.codexCLIService = codexCLIService

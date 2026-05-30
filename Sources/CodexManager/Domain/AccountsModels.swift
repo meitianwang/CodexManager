@@ -44,6 +44,23 @@ struct AccountsCloudSyncPullResult: Equatable, Sendable {
     )
 }
 
+struct WeeklyQuotaWarmupFailure: Equatable {
+    var accountID: String
+    var label: String
+    var message: String
+}
+
+struct WeeklyQuotaWarmupResult: Equatable {
+    var accounts: [AccountSummary]
+    var targetCount: Int
+    var succeededCount: Int
+    var failures: [WeeklyQuotaWarmupFailure]
+
+    var failedCount: Int {
+        failures.count
+    }
+}
+
 struct StoredAccount: Codable, Equatable, Identifiable {
     var id: String
     var label: String

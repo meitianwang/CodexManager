@@ -73,6 +73,8 @@
 "accounts.action.importing" = "取り込み中...";
 "accounts.action.add_account" = "アカウント追加";
 "accounts.action.waiting_for_login" = "ログイン待機中...";
+"accounts.action.warm_up_weekly_quota" = "週クォータを予熱";
+"accounts.action.warming_up_weekly_quota" = "予熱中...";
 "accounts.loading.message" = "アカウントを読み込み中...";
 "accounts.action.quick_actions" = "クイック操作";
 "accounts.action.collapse_all" = "全カードを折りたたむ";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ 個のアカウントを書き出しました";
 "accounts.notice.imported_accounts_format" = "%@ 個を取り込み、%@ 個を更新しました";
 "accounts.notice.usage_refreshed" = "使用量を更新しました";
+"accounts.notice.weekly_quota_warmup_no_targets" = "週クォータの予熱が必要なアカウントはありません";
+"accounts.notice.weekly_quota_warmup_completed_format" = "週クォータの予熱が完了しました: 成功 %@、失敗 %@";
+"accounts.notice.weekly_quota_warmup_partial_format" = "週クォータの予熱はエラー付きで完了しました: 成功 %@、失敗 %@";
 "accounts.notice.accounts_refreshed" = "アカウントを更新しました";
 "accounts.notice.account_deleted" = "アカウントを削除しました";
 "accounts.notice.team_name_updated" = "Team 名を更新しました";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "CodexManager のアカウント書き出しファイルではありません";
 "error.accounts.import_file_unsupported_version_format" = "未対応のアカウント書き出しバージョン: %@";
 "error.accounts.import_file_empty" = "取り込みファイルにアカウントがありません";
+"error.accounts.weekly_quota_warmup_unavailable" = "週クォータの予熱を利用できません";
+"error.weekly_quota_warmup.request_failed_format" = "週クォータの予熱リクエストに失敗しました: %@";
 "error.store.read_failed_format" = "アカウント保存データの読み込みに失敗しました: %@";
 "error.store.serialize_failed_format" = "アカウント保存データのシリアライズに失敗しました: %@";
 "error.store.invalid_format_format" = "アカウント保存データの形式が不正です: %@";

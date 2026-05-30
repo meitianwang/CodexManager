@@ -123,6 +123,93 @@ extension AccountsCoordinator {
         return latest.accountSummaries(currentAccountKey: authRepository.currentAuthAccountKey())
     }
 
+    func warmUpResetWeeklyQuotaAccounts(
+        onPartialUpdate: (@Sendable ([AccountSummary]) async -> Void)? = nil
+    ) async throws -> WeeklyQuotaWarmupResult {
+        let now = dateProvider.unixSecondsNow()
+        var snapshot = try storeRepository.loadStore()
+        let authRepository = self.authRepository
+
+        if Self.reconcileCurrentAuthSnapshot(in: &snapshot, authRepository: authRepository, now: now) {
+            try storeRepository.saveStore(snapshot)
+        }
+
+        let currentAccountKey = authRepository.currentAuthAccountKey()
+        let targets = snapshot.accounts.filter {
+            Self.shouldWarmUpResetWeeklyQuota($0, now: now)
+        }
+
+        guard !targets.isEmpty else {
+            return WeeklyQuotaWarmupResult(
+                accounts: snapshot.accountSummaries(currentAccountKey: currentAccountKey),
+                targetCount: 0,
+                succeededCount: 0,
+                failures: []
+            )
+        }
+
+        guard let weeklyQuotaWarmupService else {
+            throw AppError.invalidData(L10n.tr("error.accounts.weekly_quota_warmup_unavailable"))
+        }
+
+        var latest = snapshot
+        var succeededIDs: [String] = []
+        var failures: [WeeklyQuotaWarmupFailure] = []
+
+        for target in targets {
+            let activeAccount = latest.accounts.first(where: { $0.id == target.id }) ?? target
+            do {
+                let extracted = try authRepository.extractAuth(from: activeAccount.authJSON)
+                try await weeklyQuotaWarmupService.warmUp(
+                    accessToken: extracted.accessToken,
+                    accountID: extracted.accountID
+                )
+                succeededIDs.append(activeAccount.id)
+            } catch {
+                let message = error.localizedDescription
+                failures.append(
+                    WeeklyQuotaWarmupFailure(
+                        accountID: activeAccount.id,
+                        label: activeAccount.label,
+                        message: message
+                    )
+                )
+                latest = Self.updateWarmupFailure(
+                    accountID: activeAccount.id,
+                    message: message,
+                    now: dateProvider.unixSecondsNow(),
+                    in: latest
+                )
+                try storeRepository.saveStore(latest)
+                if let onPartialUpdate {
+                    await onPartialUpdate(
+                        latest.accountSummaries(currentAccountKey: authRepository.currentAuthAccountKey())
+                    )
+                }
+            }
+        }
+
+        let accounts: [AccountSummary]
+        if succeededIDs.isEmpty {
+            accounts = latest.accountSummaries(currentAccountKey: authRepository.currentAuthAccountKey())
+        } else {
+            accounts = try await refreshUsage(
+                accountIDs: succeededIDs,
+                force: true,
+                serial: true,
+                allowInteractiveAuthRepair: true,
+                onPartialUpdate: onPartialUpdate
+            )
+        }
+
+        return WeeklyQuotaWarmupResult(
+            accounts: accounts,
+            targetCount: targets.count,
+            succeededCount: succeededIDs.count,
+            failures: failures
+        )
+    }
+
     func refreshWorkspaceMetadata(forceRemoteCheck: Bool) async throws -> [AccountSummary] {
         var store = try storeRepository.loadStore()
         let didChange = await enrichStoredWorkspaceMetadataIfNeeded(
@@ -435,6 +522,30 @@ extension AccountsCoordinator {
             return false
         }
         return account.accountKey == currentAccountKey
+    }
+
+    private static func shouldWarmUpResetWeeklyQuota(_ account: StoredAccount, now: Int64) -> Bool {
+        guard let window = account.usage?.oneWeek,
+              window.usedPercent >= 100,
+              let resetAt = window.resetAt else {
+            return false
+        }
+        return resetAt <= now
+    }
+
+    private static func updateWarmupFailure(
+        accountID: String,
+        message: String,
+        now: Int64,
+        in store: AccountsStore
+    ) -> AccountsStore {
+        var store = store
+        guard let index = store.accounts.firstIndex(where: { $0.id == accountID }) else {
+            return store
+        }
+        store.accounts[index].usageError = message
+        store.accounts[index].updatedAt = now
+        return store
     }
 
     private static func mergeRefreshedAccount(

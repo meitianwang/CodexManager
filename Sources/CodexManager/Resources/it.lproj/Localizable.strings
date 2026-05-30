@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Importazione...";
 "accounts.action.add_account" = "Aggiungi account";
 "accounts.action.waiting_for_login" = "In attesa del login...";
+"accounts.action.warm_up_weekly_quota" = "Preriscalda quota settimanale";
+"accounts.action.warming_up_weekly_quota" = "Preriscaldamento...";
 "accounts.loading.message" = "Caricamento account...";
 "accounts.action.quick_actions" = "Azioni rapide";
 "accounts.action.collapse_all" = "Comprimi tutte le schede";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Utilizzo aggiornato";
+"accounts.notice.weekly_quota_warmup_no_targets" = "Nessun account richiede il preriscaldamento della quota settimanale";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Preriscaldamento quota settimanale completato: %@ riusciti, %@ non riusciti";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Preriscaldamento quota settimanale completato con errori: %@ riusciti, %@ non riusciti";
 "accounts.notice.accounts_refreshed" = "Account aggiornati";
 "accounts.notice.account_deleted" = "Account eliminato";
 "accounts.notice.team_name_updated" = "Nome team aggiornato";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "Il preriscaldamento della quota settimanale non è disponibile";
+"error.weekly_quota_warmup.request_failed_format" = "Richiesta di preriscaldamento della quota settimanale non riuscita: %@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

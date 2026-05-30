@@ -15,13 +15,41 @@ final class AccountsActionPresentationTests: XCTestCase {
 
         XCTAssertEqual(
             buttons.map(\.intent),
-            [.exportAccountsBackup, .importAccountsBackup, .importCurrentAuth, .addAccount, .smartSwitch, .refreshUsage]
+            [
+                .exportAccountsBackup,
+                .importAccountsBackup,
+                .importCurrentAuth,
+                .addAccount,
+                .smartSwitch,
+                .warmUpWeeklyQuota,
+                .refreshUsage
+            ]
         )
         XCTAssertEqual(buttons[2].title, L10n.tr("accounts.action.importing"))
         XCTAssertFalse(buttons[0].isEnabled)
         XCTAssertFalse(buttons[1].isEnabled)
         XCTAssertFalse(buttons[2].isEnabled)
         XCTAssertFalse(buttons[3].isEnabled)
+        XCTAssertFalse(buttons[5].isEnabled)
+    }
+
+    func testDesktopButtonsReflectWarmupState() {
+        let buttons = AccountsActionPresentation.desktopButtons(
+            isImporting: false,
+            isFileImporting: false,
+            isExporting: false,
+            isAdding: false,
+            switchingAccountID: nil,
+            canRefreshUsage: true,
+            isRefreshSpinnerActive: false,
+            canWarmUpWeeklyQuota: false,
+            isWeeklyQuotaWarmupActive: true
+        )
+
+        let warmupButton = buttons.first { $0.intent == .warmUpWeeklyQuota }
+        XCTAssertEqual(warmupButton?.title, L10n.tr("accounts.action.warming_up_weekly_quota"))
+        XCTAssertEqual(warmupButton?.systemImage, "flame")
+        XCTAssertFalse(warmupButton?.isEnabled ?? true)
     }
 
     func testTrailingToolbarButtonsReflectCollapseStateAndSpinner() {

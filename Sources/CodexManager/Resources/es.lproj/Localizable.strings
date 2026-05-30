@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Importando...";
 "accounts.action.add_account" = "Añadir cuenta";
 "accounts.action.waiting_for_login" = "Esperando inicio de sesión...";
+"accounts.action.warm_up_weekly_quota" = "Precalentar cuota semanal";
+"accounts.action.warming_up_weekly_quota" = "Precalentando...";
 "accounts.loading.message" = "Cargando cuentas...";
 "accounts.action.quick_actions" = "Acciones rápidas";
 "accounts.action.collapse_all" = "Colapsar todas las tarjetas";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Uso actualizado";
+"accounts.notice.weekly_quota_warmup_no_targets" = "No hay cuentas que necesiten precalentar la cuota semanal";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Precalentamiento de cuota semanal completado: %@ correctas, %@ fallidas";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Precalentamiento de cuota semanal terminado con errores: %@ correctas, %@ fallidas";
 "accounts.notice.accounts_refreshed" = "Cuentas actualizadas";
 "accounts.notice.account_deleted" = "Cuenta eliminada";
 "accounts.notice.team_name_updated" = "Nombre del equipo actualizado";
@@ -151,6 +156,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "El precalentamiento de cuota semanal no está disponible";
+"error.weekly_quota_warmup.request_failed_format" = "Error en la solicitud de precalentamiento de cuota semanal: %@";
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
 "error.store.invalid_format_format" = "Invalid account store format: %@";

@@ -6,6 +6,7 @@ enum AccountsPageActionIntent: String, Hashable {
     case exportAccountsBackup
     case addAccount
     case smartSwitch
+    case warmUpWeeklyQuota
     case refreshUsage
     case toggleCollapse
 }
@@ -44,7 +45,9 @@ enum AccountsActionPresentation {
         isAdding: Bool,
         switchingAccountID: String?,
         canRefreshUsage: Bool,
-        isRefreshSpinnerActive: Bool
+        isRefreshSpinnerActive: Bool,
+        canWarmUpWeeklyQuota: Bool = true,
+        isWeeklyQuotaWarmupActive: Bool = false
     ) -> [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
         [
             AccountsActionButtonDescriptor(
@@ -109,6 +112,25 @@ enum AccountsActionPresentation {
                 systemImage: "wand.and.stars",
                 accessibilityLabel: L10n.tr("accounts.action.smart_switch"),
                 isEnabled: !isImporting && !isFileImporting && !isExporting && !isAdding && switchingAccountID == nil,
+                isSpinning: false,
+                contentStyle: .label,
+                surfaceStyle: .neutral
+            ),
+            AccountsActionButtonDescriptor(
+                intent: .warmUpWeeklyQuota,
+                title: isWeeklyQuotaWarmupActive
+                    ? L10n.tr("accounts.action.warming_up_weekly_quota")
+                    : L10n.tr("accounts.action.warm_up_weekly_quota"),
+                systemImage: "flame",
+                accessibilityLabel: isWeeklyQuotaWarmupActive
+                    ? L10n.tr("accounts.action.warming_up_weekly_quota")
+                    : L10n.tr("accounts.action.warm_up_weekly_quota"),
+                isEnabled: !isImporting
+                    && !isFileImporting
+                    && !isExporting
+                    && !isAdding
+                    && switchingAccountID == nil
+                    && canWarmUpWeeklyQuota,
                 isSpinning: false,
                 contentStyle: .label,
                 surfaceStyle: .neutral

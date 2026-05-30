@@ -73,6 +73,8 @@
 "accounts.action.importing" = "Importing...";
 "accounts.action.add_account" = "Add account";
 "accounts.action.waiting_for_login" = "Waiting for login...";
+"accounts.action.warm_up_weekly_quota" = "Warm up weekly quota";
+"accounts.action.warming_up_weekly_quota" = "Warming up...";
 "accounts.loading.message" = "Loading accounts...";
 "accounts.action.quick_actions" = "Quick actions";
 "accounts.action.collapse_all" = "Collapse all cards";
@@ -106,6 +108,9 @@
 "accounts.notice.exported_format" = "%@ accounts exported";
 "accounts.notice.imported_accounts_format" = "Imported %@ accounts, updated %@";
 "accounts.notice.usage_refreshed" = "Usage refreshed";
+"accounts.notice.weekly_quota_warmup_no_targets" = "No accounts need weekly quota warmup";
+"accounts.notice.weekly_quota_warmup_completed_format" = "Weekly quota warmup complete: %@ succeeded, %@ failed";
+"accounts.notice.weekly_quota_warmup_partial_format" = "Weekly quota warmup finished with errors: %@ succeeded, %@ failed";
 "accounts.notice.accounts_refreshed" = "Accounts refreshed";
 "accounts.notice.account_deleted" = "Account deleted";
 "accounts.notice.team_name_updated" = "Team name updated";
@@ -157,6 +162,8 @@
 "error.accounts.import_file_invalid" = "This is not a CodexManager account export file";
 "error.accounts.import_file_unsupported_version_format" = "Unsupported account export version: %@";
 "error.accounts.import_file_empty" = "The import file does not contain accounts";
+"error.accounts.weekly_quota_warmup_unavailable" = "Weekly quota warmup is unavailable";
+"error.weekly_quota_warmup.request_failed_format" = "Weekly quota warmup request failed: %@";
 
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";
