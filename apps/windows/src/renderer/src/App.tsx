@@ -748,6 +748,7 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
             oneWeekResetAt={account.usage?.oneWeek?.resetAt}
             t={t}
           />
+          {account.usageError && <p className="usage-error">{account.usageError}</p>}
           <div className="account-actions">
             <button className="account-action-button" type="button" onClick={onSwitch} disabled={account.isCurrent}>
               <span className="account-action-icon switch-icon" aria-hidden="true" />
@@ -762,7 +763,6 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
               <span>{t("accounts.action.delete")}</span>
             </button>
           </div>
-          {account.usageError && <p className="usage-error">{account.usageError}</p>}
         </>
       )}
       {canShowCollapsedSwitchOverlay && (

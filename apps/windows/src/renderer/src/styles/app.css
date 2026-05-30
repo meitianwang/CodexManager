@@ -224,6 +224,16 @@ select:focus {
   gap: 18px;
 }
 
+@media (max-width: 1450px) {
+  .accounts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .accounts-grid .inspector {
+    order: -1;
+  }
+}
+
 .content-region,
 .inspector,
 .proxy-section,
@@ -715,6 +725,11 @@ button.danger {
 .account-actions {
   display: grid;
   gap: 7px;
+}
+
+.account-row:not(.grid) .account-actions {
+  grid-column: 5;
+  grid-row: 1;
 }
 
 .account-action-button {
@@ -1242,7 +1257,13 @@ button.danger {
 
   .account-actions {
     grid-column: 1 / -1;
+    grid-row: auto;
     grid-template-columns: 90px 1fr 1fr;
+  }
+
+  .account-row:not(.grid) .account-actions {
+    grid-column: 1 / -1;
+    grid-row: auto;
   }
 
   .usage-error {

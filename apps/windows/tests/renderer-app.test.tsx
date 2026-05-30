@@ -150,6 +150,12 @@ describe("Windows renderer app", () => {
 
     expect(await screen.findByText("Usage refresh failed")).toBeTruthy();
     expect(accountRow("Work").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
+    const usageError = accountRow("Work").querySelector(".usage-error");
+    const accountActions = accountRow("Work").querySelector(".account-actions");
+    if (!(usageError instanceof Node) || !(accountActions instanceof Node)) {
+      throw new Error("usage error ordering elements were not found");
+    }
+    expect(usageError.compareDocumentPosition(accountActions)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
     expect(container.querySelector(".account-row.collapsed .usage-error")).toBeNull();
