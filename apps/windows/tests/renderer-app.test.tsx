@@ -191,20 +191,25 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();
+    expect(await screen.findByText("Proxy started")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
     await waitFor(() => expect(api.clipboard.writeText).toHaveBeenCalledWith("http://localhost:17888"));
+    expect(await screen.findByText("Proxy URL copied")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Proxy stopped", { selector: ".notice" })).toBeTruthy();
 
     fireEvent.click(await screen.findByRole("button", { name: "Regenerate" }));
     await waitFor(() => expect(api.proxy.regenerateApiKey).toHaveBeenCalledOnce());
+    expect(screen.queryByText("Regenerate complete")).toBeNull();
 
     const copyButton = screen.getAllByRole("button", { name: "Copy" })[0];
     expect(copyButton).toBeDefined();
     fireEvent.click(copyButton as HTMLElement);
     await waitFor(() => expect(api.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("/v1/chat/completions")));
+    expect(screen.queryByText("Copy complete")).toBeNull();
   });
 
   it("persists settings toggles, editor targets, and locale through mocked IPC", async () => {
@@ -220,6 +225,7 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(screen.getByLabelText("Launch at startup"));
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ launchAtStartup: true }));
+    expect(await screen.findByText("Settings updated")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Restart editors after switching"));
     await waitFor(() =>
@@ -228,9 +234,11 @@ describe("Windows renderer app", () => {
         restartEditorTargets: ["cursor"]
       })
     );
+    expect(await screen.findByText("Settings updated")).toBeTruthy();
 
     fireEvent.change(await screen.findByLabelText("Editor restart target"), { target: { value: "vscode" } });
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorTargets: ["vscode"] }));
+    expect(await screen.findByText("Editor restart target updated")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "zh-Hans" } });
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ locale: "zh-Hans" }));

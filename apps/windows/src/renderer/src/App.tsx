@@ -409,42 +409,58 @@ function App(): ReactElement {
         {activePage === "proxy" && (
           <ProxyPage
             busyAction={busyAction}
-            onCopy={(text) =>
-              runAction(t("action.copy"), async () => {
-                if (!api) {
-                  await navigator.clipboard.writeText(text);
-                  return;
-                }
-                await api.clipboard.writeText(text);
-              })
+            onCopy={(text, success) =>
+              runAction(
+                t("action.copy"),
+                async () => {
+                  if (!api) {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                  }
+                  await api.clipboard.writeText(text);
+                },
+                { silentSuccess: success === undefined, success }
+              )
             }
             onRegenerateApiKey={() =>
-              runAction(t("proxy.api_key.regenerate"), async () => {
-                if (!api) {
-                  const apiKey = generateProxyApiKey();
-                  setProxyState((current) => ({ ...current, apiKey }));
-                  return;
-                }
-                setProxyState(await api.proxy.regenerateApiKey());
-              })
+              runAction(
+                t("proxy.api_key.regenerate"),
+                async () => {
+                  if (!api) {
+                    const apiKey = generateProxyApiKey();
+                    setProxyState((current) => ({ ...current, apiKey }));
+                    return;
+                  }
+                  setProxyState(await api.proxy.regenerateApiKey());
+                },
+                { silentSuccess: true }
+              )
             }
             onStart={(port, apiKey) =>
-              runAction(t("common.start"), async () => {
-                if (!api) {
-                  setProxyState((current) => ({ ...current, apiKey, isRunning: true, port, proxyURL: `http://localhost:${port}` }));
-                  return;
-                }
-                setProxyState(await api.proxy.start(port, apiKey));
-              })
+              runAction(
+                t("common.start"),
+                async () => {
+                  if (!api) {
+                    setProxyState((current) => ({ ...current, apiKey, isRunning: true, port, proxyURL: `http://localhost:${port}` }));
+                    return;
+                  }
+                  setProxyState(await api.proxy.start(port, apiKey));
+                },
+                { success: t("proxy.notice.started") }
+              )
             }
             onStop={() =>
-              runAction(t("common.stop"), async () => {
-                if (!api) {
-                  setProxyState((current) => ({ ...current, isRunning: false }));
-                  return;
-                }
-                setProxyState(await api.proxy.stop());
-              })
+              runAction(
+                t("common.stop"),
+                async () => {
+                  if (!api) {
+                    setProxyState((current) => ({ ...current, isRunning: false }));
+                    return;
+                  }
+                  setProxyState(await api.proxy.stop());
+                },
+                { success: t("proxy.notice.stopped") }
+              )
             }
             proxyState={proxyState}
             selectedEndpoint={selectedEndpoint}
@@ -483,7 +499,7 @@ function App(): ReactElement {
                 { silentSuccess: true }
               )
             }
-            onUpdateSettings={(patch) => runAction(t("tab.settings"), () => updateSettings(patch), { silentSuccess: true })}
+            onUpdateSettings={(patch) => runAction(t("tab.settings"), () => updateSettings(patch), { success: settingsUpdateNotice(patch, t) })}
             settings={settings}
             t={t}
           />
@@ -821,7 +837,7 @@ function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: num
 
 interface ProxyPageProps {
   busyAction?: string;
-  onCopy: (text: string) => void;
+  onCopy: (text: string, success?: string) => void;
   onRegenerateApiKey: () => void;
   onStart: (port: number, apiKey: string) => void;
   onStop: () => void;
@@ -872,7 +888,7 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
           </button>
           {props.proxyState.isRunning ? (
             <>
-              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL)}>
+              <button type="button" disabled={isBusy} onClick={() => props.onCopy(props.proxyState.proxyURL, props.t("proxy.notice.url_copied"))}>
                 {props.t("proxy.copy_url")}
               </button>
               <button className="danger" type="button" disabled={isBusy} onClick={props.onStop}>
@@ -1149,6 +1165,13 @@ function proxyEndpointDescription(endpoint: ProxyEndpointID, t: Translator): str
     case "messages":
       return t("proxy.endpoint.messages");
   }
+}
+
+function settingsUpdateNotice(patch: AppSettingsPatch, t: Translator): string {
+  if (patch.restartEditorTargets !== undefined && Object.keys(patch).length === 1) {
+    return t("settings.notice.restart_target_updated");
+  }
+  return t("settings.notice.updated");
 }
 
 function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult, t: Translator): string {
