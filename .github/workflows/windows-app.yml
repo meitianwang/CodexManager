@@ -1,0 +1,62 @@
+name: Windows App
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-app.yml"
+      - "apps/windows/**"
+      - "docs/release-windows.md"
+      - "scripts/package_windows.ps1"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/windows-app.yml"
+      - "apps/windows/**"
+      - "docs/release-windows.md"
+      - "scripts/package_windows.ps1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/windows/pnpm-lock.yaml
+
+      - name: Install Windows app dependencies
+        working-directory: apps/windows
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, test, build, and make Squirrel installer
+        shell: pwsh
+        run: .\scripts\package_windows.ps1 -Target make -Arch x64 -SkipInstall
+
+      - name: Upload Squirrel.Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexManager-Windows-x64-Squirrel
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/windows/out/make/squirrel.windows/x64/CodexManagerSetup.exe
+            apps/windows/out/make/squirrel.windows/x64/*.nupkg
+            apps/windows/out/make/squirrel.windows/x64/RELEASES

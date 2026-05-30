@@ -48,6 +48,20 @@ For an unpacked app only:
 .\scripts\package_windows.ps1 -Target package -Arch x64
 ```
 
+## CI Artifact Build
+
+The `.github/workflows/windows-app.yml` workflow runs the same packaging script on `windows-latest`.
+
+It runs on pushes and pull requests that touch the Windows app, release document, packaging script, or the workflow itself. It can also be started manually from GitHub Actions with `workflow_dispatch`.
+
+The workflow uploads one artifact named `CodexManager-Windows-x64-Squirrel` containing:
+
+- `CodexManagerSetup.exe`
+- `*.nupkg`
+- `RELEASES`
+
+Treat the CI artifact as the installable Windows verification build. It is not code signed yet.
+
 ## Manual Verification Checklist
 
 - App launches and opens the Accounts page.
