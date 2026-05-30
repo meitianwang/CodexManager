@@ -80,6 +80,8 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
     expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("88%")).toBeTruthy();
+    expect(within(accountRow("Work")).getByText("66%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 34%")).toBeTruthy();
 

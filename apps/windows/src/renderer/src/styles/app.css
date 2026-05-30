@@ -501,7 +501,12 @@ button.danger {
 
 .usage-cell strong {
   color: #f0f3ea;
-  font-size: 13px;
+  font-size: 18px;
+}
+
+.usage-cell small {
+  color: #9ea697;
+  font-size: 11px;
 }
 
 .usage-track {

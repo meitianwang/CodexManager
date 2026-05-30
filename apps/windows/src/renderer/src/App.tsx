@@ -800,17 +800,19 @@ function AccountTransferSelectionDialog({
 }
 
 function UsageCell({ title, usedPercent, t }: { title: string; usedPercent?: number; t: Translator }): ReactElement {
-  const percent = clampPercent(usedPercent);
+  const used = clampPercent(usedPercent);
+  const remaining = Math.max(0, 100 - used);
   return (
     <div className="usage-cell">
       <div>
         <span>{title}</span>
         <strong>
-          {usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: `${Math.round(percent)}%` })}
+          {usedPercent === undefined ? "--" : `${Math.round(remaining)}%`}
         </strong>
+        <small>{usedPercent === undefined ? t("accounts.usage.no_data") : t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` })}</small>
       </div>
       <div className="usage-track">
-        <span style={{ width: `${percent}%` }} />
+        <span style={{ width: `${remaining}%` }} />
       </div>
     </div>
   );
