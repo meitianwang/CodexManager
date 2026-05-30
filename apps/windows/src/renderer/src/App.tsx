@@ -223,22 +223,35 @@ function App(): ReactElement {
             accounts={accounts}
             busyAction={busyAction}
             onAddViaLogin={() =>
-              runAction(t("accounts.action.sign_in"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.addViaLogin();
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.sign_in"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const imported = await api.accounts.addViaLogin();
+                  await reloadAccounts();
+                  setNotice({
+                    tone: "success",
+                    text: t("accounts.notice.imported_new_format", { account: imported.label })
+                  });
+                },
+                { silentSuccess: true }
+              )
             }
             onDeleteAccount={(id) =>
-              runAction(t("accounts.action.delete"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.delete(id);
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.delete"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  await api.accounts.delete(id);
+                  await reloadAccounts();
+                  setNotice({ tone: "success", text: t("accounts.notice.account_deleted") });
+                },
+                { silentSuccess: true }
+              )
             }
             onExportSelected={() => {
               setNotice(undefined);
@@ -248,22 +261,35 @@ function App(): ReactElement {
               });
             }}
             onImportAuthFile={() =>
-              runAction(t("accounts.action.import_file"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.importAuthFile();
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.import_file"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const imported = await api.accounts.importAuthFile();
+                  if (!imported) {
+                    return;
+                  }
+                  await reloadAccounts();
+                  setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: imported.label }) });
+                },
+                { silentSuccess: true }
+              )
             }
             onImportCurrent={() =>
-              runAction(t("accounts.action.import_current"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.importCurrentAuth();
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.import_current"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const imported = await api.accounts.importCurrentAuth();
+                  await reloadAccounts();
+                  setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: imported.label }) });
+                },
+                { silentSuccess: true }
+              )
             }
             onImportPackage={() =>
               runAction(
@@ -281,12 +307,17 @@ function App(): ReactElement {
               )
             }
             onRefreshAll={() =>
-              runAction(t("accounts.action.refresh_usage"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                setAccounts(await api.accounts.refreshAllUsage());
-              })
+              runAction(
+                t("accounts.action.refresh_usage"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  setAccounts(await api.accounts.refreshAllUsage());
+                  setNotice({ tone: "success", text: t("accounts.notice.accounts_refreshed") });
+                },
+                { silentSuccess: true }
+              )
             }
             onWarmUpWeeklyQuota={() =>
               runAction(
@@ -303,13 +334,18 @@ function App(): ReactElement {
               )
             }
             onRefreshUsage={(id) =>
-              runAction(t("common.refresh"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                const refreshed = await api.accounts.refreshUsage(id);
-                setAccounts((current) => current.map((account) => (account.id === id ? refreshed : account)));
-              })
+              runAction(
+                t("common.refresh"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const refreshed = await api.accounts.refreshUsage(id);
+                  setAccounts((current) => current.map((account) => (account.id === id ? refreshed : account)));
+                  setNotice({ tone: "success", text: t("accounts.notice.usage_refreshed") });
+                },
+                { silentSuccess: true }
+              )
             }
             onSmartSwitch={() =>
               runAction(
@@ -353,13 +389,18 @@ function App(): ReactElement {
               )
             }
             onUpdateAlias={(id, alias) =>
-              runAction(t("accounts.card.team_alias"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                const updated = await api.accounts.updateTeamAlias(id, alias);
-                setAccounts((current) => current.map((account) => (account.id === id ? updated : account)));
-              })
+              runAction(
+                t("accounts.card.team_alias"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const updated = await api.accounts.updateTeamAlias(id, alias);
+                  setAccounts((current) => current.map((account) => (account.id === id ? updated : account)));
+                  setNotice({ tone: "success", text: t("accounts.notice.team_name_updated") });
+                },
+                { silentSuccess: true }
+              )
             }
             t={t}
           />

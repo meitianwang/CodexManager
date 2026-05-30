@@ -47,16 +47,20 @@ describe("Windows renderer app", () => {
     expect((within(exportDialog).getByLabelText("Selected Work") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(exportDialog).getByRole("button", { name: "Export" }));
     await waitFor(() => expect(api.accounts.exportPackage).toHaveBeenCalledWith(["a"]));
+    expect(await screen.findByText("Exported 1 accounts")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(api.accounts.addViaLogin).toHaveBeenCalledOnce());
     await waitFor(() => expect(api.accounts.list).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("New account imported: OAuth")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Import current" }));
     await waitFor(() => expect(api.accounts.importCurrentAuth).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Account imported: Current auth")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     await waitFor(() => expect(api.accounts.importAuthFile).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Account imported: Imported file")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Import package" }));
     await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
@@ -64,14 +68,17 @@ describe("Windows renderer app", () => {
     expect((within(importDialog).getByLabelText("Selected Package") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(importDialog).getByRole("button", { name: "Import" }));
     await waitFor(() => expect(api.accounts.importPreparedPackage).toHaveBeenCalledWith("draft-1", ["package"]));
+    expect(await screen.findByText("Imported 1 accounts, updated 0")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
 
     const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh" });
     expect(accountRefreshButton).toBeDefined();
     fireEvent.click(accountRefreshButton as HTMLElement);
     await waitFor(() => expect(api.accounts.refreshUsage).toHaveBeenCalledWith("a"));
+    expect(await screen.findByText("Usage refreshed")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledOnce());
@@ -84,11 +91,26 @@ describe("Windows renderer app", () => {
     fireEvent.change(screen.getByLabelText("Team alias Work"), { target: { value: "Platform" } });
     fireEvent.blur(screen.getByLabelText("Team alias Work"));
     await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
+    expect(await screen.findByText("Team name updated")).toBeTruthy();
 
     const accountDeleteButton = within(accountRow("Work")).getByRole("button", { name: "Delete" });
     expect(accountDeleteButton).toBeDefined();
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
+    expect(await screen.findByText("Account deleted")).toBeTruthy();
+  });
+
+  it("does not show a success notice when importing an auth file is canceled", async () => {
+    const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    api.accounts.importAuthFile = vi.fn(async () => undefined);
+    render(<App />);
+
+    expect(await screen.findByText("Work")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+    await waitFor(() => expect(api.accounts.importAuthFile).toHaveBeenCalledOnce());
+
+    expect(screen.queryByText("Import file complete")).toBeNull();
+    expect(screen.queryByText("Account imported: Imported file")).toBeNull();
   });
 
   it("toggles account grid/list presentation and collapse state", async () => {
