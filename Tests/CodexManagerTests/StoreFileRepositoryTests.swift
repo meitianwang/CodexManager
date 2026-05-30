@@ -319,6 +319,65 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(merged.accounts[0].usage, remoteUsage)
     }
 
+    func testCloudKitAccountsStoreMergeKeepsNewerLocalAuthWhenRemoteUsageErrorIsNewer() {
+        let localAccount = StoredAccount(
+            id: "local-id",
+            label: "Local",
+            email: "local@example.com",
+            accountID: "account-1",
+            planType: "pro",
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: makeAuthJSON(
+                accessToken: "new-access-token",
+                refreshToken: "new-refresh-token",
+                lastRefresh: "2026-05-30T10:00:00Z"
+            ),
+            addedAt: 1,
+            updatedAt: 100,
+            usage: nil,
+            usageError: nil,
+            principalID: "principal-1"
+        )
+        let remoteAccount = StoredAccount(
+            id: "remote-id",
+            label: "Remote",
+            email: "local@example.com",
+            accountID: "account-1",
+            planType: "pro",
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: makeAuthJSON(
+                accessToken: "old-access-token",
+                refreshToken: "old-refresh-token",
+                lastRefresh: "2026-05-30T09:00:00Z"
+            ),
+            addedAt: 1,
+            updatedAt: 200,
+            usage: nil,
+            usageError: "登录令牌交换失败",
+            principalID: "principal-1"
+        )
+
+        let merged = CloudKitAccountsStoreMerge.applyingRemoteSnapshot(
+            [remoteAccount],
+            remoteSyncedAt: 200,
+            to: AccountsStore(
+                version: 1,
+                accounts: [localAccount],
+                currentSelection: nil
+            )
+        )
+
+        XCTAssertEqual(merged.accounts.count, 1)
+        XCTAssertEqual(
+            merged.accounts[0].authJSON["tokens"]?["refresh_token"]?.stringValue,
+            "new-refresh-token"
+        )
+        XCTAssertEqual(merged.accounts[0].usageError, "登录令牌交换失败")
+        XCTAssertEqual(merged.accounts[0].updatedAt, 200)
+    }
+
     func testCloudKitAccountsStoreMergeKeepsRecentLocalOnlyAccounts() {
         let localOnlyAccount = StoredAccount(
             id: "local-only",
@@ -632,5 +691,23 @@ final class StoreFileRepositoryTests: XCTestCase {
             summaries.first(where: { $0.accountID == "remote-account" })?.isCurrent,
             false
         )
+    }
+
+    private func makeAuthJSON(
+        accessToken: String,
+        refreshToken: String,
+        lastRefresh: String
+    ) -> JSONValue {
+        .object([
+            "auth_mode": .string("chatgpt"),
+            "last_refresh": .string(lastRefresh),
+            "tokens": .object([
+                "access_token": .string(accessToken),
+                "refresh_token": .string(refreshToken),
+                "id_token": .string("header.payload.signature"),
+                "account_id": .string("account-1"),
+                "principal_id": .string("principal-1")
+            ])
+        ])
     }
 }

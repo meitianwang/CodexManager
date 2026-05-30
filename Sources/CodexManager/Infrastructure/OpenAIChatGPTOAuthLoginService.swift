@@ -22,6 +22,7 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
 
     private let configPath: URL
     private let session: URLSession
+    private let refreshCoordinator = ChatGPTRefreshTokenExchangeCoordinator()
     #if os(iOS)
     @MainActor private static let authenticationSessionDriver = IOSWebAuthenticationSessionDriver()
     #endif
@@ -72,7 +73,9 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
     }
 
     func refreshChatGPTTokens(refreshToken: String) async throws -> ChatGPTOAuthTokens {
-        try await Self.refreshTokens(session: session, refreshToken: refreshToken)
+        try await refreshCoordinator.refresh(refreshToken: refreshToken) { [session] in
+            try await Self.refreshTokens(session: session, refreshToken: refreshToken)
+        }
     }
 
     private func beginAuthorizationSession(
@@ -366,6 +369,83 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
 
     private static func redirectURI(for port: UInt16) -> String {
         "http://localhost:\(port)\(Configuration.callbackPath)"
+    }
+}
+
+actor ChatGPTRefreshTokenExchangeCoordinator {
+    private struct CachedExchange {
+        let tokens: ChatGPTOAuthTokens
+        let expiresAt: Date
+    }
+
+    private let cacheTTL: TimeInterval
+    private let maxCachedExchanges: Int
+    private var inFlight: [String: Task<ChatGPTOAuthTokens, Error>] = [:]
+    private var cachedExchanges: [String: CachedExchange] = [:]
+    private var cacheOrder: [String] = []
+
+    init(cacheTTL: TimeInterval = 60, maxCachedExchanges: Int = 32) {
+        self.cacheTTL = cacheTTL
+        self.maxCachedExchanges = max(1, maxCachedExchanges)
+    }
+
+    func refresh(
+        refreshToken: String,
+        operation: @Sendable @escaping () async throws -> ChatGPTOAuthTokens
+    ) async throws -> ChatGPTOAuthTokens {
+        let now = Date()
+        pruneExpiredExchanges(now: now)
+
+        if let cached = cachedExchanges[refreshToken], cached.expiresAt > now {
+            return cached.tokens
+        }
+
+        if let task = inFlight[refreshToken] {
+            return try await task.value
+        }
+
+        let task = Task {
+            try await operation()
+        }
+        inFlight[refreshToken] = task
+
+        do {
+            let tokens = try await task.value
+            inFlight[refreshToken] = nil
+            remember(tokens, for: refreshToken, now: Date())
+            return tokens
+        } catch {
+            inFlight[refreshToken] = nil
+            throw error
+        }
+    }
+
+    private func remember(_ tokens: ChatGPTOAuthTokens, for refreshToken: String, now: Date) {
+        if cachedExchanges[refreshToken] == nil {
+            cacheOrder.append(refreshToken)
+        }
+        cachedExchanges[refreshToken] = CachedExchange(
+            tokens: tokens,
+            expiresAt: now.addingTimeInterval(cacheTTL)
+        )
+        trimCache()
+    }
+
+    private func pruneExpiredExchanges(now: Date) {
+        for token in cacheOrder {
+            guard let cached = cachedExchanges[token], cached.expiresAt <= now else {
+                continue
+            }
+            cachedExchanges.removeValue(forKey: token)
+        }
+        cacheOrder.removeAll { cachedExchanges[$0] == nil }
+    }
+
+    private func trimCache() {
+        while cacheOrder.count > maxCachedExchanges {
+            let token = cacheOrder.removeFirst()
+            cachedExchanges.removeValue(forKey: token)
+        }
     }
 }
 

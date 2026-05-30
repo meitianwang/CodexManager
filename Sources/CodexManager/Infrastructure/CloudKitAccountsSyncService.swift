@@ -264,10 +264,12 @@ enum CloudKitAccountsStoreMerge {
     private static func mergeMatchedAccount(local: StoredAccount, remote: StoredAccount) -> StoredAccount {
         let remoteMetadataWins = remote.updatedAt >= local.updatedAt
         let metadataWinner = remoteMetadataWins ? remote : local
+        let authWinner = preferredAuthSource(local: local, remote: remote, fallback: metadataWinner)
         let usageWinner = preferredUsageSource(local: local, remote: remote)
 
         var merged = metadataWinner
         merged.id = local.id
+        merged.authJSON = authWinner.authJSON
         merged.teamName = preferredMetadataValue(
             primary: metadataWinner.teamName,
             fallback: remoteMetadataWins ? local.teamName : remote.teamName
@@ -312,6 +314,59 @@ enum CloudKitAccountsStoreMerge {
         }
 
         return local
+    }
+
+    private static func preferredAuthSource(
+        local: StoredAccount,
+        remote: StoredAccount,
+        fallback: StoredAccount
+    ) -> StoredAccount {
+        guard local.authJSON != remote.authJSON else {
+            return fallback
+        }
+
+        let localAuthTimestamp = authTimestamp(for: local)
+        let remoteAuthTimestamp = authTimestamp(for: remote)
+        if localAuthTimestamp != remoteAuthTimestamp {
+            return (remoteAuthTimestamp ?? .distantPast) > (localAuthTimestamp ?? .distantPast)
+                ? remote
+                : local
+        }
+
+        return fallback
+    }
+
+    private static func authTimestamp(for account: StoredAccount) -> Date? {
+        guard let rawValue = account.authJSON["last_refresh"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawValue.isEmpty else {
+            return nil
+        }
+        return parseAuthTimestamp(rawValue)
+    }
+
+    private static func parseAuthTimestamp(_ value: String) -> Date? {
+        for candidate in authTimestampCandidates(for: value) {
+            let fractionalFormatter = ISO8601DateFormatter()
+            fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let parsed = fractionalFormatter.date(from: candidate) {
+                return parsed
+            }
+
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            if let parsed = formatter.date(from: candidate) {
+                return parsed
+            }
+        }
+        return nil
+    }
+
+    private static func authTimestampCandidates(for value: String) -> [String] {
+        if value.range(of: #"(Z|[+-]\d{2}:\d{2})$"#, options: .regularExpression) != nil {
+            return [value]
+        }
+        return [value, "\(value)Z"]
     }
 
     private static func usageTimestamp(for account: StoredAccount) -> Int64 {
