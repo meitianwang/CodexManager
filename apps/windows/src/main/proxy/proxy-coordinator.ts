@@ -2,17 +2,22 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
 import type { AccountsStore, StoredAccount } from "../../shared/models/accounts";
-import type { ExtractedAuth } from "../../shared/models/auth";
+import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import { accountSummaries } from "../../shared/domain/accounts-store";
-import { accountKeyForExtractedAuth } from "../../shared/domain/account-identity";
+import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId } from "../../shared/domain/account-identity";
+import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
 import { sortForDisplay } from "../../shared/domain/account-ranking";
 import { resolveChatGPTBaseOrigin, removeSuffix } from "../services/chatgpt-base-origin";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../services/accounts-coordinator";
+import { tokenObjectFromAuth } from "../repositories/auth-parsing";
 import { translateChatRequest, translateCodexSSEToChatCompletion } from "./chat-to-codex-translator";
 import { translateAnthropicRequest } from "./anthropic-to-codex-translator";
-import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamResult } from "./upstream-client";
+import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamRequest, type CodexUpstreamResult } from "./upstream-client";
 
 const maxRequestBytes = 50 * 1024 * 1024;
+const accountCooldownSeconds = 60;
+const authCooldownSeconds = 5 * 60;
+const shortCooldownSeconds = 30;
 
 export interface SettingsRepositoryLike {
   loadSettings(): Promise<AppSettings>;
@@ -23,13 +28,20 @@ export interface ProxyCoordinatorOptions {
   settingsRepository: SettingsRepositoryLike;
   authRepository: AuthRepositoryLike;
   codexConfigPath: string;
+  chatGPTOAuthLoginService?: ProxyRefreshTokenServiceLike;
   upstreamClient?: CodexUpstreamClientLike;
   dateProvider?: { unixSecondsNow(): number };
+}
+
+export interface ProxyRefreshTokenServiceLike {
+  refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens>;
 }
 
 export class ProxyCoordinator {
   private readonly upstreamClient: CodexUpstreamClientLike;
   private readonly dateProvider: { unixSecondsNow(): number };
+  private readonly accountCooldowns = new Map<string, number>();
+  private readonly accountModelCooldowns = new Map<string, number>();
   private server: Server | undefined;
 
   constructor(private readonly options: ProxyCoordinatorOptions) {
@@ -84,7 +96,7 @@ export class ProxyCoordinator {
 
     try {
       if (request.method === "GET" && url.pathname === "/v1/models") {
-        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), true);
+        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), true, "", true);
         return;
       }
 
@@ -141,6 +153,7 @@ export class ProxyCoordinator {
       "responses",
       Buffer.from(JSON.stringify(codexBody)),
       true,
+      model,
       false
     );
 
@@ -168,6 +181,7 @@ export class ProxyCoordinator {
       "responses",
       Buffer.from(JSON.stringify(translation.codexBody)),
       true,
+      readOptionalString(json.model) ?? "",
       false
     );
     sendUpstream(response, result, translation.isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
@@ -180,6 +194,7 @@ export class ProxyCoordinator {
     json: Record<string, unknown>,
     forceStream: boolean
   ): Promise<void> {
+    const model = readOptionalString(json.model) ?? "";
     const body = forceStream ? { ...json, stream: true } : json;
     const result = await this.forwardProxyRequest(
       request,
@@ -187,6 +202,7 @@ export class ProxyCoordinator {
       normalizedPath,
       Buffer.from(JSON.stringify(body)),
       forceStream,
+      model,
       false
     );
     sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
@@ -198,10 +214,11 @@ export class ProxyCoordinator {
     normalizedPath: string,
     body: Buffer,
     isStream: boolean,
+    model: string,
     writeResponse = true
   ): Promise<CodexUpstreamResult> {
     const store = await this.options.storeRepository.loadStore();
-    const orderedAccounts = await this.orderedEligibleAccounts(store);
+    const orderedAccounts = await this.orderedEligibleAccounts(store, model);
     const url = await this.upstreamURL(normalizedPath);
     let lastError: unknown;
 
@@ -212,15 +229,13 @@ export class ProxyCoordinator {
       }
 
       try {
-        const result = await this.upstreamClient.execute({
+        const result = await this.executeUpstreamRequest({
           method: request.method ?? "POST",
           url,
           body,
           headers: requestHeaders(request),
-          accessToken: extracted.accessToken,
-          accountId: extracted.accountId,
           isStream
-        });
+        }, account, extracted, model);
         if (writeResponse) {
           sendUpstream(response, result, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
         }
@@ -236,13 +251,66 @@ export class ProxyCoordinator {
     throw lastError instanceof Error ? lastError : new Error("No eligible account could satisfy the proxy request");
   }
 
-  private async orderedEligibleAccounts(store: AccountsStore): Promise<StoredAccount[]> {
+  private async executeUpstreamRequest(
+    request: Omit<CodexUpstreamRequest, "accessToken" | "accountId">,
+    account: StoredAccount,
+    extracted: ExtractedAuth,
+    model: string
+  ): Promise<CodexUpstreamResult> {
+    try {
+      return await this.upstreamClient.execute({
+        ...request,
+        accessToken: extracted.accessToken,
+        accountId: extracted.accountId
+      });
+    } catch (error) {
+      if (error instanceof CodexUpstreamError && isAuthenticationFailure(error)) {
+        const refreshed = await this.refreshProxyAccountAuth(account);
+        if (refreshed) {
+          try {
+            return await this.upstreamClient.execute({
+              ...request,
+              accessToken: refreshed.extracted.accessToken,
+              accountId: refreshed.extracted.accountId
+            });
+          } catch (refreshedError) {
+            this.recordCooldown(refreshed.account, model, refreshedError);
+            throw refreshedError;
+          }
+        }
+      }
+
+      this.recordCooldown(account, model, error);
+      throw error;
+    }
+  }
+
+  private async orderedEligibleAccounts(store: AccountsStore, model: string): Promise<StoredAccount[]> {
+    const now = this.dateProvider.unixSecondsNow();
+    this.expireCooldowns(now);
     const summaries = sortForDisplay(accountSummaries(store, await this.currentAuthAccountKey()));
     const byId = new Map(store.accounts.map((account) => [account.id, account]));
     return summaries
-      .filter((summary) => !isAccountCoolingDown(summary.usage, this.dateProvider.unixSecondsNow()))
       .map((summary) => byId.get(summary.id))
-      .filter((account): account is StoredAccount => account !== undefined);
+      .filter((account): account is StoredAccount => account !== undefined)
+      .filter((account) => this.isAccountEligible(account, model, now));
+  }
+
+  private isAccountEligible(account: StoredAccount, model: string, now: number): boolean {
+    const accountKey = accountKeyForStoredAccount(account);
+    const quotaResetTime = exhaustedQuotaResetTime(account.usage, now);
+    if (quotaResetTime !== undefined) {
+      this.accountCooldowns.set(accountKey, quotaResetTime);
+      return false;
+    }
+
+    const cooldownUntil = this.accountCooldowns.get(accountKey);
+    if (cooldownUntil !== undefined && cooldownUntil > now) {
+      return false;
+    }
+
+    const modelCooldownUntil = this.accountModelCooldowns.get(modelCooldownKey(accountKey, model));
+    return modelCooldownUntil === undefined || modelCooldownUntil <= now;
   }
 
   private async currentAuthAccountKey(): Promise<string | undefined> {
@@ -263,6 +331,82 @@ export class ProxyCoordinator {
     } catch {
       return undefined;
     }
+  }
+
+  private async refreshProxyAccountAuth(
+    account: StoredAccount
+  ): Promise<{ account: StoredAccount; extracted: ExtractedAuth } | undefined> {
+    const refreshToken = refreshTokenFromAuth(account.authJson);
+    if (!this.options.chatGPTOAuthLoginService || !refreshToken) {
+      return undefined;
+    }
+
+    try {
+      const tokens = await this.options.chatGPTOAuthLoginService.refreshChatGPTTokens(refreshToken);
+      const authJson = this.options.authRepository.replacingChatGPTTokens(account.authJson, tokens);
+      const extracted = this.options.authRepository.extractAuth(authJson);
+      if (normalizedAccountId(extracted.accountId) !== normalizedAccountId(account.accountId)) {
+        return undefined;
+      }
+
+      const store = await this.options.storeRepository.loadStore();
+      const index = store.accounts.findIndex((candidate) => candidate.id === account.id);
+      const stored = store.accounts[index];
+      if (index < 0 || !stored) {
+        return undefined;
+      }
+
+      const updated: StoredAccount = {
+        ...stored,
+        accountId: extracted.accountId,
+        authJson,
+        email: extracted.email ?? stored.email,
+        planType: preferredPlanType(extracted.planType, stored.usage?.planType, stored.planType),
+        principalId: extracted.principalId,
+        teamName: normalizeTeamName(extracted.teamName) ?? stored.teamName,
+        updatedAt: this.dateProvider.unixSecondsNow()
+      };
+      store.accounts[index] = updated;
+      await this.options.storeRepository.saveStore(store);
+
+      if ((await this.currentAuthAccountKey()) === accountKeyForStoredAccount(account)) {
+        await this.options.authRepository.writeCurrentAuth(authJson);
+      }
+
+      return { account: updated, extracted };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private recordCooldown(account: StoredAccount, model: string, error: unknown): void {
+    if (!(error instanceof CodexUpstreamError)) {
+      this.accountCooldowns.set(accountKeyForStoredAccount(account), this.dateProvider.unixSecondsNow() + shortCooldownSeconds);
+      return;
+    }
+
+    const now = this.dateProvider.unixSecondsNow();
+    const accountKey = accountKeyForStoredAccount(account);
+    if (isAuthenticationFailure(error)) {
+      this.accountCooldowns.set(accountKey, now + authCooldownSeconds);
+      return;
+    }
+    if (isRateLimited(error)) {
+      this.accountCooldowns.set(accountKey, quotaRetryCooldown(account.usage, now));
+      return;
+    }
+    if (isModelRestriction(error) && model) {
+      this.accountModelCooldowns.set(modelCooldownKey(accountKey, model), now + authCooldownSeconds);
+      return;
+    }
+    if (error.isRetryable) {
+      this.accountCooldowns.set(accountKey, now + shortCooldownSeconds);
+    }
+  }
+
+  private expireCooldowns(now: number): void {
+    expireMap(this.accountCooldowns, now);
+    expireMap(this.accountModelCooldowns, now);
   }
 
   private async upstreamURL(normalizedPath: string): Promise<string> {
@@ -286,11 +430,6 @@ function isAuthorized(request: IncomingMessage, apiKey: string): boolean {
   }
   const authorization = request.headers.authorization;
   return authorization === `Bearer ${apiKey}`;
-}
-
-function isAccountCoolingDown(usage: StoredAccount["usage"], now: number): boolean {
-  const windows = [usage?.fiveHour, usage?.oneWeek];
-  return windows.some((window) => window !== undefined && window.usedPercent >= 100 && window.resetAt !== undefined && window.resetAt > now);
 }
 
 async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
@@ -364,6 +503,10 @@ function readString(value: unknown, label: string): string {
   return value;
 }
 
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -394,4 +537,62 @@ async function closeServer(server: Server): Promise<void> {
       }
     });
   });
+}
+
+function refreshTokenFromAuth(auth: StoredAccount["authJson"]): string | undefined {
+  const tokens = tokenObjectFromAuth(auth);
+  const refreshToken = tokens?.refresh_token;
+  return typeof refreshToken === "string" && refreshToken.length > 0 ? refreshToken : undefined;
+}
+
+function isAuthenticationFailure(error: CodexUpstreamError): boolean {
+  return error.statusCode === 401 || error.body.toLowerCase().includes("authentication");
+}
+
+function isRateLimited(error: CodexUpstreamError): boolean {
+  return error.statusCode === 429;
+}
+
+function isModelRestriction(error: CodexUpstreamError): boolean {
+  const body = error.body.toLowerCase();
+  return error.statusCode === 403 && (body.includes("model_restricted") || body.includes("model_not_found"));
+}
+
+function exhaustedQuotaResetTime(usage: StoredAccount["usage"], now: number): number | undefined {
+  const exhausted = [usage?.fiveHour, usage?.oneWeek].flatMap((window) =>
+    window !== undefined && window.usedPercent >= 100 ? [window] : []
+  );
+  if (exhausted.length === 0) {
+    return undefined;
+  }
+
+  const futureResetTimes = exhausted
+    .map((window) => window.resetAt)
+    .filter((resetAt): resetAt is number => resetAt !== undefined && resetAt > now);
+  if (futureResetTimes.length > 0) {
+    return Math.max(...futureResetTimes);
+  }
+
+  return exhausted.some((window) => window.resetAt === undefined) ? now + shortCooldownSeconds : undefined;
+}
+
+function quotaRetryCooldown(usage: StoredAccount["usage"], now: number): number {
+  return exhaustedQuotaResetTime(usage, now) ?? now + accountCooldownSeconds;
+}
+
+function modelCooldownKey(accountKey: string, model: string): string {
+  return `${accountKey}|${model}`;
+}
+
+function expireMap(map: Map<string, number>, now: number): void {
+  for (const [key, value] of map.entries()) {
+    if (value <= now) {
+      map.delete(key);
+    }
+  }
+}
+
+function normalizeTeamName(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }

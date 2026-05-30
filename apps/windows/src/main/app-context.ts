@@ -49,7 +49,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
       storeRepository,
       settingsRepository,
       authRepository,
-      codexConfigPath: paths.codexConfigPath
+      codexConfigPath: paths.codexConfigPath,
+      chatGPTOAuthLoginService
     }),
     settingsCoordinator
   );

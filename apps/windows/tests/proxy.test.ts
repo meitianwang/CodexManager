@@ -136,23 +136,95 @@ describe("local proxy", () => {
     expect(response.status).toBe(200);
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
+
+  it("refreshes an expired access token and retries the same account before moving on", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(401, "HTTP 401", "authentication failed"),
+      successResult({ id: "resp-refreshed" })
+    ]);
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [makeAccount("a", "acct-a", "expired-access", 1, "refresh-a")]
+    });
+    const authRepository = new FakeAuthRepository(fakeAuth("acct-a", "expired-access", "a@example.com", "refresh-a"));
+    const context = await makeProxyContext({
+      upstream,
+      storeRepository,
+      authRepository,
+      refreshService: new FakeRefreshTokenService({
+        accessToken: "fresh-access",
+        refreshToken: "refresh-new",
+        idToken: "id-new"
+      })
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accessToken)).toEqual(["expired-access", "fresh-access"]);
+    expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({
+      accessToken: "fresh-access"
+    });
+    expect(authRepository.currentAuth).toMatchObject({
+      accessToken: "fresh-access"
+    });
+  });
+
+  it("cools down a rate-limited account on later requests", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(429, "HTTP 429", "rate limit"),
+      successResult({ id: "resp-b" }),
+      successResult({ id: "resp-b-again" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+  });
 });
 
 async function makeProxyContext(options: {
   store?: AccountsStore;
+  storeRepository?: MemoryStoreRepository;
   settings?: AppSettings;
   upstream?: FakeUpstreamClient;
+  authRepository?: FakeAuthRepository;
+  refreshService?: FakeRefreshTokenService;
 } = {}) {
   const store = options.store ?? {
     version: 1,
     accounts: [makeAccount("one", "acct-1", "access-1", 1)]
   };
+  const storeRepository = options.storeRepository ?? new MemoryStoreRepository(store);
   const upstream = options.upstream ?? new FakeUpstreamClient([successResult({ id: "resp-default" })]);
   const proxy = new ProxyCoordinator({
-    storeRepository: new MemoryStoreRepository(store),
+    storeRepository,
     settingsRepository: new StaticSettingsRepository(options.settings ?? { ...defaultAppSettings(), proxyApiKey: "test-key", proxyPort: 0 }),
-    authRepository: new FakeAuthRepository(),
+    authRepository: options.authRepository ?? new FakeAuthRepository(),
     codexConfigPath: "/missing-config.toml",
+    chatGPTOAuthLoginService: options.refreshService,
     upstreamClient: upstream,
     dateProvider: { unixSecondsNow: () => 1_780_000_000 }
   });
@@ -174,13 +246,15 @@ async function authorizedFetch(port: number, path: string, body: unknown): Promi
 }
 
 class MemoryStoreRepository implements AccountsStoreRepositoryLike {
-  constructor(private readonly store: AccountsStore) {}
+  constructor(public store: AccountsStore) {}
 
   async loadStore(): Promise<AccountsStore> {
     return structuredClone(this.store);
   }
 
-  async saveStore(): Promise<void> {}
+  async saveStore(store: AccountsStore): Promise<void> {
+    this.store = structuredClone(store);
+  }
 }
 
 class StaticSettingsRepository implements SettingsRepositoryLike {
@@ -192,37 +266,73 @@ class StaticSettingsRepository implements SettingsRepositoryLike {
 }
 
 class FakeAuthRepository implements AuthRepositoryLike {
+  public currentAuth: JSONValue | undefined;
+
+  constructor(currentAuth?: JSONValue) {
+    this.currentAuth = currentAuth;
+  }
+
   async readCurrentAuth(): Promise<JSONValue> {
-    throw new Error("missing current auth");
+    if (!this.currentAuth) {
+      throw new Error("missing current auth");
+    }
+    return this.currentAuth;
   }
 
   async readCurrentAuthOptional(): Promise<JSONValue | undefined> {
-    return undefined;
+    return this.currentAuth;
   }
 
   async readAuth(): Promise<JSONValue> {
     throw new Error("not implemented");
   }
 
-  async writeCurrentAuth(): Promise<void> {}
+  async writeCurrentAuth(auth: JSONValue): Promise<void> {
+    this.currentAuth = auth;
+  }
 
   makeChatGPTAuth(tokens: ChatGPTOAuthTokens): JSONValue {
     return fakeAuth("acct", tokens.accessToken);
   }
 
-  replacingChatGPTTokens(auth: JSONValue): JSONValue {
-    return auth;
+  replacingChatGPTTokens(auth: JSONValue, tokens: ChatGPTOAuthTokens): JSONValue {
+    const object = auth as Record<string, JSONValue>;
+    const tokensObject = typeof object.tokens === "object" && object.tokens !== null && !Array.isArray(object.tokens)
+      ? (object.tokens as Record<string, JSONValue>)
+      : {};
+    return {
+      ...object,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      tokens: {
+        ...tokensObject,
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+        id_token: tokens.idToken
+      }
+    };
   }
 
   extractAuth(auth: JSONValue): ExtractedAuth {
     const object = auth as Record<string, JSONValue>;
+    const tokens = typeof object.tokens === "object" && object.tokens !== null && !Array.isArray(object.tokens)
+      ? (object.tokens as Record<string, JSONValue>)
+      : {};
     return {
-      accountId: String(object.accountId),
-      accessToken: String(object.accessToken),
+      accountId: String(object.accountId ?? tokens.account_id),
+      accessToken: String(object.accessToken ?? tokens.access_token),
       email: typeof object.email === "string" ? object.email : undefined,
       planType: "plus",
       principalId: typeof object.email === "string" ? object.email : undefined
     };
+  }
+}
+
+class FakeRefreshTokenService {
+  constructor(private readonly tokens: ChatGPTOAuthTokens) {}
+
+  async refreshChatGPTTokens(): Promise<ChatGPTOAuthTokens> {
+    return this.tokens;
   }
 }
 
@@ -244,14 +354,14 @@ class FakeUpstreamClient implements CodexUpstreamClientLike {
   }
 }
 
-function makeAccount(id: string, accountId: string, accessToken: string, addedAt: number) {
+function makeAccount(id: string, accountId: string, accessToken: string, addedAt: number, refreshToken = `refresh-${id}`) {
   return {
     id,
     label: id,
     email: `${id}@example.com`,
     accountId,
     planType: "plus",
-    authJson: fakeAuth(accountId, accessToken, `${id}@example.com`),
+    authJson: fakeAuth(accountId, accessToken, `${id}@example.com`, refreshToken),
     addedAt,
     updatedAt: addedAt,
     usage: {
@@ -263,11 +373,18 @@ function makeAccount(id: string, accountId: string, accessToken: string, addedAt
   };
 }
 
-function fakeAuth(accountId: string, accessToken: string, email = "one@example.com"): JSONValue {
+function fakeAuth(accountId: string, accessToken: string, email = "one@example.com", refreshToken = "refresh-token"): JSONValue {
   return {
     accountId,
     accessToken,
-    email
+    refreshToken,
+    email,
+    tokens: {
+      account_id: accountId,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      id_token: `id-${accountId}`
+    }
   };
 }
 
