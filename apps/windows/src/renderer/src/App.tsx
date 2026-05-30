@@ -123,7 +123,7 @@ function App(): ReactElement {
   const currentPageLabel = useMemo(() => pages.find((page) => page.id === activePage)?.label ?? t("tab.accounts"), [activePage, pages, t]);
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-active-page={activePage}>
       <aside className="sidebar" aria-label={t("aria.primary")}>
         <div className="brand-block">
           <div className="brand-mark">CM</div>

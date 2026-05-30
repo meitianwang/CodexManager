@@ -16,16 +16,19 @@ describe("Windows renderer app", () => {
   });
 
   it("renders the accounts workspace and navigates to proxy and settings without IPC", () => {
-    render(<App />);
+    const { container } = render(<App />);
 
+    expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
     expect(screen.getByRole("heading", { name: "Accounts" })).toBeTruthy();
     expect(screen.getByText("Add ChatGPT OAuth or import an existing Codex auth file.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Proxy" }));
+    expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("proxy");
     expect(screen.getByRole("heading", { name: "Proxy" })).toBeTruthy();
     expect(screen.getByText("/v1/chat/completions")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("settings");
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
     expect(screen.getByText("Launch at startup")).toBeTruthy();
   });
