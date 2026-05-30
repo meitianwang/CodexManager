@@ -1029,8 +1029,8 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
       <section className="settings-section">
         <h3>{t("settings.section.language")}</h3>
         <label className="select-row">
-          <span>{t("settings.application_language")}</span>
-          <select value={settings.locale} onChange={(event) => onUpdateSettings({ locale: event.target.value })}>
+          <span>{t("settings.language")}</span>
+          <select aria-label={t("settings.language")} value={settings.locale} onChange={(event) => onUpdateSettings({ locale: event.target.value })}>
             {localeOptions.map((locale) => (
               <option key={locale.id} value={locale.id}>
                 {locale.label}

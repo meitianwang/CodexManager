@@ -17,5 +17,7 @@ describe("renderer i18n", () => {
 
     expect(t("tab.accounts")).toBe("账号");
     expect(t("accounts.action.warm_weekly_quota")).toBe("一键预热");
+    expect(t("settings.language")).toBe("语言");
+    expect(t("language.japanese")).toBe("日本語");
   });
 });

@@ -232,7 +232,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ launchAtStartup: true }));
     expect(await screen.findByText("Settings updated")).toBeTruthy();
 
-    fireEvent.click(screen.getByLabelText("Restart editors after switching"));
+    fireEvent.click(screen.getByLabelText("Restart editors on switch"));
     await waitFor(() =>
       expect(api.settings.update).toHaveBeenCalledWith({
         restartEditorsOnSwitch: true,
@@ -245,7 +245,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorTargets: ["vscode"] }));
     expect(await screen.findByText("Editor restart target updated")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "zh-Hans" } });
+    fireEvent.change(screen.getByLabelText("Language"), { target: { value: "zh-Hans" } });
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ locale: "zh-Hans" }));
     expect(await screen.findByRole("heading", { name: "设置" })).toBeTruthy();
   });
@@ -267,7 +267,7 @@ describe("Windows renderer app", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.change(screen.getByLabelText("Application language"), { target: { value: "zh-Hans" } });
+    fireEvent.change(screen.getByLabelText("Language"), { target: { value: "zh-Hans" } });
     fireEvent.click(screen.getByRole("button", { name: "账号" }));
     await waitFor(() => expect((screen.getByRole("button", { name: "添加账号" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "添加账号" }));
