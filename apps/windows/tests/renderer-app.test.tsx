@@ -68,7 +68,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
 
-    const accountRefreshButton = screen.getAllByRole("button", { name: "Refresh" })[0];
+    const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh" });
     expect(accountRefreshButton).toBeDefined();
     fireEvent.click(accountRefreshButton as HTMLElement);
     await waitFor(() => expect(api.accounts.refreshUsage).toHaveBeenCalledWith("a"));
@@ -76,7 +76,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledOnce());
 
-    const accountSwitchButton = screen.getAllByRole("button", { name: "Switch" })[0];
+    const accountSwitchButton = within(accountRow("Work")).getByRole("button", { name: "Switch" });
     expect(accountSwitchButton).toBeDefined();
     fireEvent.click(accountSwitchButton as HTMLElement);
     await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
@@ -85,7 +85,7 @@ describe("Windows renderer app", () => {
     fireEvent.blur(screen.getByLabelText("Team alias Work"));
     await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
 
-    const accountDeleteButton = screen.getAllByRole("button", { name: "Delete" })[0];
+    const accountDeleteButton = within(accountRow("Work")).getByRole("button", { name: "Delete" });
     expect(accountDeleteButton).toBeDefined();
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
@@ -110,6 +110,45 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Expand all cards" }));
     expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(false);
+  });
+
+  it("skips smart switch when the current account is already best", async () => {
+    const currentAccount = { ...makeAccount("a", "Work"), isCurrent: true, usage: makeUsage(4, 6) };
+    const api = installMockAPI({ accounts: [currentAccount] });
+    render(<App />);
+
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
+
+    expect(await screen.findByText("Current account is already the best available")).toBeTruthy();
+    expect(api.accounts.smartSwitch).not.toHaveBeenCalled();
+  });
+
+  it("shows mac-aligned switch and smart-switch result notices", async () => {
+    const currentAccount = { ...makeAccount("a", "Work"), isCurrent: true, usage: makeUsage(99, 99) };
+    const targetAccount = { ...makeAccount("b", "Personal"), usage: makeUsage(3, 5) };
+    const api = installMockAPI({ accounts: [currentAccount, targetAccount] });
+    api.accounts.smartSwitch = vi.fn(async () => ({
+      account: targetAccount,
+      execution: { restartedEditorApps: ["cursor" as const], usedFallbackCLI: true }
+    }));
+    api.accounts.switch = vi.fn(async () => ({
+      editorRestartError: "taskkill failed",
+      restartedEditorApps: [],
+      usedFallbackCLI: false
+    }));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
+    expect(
+      await screen.findByText("Smart switched to: Personal · Switched account (via codex app command) · Editors restarted: cursor")
+    ).toBeTruthy();
+
+    const accountSwitchButton = within(accountRow("Personal")).getByRole("button", { name: "Switch" });
+    expect(accountSwitchButton).toBeDefined();
+    fireEvent.click(accountSwitchButton as HTMLElement);
+    expect(await screen.findByText("Switched account · Editor restart failed: taskkill failed")).toBeTruthy();
   });
 
   it("starts, stops, regenerates, and copies proxy values through mocked IPC", async () => {
@@ -330,6 +369,14 @@ function makeAccount(id: string, label: string): AccountSummary {
     shouldDisplayWorkspaceTag: true,
     updatedAt: 2
   };
+}
+
+function accountRow(label: string): HTMLElement {
+  const row = screen.getByLabelText(`Team alias ${label}`).closest("article");
+  if (!row) {
+    throw new Error(`Account row ${label} was not found`);
+  }
+  return row;
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {

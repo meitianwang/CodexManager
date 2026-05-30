@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { appInfo as fallbackAppInfo, type AppInfo } from "@shared/app-info";
+import { sortByRemaining } from "@shared/domain/account-ranking";
 import type { AccountsImportDraftDescriptor, AccountTransferSelectableItem } from "@shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "@shared/models/accounts";
-import type { InstalledEditorApp } from "@shared/models/app";
+import type { InstalledEditorApp, SwitchAccountExecutionResult } from "@shared/models/app";
 import {
   appLocales,
   defaultAppSettings,
@@ -311,22 +312,45 @@ function App(): ReactElement {
               })
             }
             onSmartSwitch={() =>
-              runAction(t("accounts.action.smart_switch"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.smartSwitch();
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.smart_switch"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const best = sortByRemaining(accounts)[0];
+                  if (!best) {
+                    setNotice({ tone: "info", text: t("accounts.notice.no_switch_target") });
+                    return;
+                  }
+                  if (best.isCurrent) {
+                    setNotice({ tone: "info", text: t("accounts.notice.already_best") });
+                    return;
+                  }
+                  const result = await api.accounts.smartSwitch();
+                  await reloadAccounts();
+                  if (!result) {
+                    setNotice({ tone: "info", text: t("accounts.notice.no_switch_target") });
+                    return;
+                  }
+                  setNotice(smartSwitchNotice(result.account, result.execution, t));
+                },
+                { silentSuccess: true }
+              )
             }
             onSwitchAccount={(id) =>
-              runAction(t("accounts.action.switch"), async () => {
-                if (!api) {
-                  throw new Error(t("error.ipc_bridge_unavailable"));
-                }
-                await api.accounts.switch(id);
-                await reloadAccounts();
-              })
+              runAction(
+                t("accounts.action.switch"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const execution = await api.accounts.switch(id);
+                  await reloadAccounts();
+                  setNotice(switchNotice(execution, t));
+                },
+                { silentSuccess: true }
+              )
             }
             onUpdateAlias={(id, alias) =>
               runAction(t("accounts.card.team_alias"), async () => {
@@ -1094,6 +1118,32 @@ function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult, t: Translator): str
     return t("accounts.notice.weekly_complete", { succeeded: result.succeededCount });
   }
   return t("accounts.notice.weekly_partial", { succeeded: result.succeededCount, failed: result.failures.length });
+}
+
+function smartSwitchNotice(account: AccountSummary, execution: SwitchAccountExecutionResult, t: Translator): Notice {
+  const notice = switchNotice(execution, t);
+  return {
+    tone: notice.tone,
+    text: t("accounts.notice.smart_switched_prefix_format", { account: account.label, message: notice.text })
+  };
+}
+
+function switchNotice(execution: SwitchAccountExecutionResult, t: Translator): Notice {
+  let tone: NoticeTone = "success";
+  const segments = [t(execution.usedFallbackCLI ? "accounts.notice.switch_done_fallback" : "accounts.notice.switch_done")];
+
+  if (execution.usedFallbackCLI) {
+    tone = "info";
+  }
+
+  if (execution.editorRestartError) {
+    tone = "error";
+    segments.push(t("accounts.notice.editor_restart_failed_format", { message: execution.editorRestartError }));
+  } else if (execution.restartedEditorApps.length > 0) {
+    segments.push(t("accounts.notice.editor_restarted_format", { editors: execution.restartedEditorApps.join(" / ") }));
+  }
+
+  return { tone, text: segments.join(" · ") };
 }
 
 export default App;

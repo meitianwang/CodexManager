@@ -246,6 +246,57 @@ describe("accounts coordinator", () => {
     expect(authRepository.currentAuth).toEqual(account.authJson);
   });
 
+  it("does not smart-switch when the best account is already current", async () => {
+    const current = makeStoredAccount({
+      id: "current",
+      accountId: "acct-current",
+      email: "current@example.com",
+      usage: makeUsageSnapshot("team", 3, 5)
+    });
+    const other = makeStoredAccount({
+      id: "other",
+      accountId: "acct-other",
+      email: "other@example.com",
+      usage: makeUsageSnapshot("team", 60, 70)
+    });
+    const authRepository = new FakeAuthRepository(current.authJson);
+    const coordinator = new AccountsCoordinator({
+      storeRepository: new MemoryStoreRepository({ version: 1, accounts: [current, other] }),
+      authRepository,
+      dateProvider: fixedDateProvider()
+    });
+
+    await expect(coordinator.smartSwitch()).resolves.toBeUndefined();
+    expect(authRepository.currentAuth).toEqual(current.authJson);
+  });
+
+  it("smart-switches to the highest remaining non-current account", async () => {
+    const current = makeStoredAccount({
+      id: "current",
+      accountId: "acct-current",
+      email: "current@example.com",
+      usage: makeUsageSnapshot("team", 95, 90)
+    });
+    const best = makeStoredAccount({
+      id: "best",
+      accountId: "acct-best",
+      email: "best@example.com",
+      usage: makeUsageSnapshot("team", 5, 10)
+    });
+    const authRepository = new FakeAuthRepository(current.authJson);
+    const coordinator = new AccountsCoordinator({
+      storeRepository: new MemoryStoreRepository({ version: 1, accounts: [current, best] }),
+      authRepository,
+      dateProvider: fixedDateProvider()
+    });
+
+    const result = await coordinator.smartSwitch();
+
+    expect(result?.account.id).toBe("best");
+    expect(result?.execution).toEqual({ restartedEditorApps: [], usedFallbackCLI: false });
+    expect(authRepository.currentAuth).toEqual(best.authJson);
+  });
+
   it("enriches missing workspace names from remote metadata when listing accounts", async () => {
     const account = makeStoredAccount({
       id: "team",
