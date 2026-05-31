@@ -534,6 +534,16 @@ function Add-SmokeResultChecks {
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "restoredAccountCount")) -eq 1
   ) $accountWorkflows
 
+  $platform = Get-PropertyValue $workflows "platform"
+  Add-Check "automated.platformSideEffects" (
+    (Get-BoolValue (Get-PropertyValue $platform "usedFallbackCLI")) -and
+    (Get-NumberValue (Get-PropertyValue $platform "codexLaunchCount")) -ge 1 -and
+    (Get-StringValue (Get-PropertyValue $platform "codexWorkspacePath")) -eq "C:\smoke-workspace" -and
+    (Get-NumberValue (Get-PropertyValue $platform "editorRestartCount")) -ge 1 -and
+    (Test-ContainsAll (Get-PropertyValue $platform "restartedEditorApps") @("cursor")) -and
+    ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $platform "editorRestartError"))))
+  ) $platform
+
   Add-Check "automated.proxySmoke" (
     (Get-BoolValue (Get-PropertyValue $workflows "proxyHealthOK")) -and
     (Get-NumberValue (Get-PropertyValue $workflows "proxyPort")) -gt 0 -and

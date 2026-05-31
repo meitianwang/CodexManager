@@ -16,6 +16,21 @@ import { RemoteModelCatalogService } from "./services/remote-model-catalog-servi
 import { CodexCLIService } from "./platform/codex-cli-service";
 import { EditorAppService } from "./platform/editor-app-service";
 import { LaunchAtStartupService } from "./platform/launch-at-startup-service";
+import type { EditorAppID } from "../shared/models/settings";
+
+export interface SmokePlatformSideEffectLog {
+  codexLaunches: Array<{
+    workspacePath?: string;
+  }>;
+  editorRestarts: Array<{
+    restarted: EditorAppID[];
+    targets: EditorAppID[];
+  }>;
+}
+
+export interface SmokePlatformSideEffects {
+  snapshot(): SmokePlatformSideEffectLog;
+}
 
 export interface WindowsAppContext {
   accountsCoordinator: AccountsCoordinator;
@@ -23,6 +38,7 @@ export interface WindowsAppContext {
   editorAppService: EditorAppService;
   paths: FileSystemPaths;
   proxyRuntimeService: ProxyRuntimeService;
+  smokePlatformSideEffects?: SmokePlatformSideEffects;
   storeRepository: AccountsStoreRepository;
   settingsCoordinator: SettingsCoordinator;
 }
@@ -43,6 +59,7 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     localeProvider: async () => (await settingsRepository.loadSettings()).locale
   });
   const editorAppService = new EditorAppService();
+  const smokePlatformSideEffects = createSmokePlatformSideEffects();
   const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({
     storeRepository,
@@ -52,8 +69,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     weeklyQuotaWarmupService,
     workspaceMetadataService,
     chatGPTOAuthLoginService,
-    codexCLIService: new CodexCLIService(),
-    editorAppService
+    codexCLIService: smokePlatformSideEffects?.codexCLIService ?? new CodexCLIService(),
+    editorAppService: smokePlatformSideEffects?.editorAppService ?? editorAppService
   });
   const proxyRuntimeService = new ProxyRuntimeService(
     new ProxyCoordinator({
@@ -84,6 +101,7 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     editorAppService,
     paths,
     proxyRuntimeService,
+    smokePlatformSideEffects,
     storeRepository,
     settingsCoordinator
   };
@@ -115,5 +133,51 @@ function resolveRuntimeFileSystemPaths(electronApp: Pick<App, "getPath">): FileS
     settingsStorePath: join(applicationSupportDirectory, "settings.json"),
     codexAuthPath: join(codexDirectory, "auth.json"),
     codexConfigPath: join(codexDirectory, "config.toml")
+  };
+}
+
+function createSmokePlatformSideEffects():
+  | (SmokePlatformSideEffects & {
+      codexCLIService: { launchApp(workspacePath?: string): Promise<boolean> };
+      editorAppService: {
+        restartSelectedApps(targets: readonly EditorAppID[]): Promise<{ restarted: EditorAppID[] }>;
+      };
+    })
+  | undefined {
+  if (!process.env.CODEX_MANAGER_ELECTRON_SMOKE_ROOT) {
+    return undefined;
+  }
+
+  const log: SmokePlatformSideEffectLog = {
+    codexLaunches: [],
+    editorRestarts: []
+  };
+
+  return {
+    codexCLIService: {
+      async launchApp(workspacePath?: string): Promise<boolean> {
+        log.codexLaunches.push(workspacePath === undefined ? {} : { workspacePath });
+        return true;
+      }
+    },
+    editorAppService: {
+      async restartSelectedApps(targets: readonly EditorAppID[]): Promise<{ restarted: EditorAppID[] }> {
+        const normalizedTargets = [...targets];
+        log.editorRestarts.push({
+          restarted: normalizedTargets,
+          targets: normalizedTargets
+        });
+        return { restarted: normalizedTargets };
+      }
+    },
+    snapshot(): SmokePlatformSideEffectLog {
+      return {
+        codexLaunches: log.codexLaunches.map((entry) => ({ ...entry })),
+        editorRestarts: log.editorRestarts.map((entry) => ({
+          restarted: [...entry.restarted],
+          targets: [...entry.targets]
+        }))
+      };
+    }
   };
 }

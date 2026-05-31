@@ -250,6 +250,12 @@ jobs:
             $Result.workflows.accounts.exportPackageAccountCount -ne 3
             $Result.workflows.accounts.smartSwitchAccountId -ne "acct-package"
             $Result.workflows.accounts.restoredAccountCount -ne 1
+            -not ([bool]$Result.workflows.platform.usedFallbackCLI)
+            $Result.workflows.platform.codexLaunchCount -lt 1
+            $Result.workflows.platform.codexWorkspacePath -ne "C:\smoke-workspace"
+            $Result.workflows.platform.editorRestartCount -lt 1
+            @($Result.workflows.platform.restartedEditorApps) -notcontains "cursor"
+            (-not ([string]::IsNullOrWhiteSpace([string] $Result.workflows.platform.editorRestartError)))
             -not ([bool]$Result.workflows.persistence.accountsJsonExists)
             -not ([bool]$Result.workflows.persistence.settingsJsonExists)
             -not ([bool]$Result.workflows.persistence.codexAuthExists)

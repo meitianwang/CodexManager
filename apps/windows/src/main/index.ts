@@ -86,6 +86,7 @@ interface SmokeUIFingerprint {
 interface SmokeWorkflowState {
   accounts: SmokeAccountWorkflowState;
   persistence: SmokePersistenceState;
+  platform: SmokePlatformWorkflowState;
   proxyHealthOK: boolean;
   proxyPort: number;
   proxyUnauthorizedStatus: number;
@@ -101,6 +102,15 @@ interface SmokeAccountWorkflowState {
   importPackageUpdatedCount: number;
   restoredAccountCount: number;
   smartSwitchAccountId: string;
+}
+
+interface SmokePlatformWorkflowState {
+  codexLaunchCount: number;
+  codexWorkspacePath: string;
+  editorRestartCount: number;
+  editorRestartError?: string;
+  restartedEditorApps: string[];
+  usedFallbackCLI: boolean;
 }
 
 interface SmokePersistenceState {
@@ -720,6 +730,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   }
 
   const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now);
+  const platform = await verifySmokePlatformSideEffects(context, account);
 
   const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
   try {
@@ -757,6 +768,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
     return {
       accounts: accountWorkflows,
       persistence,
+      platform,
       proxyHealthOK: true,
       proxyPort: proxyState.port,
       proxyUnauthorizedStatus: unauthorizedResponse.status,
@@ -842,6 +854,60 @@ async function verifySmokeAccountWorkflows(
     restoredAccountCount: restoredAccounts.length,
     smartSwitchAccountId
   };
+}
+
+async function verifySmokePlatformSideEffects(
+  context: WindowsAppContext,
+  primaryAccount: StoredAccount
+): Promise<SmokePlatformWorkflowState> {
+  if (!context.smokePlatformSideEffects) {
+    throw new Error("Smoke platform side-effect recorder is unavailable");
+  }
+
+  const workspacePath = "C:\\smoke-workspace";
+  try {
+    await context.settingsCoordinator.updateSettings({
+      launchCodexAfterSwitch: true,
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: ["cursor"]
+    });
+
+    const execution = await context.accountsCoordinator.switchAccountAndApplySettings(primaryAccount.id, workspacePath);
+    const sideEffects = context.smokePlatformSideEffects.snapshot();
+    const latestCodexLaunch = sideEffects.codexLaunches[sideEffects.codexLaunches.length - 1];
+    const latestEditorRestart = sideEffects.editorRestarts[sideEffects.editorRestarts.length - 1];
+    const restartedEditorApps = latestEditorRestart?.restarted ?? [];
+
+    if (!execution.usedFallbackCLI) {
+      throw new Error(`Smoke platform side effects did not record Codex CLI fallback: ${JSON.stringify(execution)}`);
+    }
+    if (execution.editorRestartError) {
+      throw new Error(`Smoke editor restart returned an error: ${execution.editorRestartError}`);
+    }
+    if (latestCodexLaunch?.workspacePath !== workspacePath) {
+      throw new Error(`Smoke Codex launch workspace mismatch: ${JSON.stringify(sideEffects.codexLaunches)}`);
+    }
+    if (!execution.restartedEditorApps.includes("cursor") || !restartedEditorApps.includes("cursor")) {
+      throw new Error(
+        `Smoke editor restart did not include Cursor: ${JSON.stringify({ execution, editorRestarts: sideEffects.editorRestarts })}`
+      );
+    }
+
+    return {
+      codexLaunchCount: sideEffects.codexLaunches.length,
+      codexWorkspacePath: latestCodexLaunch.workspacePath ?? "",
+      editorRestartCount: sideEffects.editorRestarts.length,
+      editorRestartError: execution.editorRestartError,
+      restartedEditorApps,
+      usedFallbackCLI: execution.usedFallbackCLI
+    };
+  } finally {
+    await context.settingsCoordinator.updateSettings({
+      launchCodexAfterSwitch: false,
+      restartEditorsOnSwitch: false,
+      restartEditorTargets: []
+    });
+  }
 }
 
 function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {
