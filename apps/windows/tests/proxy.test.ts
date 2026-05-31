@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountsStore, StoredAccount } from "../src/shared/models/accounts";
 import type { AppSettings } from "../src/shared/models/settings";
 import { appInfo } from "../src/shared/app-info";
@@ -7,6 +7,7 @@ import type { JSONValue } from "../src/shared/models/json-value";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../src/shared/models/auth";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../src/main/services/accounts-coordinator";
 import { ProxyCoordinator, type SettingsRepositoryLike } from "../src/main/proxy/proxy-coordinator";
+import { translateCodexSSEToChatCompletion } from "../src/main/proxy/chat-to-codex-translator";
 import {
   CodexUpstreamClient,
   CodexUpstreamError,
@@ -384,6 +385,27 @@ describe("local proxy", () => {
       choices: [{ message: { role: "assistant", content: "Hello" } }]
     });
     expect(forwarded.stream).toBe(true);
+  });
+
+  it("stops accumulating non-streaming Chat Completions text after the mac-compatible byte cap", () => {
+    const sseText = [
+      sseDataLine({ type: "response.output_text.delta", delta: "first" }),
+      sseDataLine({ type: "response.output_text.delta", delta: "second" }),
+      sseDataLine({ type: "response.completed", response: { usage: { input_tokens: 1, output_tokens: 2 } } })
+    ].join("");
+    const byteLength = vi.spyOn(Buffer, "byteLength").mockReturnValue(50 * 1024 * 1024 + 1);
+    try {
+      const response = translateCodexSSEToChatCompletion("gpt-5-codex", sseText) as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: unknown;
+      };
+
+      expect(response.choices?.[0]?.message?.content).toBe("first");
+      expect(response.usage).toEqual({ input_tokens: 1, output_tokens: 2 });
+      expect(byteLength).toHaveBeenCalledTimes(1);
+    } finally {
+      byteLength.mockRestore();
+    }
   });
 
   it("rejects Chat Completions requests without a model before forwarding", async () => {
@@ -1273,6 +1295,10 @@ function sseResult(text: string): CodexUpstreamResult {
       ].join("\n")
     )
   };
+}
+
+function sseDataLine(value: Record<string, unknown>): string {
+  return `data: ${JSON.stringify(value)}\n\n`;
 }
 
 function sseErrorResult(error: { code: string; message: string; status: number }): CodexUpstreamResult {

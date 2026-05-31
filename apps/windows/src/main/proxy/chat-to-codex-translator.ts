@@ -1,5 +1,7 @@
 import { codexSSEErrorFromEvent, parseCodexSSEEvents } from "./codex-sse";
 
+const maxAccumulatedTextBytes = 50 * 1024 * 1024;
+
 export function translateChatRequest(model: string, messages: readonly Record<string, unknown>[], original: Record<string, unknown>): Record<string, unknown> {
   const effort = typeof original.reasoning_effort === "string" ? original.reasoning_effort : "medium";
   const body: Record<string, unknown> = {
@@ -54,11 +56,15 @@ export function translateChatRequest(model: string, messages: readonly Record<st
 
 export function translateCodexSSEToChatCompletion(model: string, text: string): Record<string, unknown> {
   let fullText = "";
+  let truncated = false;
   let usage: unknown;
 
   for (const event of parseCodexSSEEvents(text)) {
-    if (event.type === "response.output_text.delta" && typeof event.object.delta === "string") {
+    if (!truncated && event.type === "response.output_text.delta" && typeof event.object.delta === "string") {
       fullText += event.object.delta;
+      if (Buffer.byteLength(fullText, "utf8") > maxAccumulatedTextBytes) {
+        truncated = true;
+      }
     }
     if (event.type === "response.completed" && isRecord(event.object.response)) {
       usage = event.object.response.usage;
