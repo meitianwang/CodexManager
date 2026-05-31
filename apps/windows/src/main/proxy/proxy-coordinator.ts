@@ -227,12 +227,12 @@ export class ProxyCoordinator {
       return;
     }
 
-    if (!Array.isArray(json.messages)) {
+    if (!Array.isArray(json.messages) || !json.messages.every(isRecord)) {
       sendProxyError(response, 400, "Chat request missing messages array");
       return;
     }
 
-    const messages = json.messages.filter(isRecord);
+    const messages = json.messages;
     const clientWantsStream = json.stream === true;
     const codexBody = translateChatRequest(model, messages, json);
     const result = await this.forwardProxyRequest(

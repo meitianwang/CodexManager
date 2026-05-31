@@ -399,6 +399,26 @@ describe("local proxy", () => {
     expect(upstream.requests).toEqual([]);
   });
 
+  it("rejects Chat Completions requests with non-object messages before forwarding", async () => {
+    const upstream = new FakeUpstreamClient([]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      messages: [{ role: "user", content: "Hi" }, "bad"]
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({
+      error: {
+        message: "Chat request missing messages array",
+        type: "proxy_error"
+      }
+    });
+    expect(upstream.requests).toEqual([]);
+  });
+
   it("translates streaming Chat Completions responses to OpenAI chunks", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });
