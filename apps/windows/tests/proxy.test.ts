@@ -59,6 +59,27 @@ describe("local proxy", () => {
     expect(response.headers.get("access-control-expose-headers")).toContain("x-codex-ratelimit-limit-tokens");
   });
 
+  it("returns a bad request for invalid JSON on supported proxy routes", async () => {
+    const context = await makeProxyContext();
+    const response = await rawAuthorizedFetch(context.port, "/v1/responses", "{");
+    const body = await response.json() as Record<string, { message?: string; type?: string }>;
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatchObject({
+      message: "Request body must be a JSON object",
+      type: "proxy_error"
+    });
+  });
+
+  it("does not parse request bodies before rejecting unsupported routes", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
+    const context = await makeProxyContext({ upstream });
+    const response = await rawAuthorizedFetch(context.port, "/v1/unknown", "{");
+
+    expect(response.status).toBe(404);
+    expect(upstream.requests).toEqual([]);
+  });
+
   it("forwards Responses requests through the selected account and cleans headers", async () => {
     const upstream = new FakeUpstreamClient([
       completedResponseResult({ id: "resp-1" }, { "x-codex-turn-state": "next", "transfer-encoding": "chunked" })
@@ -776,6 +797,10 @@ async function makeProxyContext(options: {
 }
 
 async function authorizedFetch(port: number, path: string, body: unknown): Promise<Response> {
+  return rawAuthorizedFetch(port, path, JSON.stringify(body));
+}
+
+async function rawAuthorizedFetch(port: number, path: string, body: string): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}${path}`, {
     method: "POST",
     headers: {
@@ -783,7 +808,7 @@ async function authorizedFetch(port: number, path: string, body: unknown): Promi
       "x-api-key": "test-key",
       "ChatGPT-Account-ID": "client-account"
     },
-    body: JSON.stringify(body)
+    body
   });
 }
 

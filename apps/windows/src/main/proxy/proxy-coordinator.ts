@@ -61,6 +61,14 @@ const corsExposedHeaders = [
   "x-codex-ratelimit-remaining-tokens",
   "x-codex-ratelimit-limit-tokens"
 ].join(", ");
+const supportedPostPaths = new Set([
+  "/v1/chat/completions",
+  "/v1/messages",
+  "/v1/responses",
+  "/v1/responses/compact",
+  "/v1/memories/trace_summarize",
+  "/v1/alpha/search"
+]);
 
 export interface SettingsRepositoryLike {
   loadSettings(): Promise<AppSettings>;
@@ -153,6 +161,11 @@ export class ProxyCoordinator {
         return;
       }
 
+      if (!supportedPostPaths.has(url.pathname)) {
+        sendJson(response, 404, { error: { message: "Not Found" } });
+        return;
+      }
+
       const body = await readRequestBody(request);
       const json = parseJsonObject(body);
       switch (url.pathname) {
@@ -174,10 +187,12 @@ export class ProxyCoordinator {
         case "/v1/alpha/search":
           await this.forwardCodexJSONPassthrough(request, response, "alpha/search", body, json, "");
           return;
-        default:
-          sendJson(response, 404, { error: { message: "Not Found" } });
       }
     } catch (error) {
+      if (error instanceof ProxyBadRequestError) {
+        sendProxyError(response, 400, error.message);
+        return;
+      }
       sendJson(response, error instanceof CodexUpstreamError ? error.statusCode : 500, {
         error: {
           message: error instanceof Error ? error.message : String(error),
@@ -586,11 +601,23 @@ async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
 }
 
 function parseJsonObject(body: Buffer): Record<string, unknown> {
-  const parsed = JSON.parse(body.toString("utf8")) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8")) as unknown;
+  } catch {
+    throw new ProxyBadRequestError("Request body must be a JSON object");
+  }
   if (!isRecord(parsed)) {
-    throw new Error("Request body must be a JSON object");
+    throw new ProxyBadRequestError("Request body must be a JSON object");
   }
   return parsed;
+}
+
+class ProxyBadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProxyBadRequestError";
+  }
 }
 
 function normalizedResponsesBody(json: Record<string, unknown>): Record<string, unknown> {
