@@ -132,7 +132,7 @@ final class DefaultUsageService: UsageService, @unchecked Sendable {
 final class DefaultWeeklyQuotaWarmupService: WeeklyQuotaWarmupService, @unchecked Sendable {
     private enum RequestPolicy {
         static let scope = "weekly-quota-warmup"
-        static let model = "gpt-5"
+        static let model = "gpt-5.4-mini"
     }
 
     private let configPath: URL
@@ -183,7 +183,7 @@ final class DefaultWeeklyQuotaWarmupService: WeeklyQuotaWarmupService, @unchecke
                 )
                 return
             } catch {
-                failures.append("\(endpointString) -> \(error.localizedDescription)")
+                failures.append("\(endpointString) -> \(Self.failureDescription(error))")
             }
         }
 
@@ -222,12 +222,11 @@ final class DefaultWeeklyQuotaWarmupService: WeeklyQuotaWarmupService, @unchecke
             "store": false,
             "instructions": "Reply with OK.",
             "tools": [] as [Any],
-            "tool_choice": "auto",
+            "tool_choice": "none",
             "parallel_tool_calls": false,
             "include": [] as [Any],
             "reasoning": [
-                "effort": "low",
-                "summary": "auto"
+                "effort": "low"
             ],
             "input": [[
                 "type": "message",
@@ -239,6 +238,27 @@ final class DefaultWeeklyQuotaWarmupService: WeeklyQuotaWarmupService, @unchecke
             ]]
         ]
         return try JSONSerialization.data(withJSONObject: body, options: [])
+    }
+
+    private static func failureDescription(_ error: Error) -> String {
+        guard let upstreamError = error as? CodexUpstreamError else {
+            return error.localizedDescription
+        }
+
+        let body: Data
+        switch upstreamError {
+        case .httpError(_, let data), .eventError(_, _, let data):
+            body = data
+        case .networkError, .invalidResponse:
+            return upstreamError.localizedDescription
+        }
+
+        let bodyText = String(data: body.prefix(512), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let bodyText, !bodyText.isEmpty else {
+            return upstreamError.localizedDescription
+        }
+        return "\(upstreamError.localizedDescription): \(bodyText)"
     }
 
     private static func drainWarmupResponse(_ result: CodexUpstreamResult) async throws {
