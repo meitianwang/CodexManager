@@ -54,6 +54,121 @@ jobs:
           cache: pnpm
           cache-dependency-path: apps/windows/pnpm-lock.yaml
 
+      - name: Self-test Windows verification collector
+        shell: pwsh
+        run: |
+          $MockProxyPath = Join-Path $env:RUNNER_TEMP "codexmanager-mock-proxy.js"
+          $PortPath = Join-Path $env:RUNNER_TEMP "codexmanager-mock-proxy-port.txt"
+          Remove-Item -LiteralPath $PortPath -Force -ErrorAction SilentlyContinue
+          @'
+          const http = require("node:http");
+          const apiKey = "sk-local-ci";
+          const server = http.createServer((request, response) => {
+            request.resume();
+            request.on("end", () => {
+              if (request.url === "/health") {
+                response.writeHead(200, { "content-type": "application/json" });
+                response.end(JSON.stringify({ ok: true }));
+                return;
+              }
+              const authorized = request.headers.authorization === `Bearer ${apiKey}` || request.headers["x-api-key"] === apiKey;
+              if (!authorized) {
+                response.writeHead(401, { "content-type": "application/json" });
+                response.end(JSON.stringify({ error: "unauthorized" }));
+                return;
+              }
+              response.writeHead(200, { "content-type": "application/json" });
+              response.end(JSON.stringify({ ok: true, path: request.url }));
+            });
+          });
+          server.listen(0, "127.0.0.1", () => {
+            console.log(server.address().port);
+          });
+          '@ | Set-Content -LiteralPath $MockProxyPath -Encoding UTF8
+
+          $MockProxy = Start-Process -FilePath "node" -ArgumentList $MockProxyPath -RedirectStandardOutput $PortPath -PassThru
+          try {
+            $Deadline = (Get-Date).AddSeconds(15)
+            do {
+              Start-Sleep -Milliseconds 200
+              $Port = if (Test-Path $PortPath) { (Get-Content -Raw $PortPath).Trim() } else { "" }
+            } while ([string]::IsNullOrWhiteSpace($Port) -and (Get-Date) -lt $Deadline -and -not $MockProxy.HasExited)
+
+            if ([string]::IsNullOrWhiteSpace($Port)) {
+              throw "Mock proxy did not report a port."
+            }
+
+            $FixtureRoot = Join-Path $env:RUNNER_TEMP "codexmanager-verification-fixture"
+            $env:APPDATA = Join-Path $FixtureRoot "AppDataRoaming"
+            $env:USERPROFILE = Join-Path $FixtureRoot "UserProfile"
+            New-Item -ItemType Directory -Force -Path (Join-Path $env:APPDATA "CodexManager"), (Join-Path $env:USERPROFILE ".codex") | Out-Null
+
+            @{
+              version = 1
+              accounts = @(@{
+                id = "stored-ci"
+                label = "CI account"
+                accountId = "acct-ci"
+                addedAt = 0
+                updatedAt = 0
+              })
+              currentSelection = @{
+                accountId = "acct-ci"
+                selectedAt = 0
+                sourceDeviceID = "ci"
+                accountKey = "acct-ci"
+              }
+            } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $env:APPDATA "CodexManager\accounts.json") -Encoding UTF8
+
+            @{
+              launchAtStartup = $true
+              launchCodexAfterSwitch = $true
+              autoSmartSwitch = $true
+              restartEditorsOnSwitch = $true
+              restartEditorTargets = @("cursor")
+              locale = "en"
+              proxyPort = [int] $Port
+              proxyApiKey = "sk-local-ci"
+              autoStartProxy = $true
+            } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $env:APPDATA "CodexManager\settings.json") -Encoding UTF8
+
+            @{
+              auth_mode = "chatgpt"
+              last_refresh = "1970-01-01T00:00:00.000Z"
+              tokens = @{
+                access_token = "ci-access-token"
+                account_id = "acct-ci"
+                principal_id = "ci@example.com"
+                refresh_token = "ci-refresh-token"
+              }
+            } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $env:USERPROFILE ".codex\auth.json") -Encoding UTF8
+
+            $ReportPath = Join-Path $env:RUNNER_TEMP "codexmanager-verification-report.json"
+            .\scripts\collect_windows_verification.ps1 `
+              -OutputPath $ReportPath `
+              -ArtifactRunUrl "https://github.com/meitianwang/CodexManager/actions/runs/0" `
+              -ArtifactDigest "sha256:0000000000000000000000000000000000000000000000000000000000000000" `
+              -ExpectedCurrentAccountId "acct-ci" `
+              -ProxyPort ([int] $Port) `
+              -ProxyApiKey "sk-local-ci" `
+              -ProbeProxyRoutes `
+              -OAuthVerified `
+              -SwitchVerified `
+              -CodexLaunchVerified `
+              -StartupVerified `
+              -EditorRestartVerified `
+              -RequireComplete
+
+            $Report = Get-Content -Raw $ReportPath | ConvertFrom-Json
+            if ($Report.checks."paths.codexAuthJson".detail.summary.accountId -ne "acct-ci") {
+              throw "Verification report did not include the expected current account summary."
+            }
+          } finally {
+            if (-not $MockProxy.HasExited) {
+              Stop-Process -Id $MockProxy.Id -Force
+            }
+          }
+
       - name: Install Windows app dependencies
         working-directory: apps/windows
         run: pnpm install --frozen-lockfile
