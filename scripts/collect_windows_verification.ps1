@@ -313,6 +313,123 @@ function Get-EvidencePathStatus {
   return $status
 }
 
+function Get-PngDimensions {
+  param(
+    [string] $Path
+  )
+
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    if ($stream.Length -lt 24) {
+      return $null
+    }
+
+    $bytes = [byte[]]::new(24)
+    $read = $stream.Read($bytes, 0, 24)
+    $isPng = (
+      $read -eq 24 -and
+      $bytes[0] -eq 0x89 -and
+      $bytes[1] -eq 0x50 -and
+      $bytes[2] -eq 0x4E -and
+      $bytes[3] -eq 0x47 -and
+      $bytes[4] -eq 0x0D -and
+      $bytes[5] -eq 0x0A -and
+      $bytes[6] -eq 0x1A -and
+      $bytes[7] -eq 0x0A
+    )
+    if (-not $isPng) {
+      return $null
+    }
+
+    $width = ([int] $bytes[16] -shl 24) -bor ([int] $bytes[17] -shl 16) -bor ([int] $bytes[18] -shl 8) -bor [int] $bytes[19]
+    $height = ([int] $bytes[20] -shl 24) -bor ([int] $bytes[21] -shl 16) -bor ([int] $bytes[22] -shl 8) -bor [int] $bytes[23]
+    return [ordered]@{
+      width = $width
+      height = $height
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
+function Get-UIParityEvidenceStatus {
+  param(
+    [string] $Path
+  )
+
+  $status = Get-EvidencePathStatus $Path
+  $status["requiredPages"] = [ordered]@{}
+  $status["requiredPagesPassed"] = $false
+
+  if (-not $status.exists) {
+    return $status
+  }
+
+  try {
+    $files = @()
+    if ($status.kind -eq "file") {
+      $files = @(Get-Item -LiteralPath $Path)
+    } elseif ($status.kind -eq "directory") {
+      $files = @(Get-ChildItem -LiteralPath $Path -File -Recurse -ErrorAction Stop | Select-Object -First 100)
+    }
+
+    $requiredPages = @("accounts", "proxy", "settings")
+    foreach ($page in $requiredPages) {
+      $matches = @($files | Where-Object { $_.BaseName -match "(?i)$page" })
+      if ($matches.Count -eq 0) {
+        $status["requiredPages"][$page] = [ordered]@{
+          passed = $false
+          error = "No evidence file name contained '$page'."
+        }
+        continue
+      }
+
+      $candidateStatuses = @()
+      foreach ($item in $matches) {
+        $pngDimensions = $null
+        $pagePassed = $item.Length -gt 0
+        if ($item.Extension -ieq ".png") {
+          $pngDimensions = Get-PngDimensions $item.FullName
+          $pagePassed = (
+            $item.Length -ge 10000 -and
+            $null -ne $pngDimensions -and
+            $pngDimensions["width"] -ge 900 -and
+            $pngDimensions["height"] -ge 450
+          )
+        }
+
+        $candidateStatuses += [ordered]@{
+          passed = $pagePassed
+          path = $item.FullName
+          sizeBytes = $item.Length
+          extension = $item.Extension
+          pngDimensions = $pngDimensions
+        }
+      }
+
+      $passedCandidates = @($candidateStatuses | Where-Object { $_.passed })
+      $selectedCandidate = $candidateStatuses[0]
+      if ($passedCandidates.Count -gt 0) {
+        $selectedCandidate = $passedCandidates[0]
+      }
+      $status["requiredPages"][$page] = [ordered]@{
+        passed = $selectedCandidate.passed
+        path = $selectedCandidate.path
+        sizeBytes = $selectedCandidate.sizeBytes
+        extension = $selectedCandidate.extension
+        pngDimensions = $selectedCandidate.pngDimensions
+        candidateCount = $candidateStatuses.Count
+      }
+    }
+
+    $status["requiredPagesPassed"] = -not (@($status["requiredPages"].GetEnumerator() | Where-Object { -not $_.Value.passed }).Count -gt 0)
+  } catch {
+    $status.error = $_.Exception.Message
+  }
+
+  return $status
+}
+
 function New-HttpClient {
   $client = [System.Net.Http.HttpClient]::new()
   $client.Timeout = [TimeSpan]::FromSeconds(90)
@@ -438,9 +555,9 @@ Add-Check "artifact.digest" ($ArtifactDigest -match "^sha256:[0-9a-fA-F]{64}$") 
 Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) "Manual verification must run on Windows."
 
 Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
-$uiEvidenceStatus = Get-EvidencePathStatus $UIParityEvidencePath
-Add-Check "manual.uiParity" ($UIParityVerified.IsPresent -and $uiEvidenceStatus.exists -and $uiEvidenceStatus.fileCount -gt 0) ([ordered]@{
-  instruction = "Pass -UIParityVerified only after comparing Accounts, Proxy, and Settings UI with the macOS app and storing screenshots or notes at -UIParityEvidencePath."
+$uiEvidenceStatus = Get-UIParityEvidenceStatus $UIParityEvidencePath
+Add-Check "manual.uiParity" ($UIParityVerified.IsPresent -and $uiEvidenceStatus.exists -and $uiEvidenceStatus["requiredPagesPassed"]) ([ordered]@{
+  instruction = "Pass -UIParityVerified only after comparing Accounts, Proxy, and Settings UI with the macOS app and storing page-specific screenshots or notes at -UIParityEvidencePath."
   evidence = $uiEvidenceStatus
 })
 Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."

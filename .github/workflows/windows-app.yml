@@ -146,7 +146,9 @@ jobs:
 
             $UIEvidenceRoot = Join-Path $env:RUNNER_TEMP "codexmanager-ui-parity-evidence"
             New-Item -ItemType Directory -Force -Path $UIEvidenceRoot | Out-Null
-            "CI verification collector self-test evidence placeholder." | Set-Content -LiteralPath (Join-Path $UIEvidenceRoot "ui-parity-notes.txt") -Encoding UTF8
+            foreach ($Page in @("accounts", "proxy", "settings")) {
+              "CI verification collector self-test $Page UI parity evidence placeholder." | Set-Content -LiteralPath (Join-Path $UIEvidenceRoot "$Page-notes.txt") -Encoding UTF8
+            }
 
             $ReportPath = Join-Path $env:RUNNER_TEMP "codexmanager-verification-report.json"
             .\scripts\collect_windows_verification.ps1 `
