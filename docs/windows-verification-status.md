@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26719934883
-- Commit: `53100b3cb8cfabfdbc345a0923053f42debbbc4b`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26720156855
+- Commit: `aafd32949118d276efe6aae6e0ee6a4c2b235dde`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:11b0517dc5b38180960b063ae32407323521c63370828310a648c33817de5658`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:ba1de27c4b54a9f08461d20eb424182876389f776757ecf4f3c764b2d37ce284`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:1989f7e329fb56d2a764a280454d821eea2a4b4fa5f0de25cbaf42223ac3ee57`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:6e65506def6f39dc2b9ca74ec808320f5bf8ab055f533e84f28fffb7904226c1`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:f5fe19c4ca4d1a25a615b533151153a1a71fac75464623263151955f3a5e249f`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:233205eba96366e4e055867e5143c5d12acf4999a14928aa84f3c7cc00174a24`.
 - Packaged smoke result: passed.
 - Packaged UI screenshots: Accounts, Proxy, and Settings screenshots were recorded at `944x471` with non-trivial file sizes.
 - Packaged Proxy route smoke: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages` all returned `200` through smoke-safe upstream routing.
