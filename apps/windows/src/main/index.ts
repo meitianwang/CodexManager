@@ -56,10 +56,11 @@ function appIconPath(): string {
 
 function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow {
   mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 760,
-    minWidth: 960,
-    minHeight: 640,
+    width: 960,
+    height: 536,
+    minWidth: 900,
+    minHeight: 520,
+    maxWidth: 1080,
     backgroundColor: "#fafafc",
     icon: appIconPath(),
     show: false,

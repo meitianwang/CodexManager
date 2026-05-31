@@ -28,6 +28,8 @@ describe("Windows renderer app", () => {
     expect(rendererStyles()).toContain("margin-bottom: 14px;");
     expect(rendererStyles()).toContain("font-size: 20px;");
     expect(rendererStyles()).toContain("background: #fafafc;");
+    expect(rendererStyles()).toContain("min-width: 900px;");
+    expect(rendererStyles()).toContain("min-height: 520px;");
     expect(rendererStyles()).toContain("background: #f7f5fc;");
     expect(rendererStyles()).toContain("background: #5933d6;");
     expect(rendererStyles()).toContain("color: #121217;");
@@ -214,10 +216,18 @@ describe("Windows renderer app", () => {
 
     expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
     expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
+    expect(container.querySelector(".account-list")?.classList.contains("grid")).toBe(true);
     expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
+    expect(rendererStyles()).toContain("grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));");
+    expect(rendererStyles()).toContain("max-width: 280px;");
+    expect(rendererStyles()).toContain(".account-list.list");
+    expect(rendererStyles()).toContain("grid-template-columns: 58px 58px minmax(0, 1fr);");
+    expect(rendererStyles()).toContain("min-height: 178px;");
+    expect(rendererStyles()).not.toContain(".account-row:not(.grid) .account-actions");
 
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
     expect(container.querySelector(".account-row")?.classList.contains("list")).toBe(true);
+    expect(container.querySelector(".account-list")?.classList.contains("list")).toBe(true);
     expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
