@@ -871,11 +871,11 @@ async function verifySmokeProxyRoutes(
     "x-api-key": apiKey
   };
   const statuses = {
-    modelsStatus: await smokeProxyStatus(proxyURL, "/v1/models", {
+    modelsStatus: await smokeProxyStatus("modelsStatus", proxyURL, "/v1/models", {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` }
     }),
-    chatCompletionsStatus: await smokeProxyStatus(proxyURL, "/v1/chat/completions", {
+    chatCompletionsStatus: await smokeProxyStatus("chatCompletionsStatus", proxyURL, "/v1/chat/completions", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({
@@ -884,12 +884,12 @@ async function verifySmokeProxyRoutes(
         stream: false
       })
     }),
-    responsesStatus: await smokeProxyStatus(proxyURL, "/v1/responses", {
+    responsesStatus: await smokeProxyStatus("responsesStatus", proxyURL, "/v1/responses", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({ model: "gpt-5-codex", input: "Reply with exactly: ok", stream: false })
     }),
-    responsesCompactStatus: await smokeProxyStatus(proxyURL, "/v1/responses/compact", {
+    responsesCompactStatus: await smokeProxyStatus("responsesCompactStatus", proxyURL, "/v1/responses/compact", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({
@@ -900,23 +900,24 @@ async function verifySmokeProxyRoutes(
         parallel_tool_calls: true
       })
     }),
-    memoriesTraceSummarizeStatus: await smokeProxyStatus(proxyURL, "/v1/memories/trace_summarize", {
+    memoriesTraceSummarizeStatus: await smokeProxyStatus("memoriesTraceSummarizeStatus", proxyURL, "/v1/memories/trace_summarize", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({ model: "gpt-5-codex", traces: [], reasoning: { effort: "low" } })
     }),
-    alphaSearchStatus: await smokeProxyStatus(proxyURL, "/v1/alpha/search", {
+    alphaSearchStatus: await smokeProxyStatus("alphaSearchStatus", proxyURL, "/v1/alpha/search", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({ query: "codex", commands: [] })
     }),
-    messagesStatus: await smokeProxyStatus(proxyURL, "/v1/messages", {
+    messagesStatus: await smokeProxyStatus("messagesStatus", proxyURL, "/v1/messages", {
       method: "POST",
       headers: anthropicHeaders,
       body: JSON.stringify({
         model: "gpt-5-codex",
         max_tokens: 16,
-        messages: [{ role: "user", content: "Reply with exactly: ok" }]
+        messages: [{ role: "user", content: "Reply with exactly: ok" }],
+        stream: false
       })
     })
   };
@@ -945,10 +946,18 @@ async function verifySmokeProxyRoutes(
   };
 }
 
-async function smokeProxyStatus(proxyURL: string, pathName: string, init: RequestInit): Promise<number> {
-  const response = await fetch(`${proxyURL}${pathName}`, init);
-  await response.arrayBuffer();
-  return response.status;
+async function smokeProxyStatus(routeName: string, proxyURL: string, pathName: string, init: RequestInit): Promise<number> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`${proxyURL}${pathName}`, { ...init, signal: controller.signal });
+    await response.arrayBuffer();
+    return response.status;
+  } catch (error) {
+    throw new Error(`Smoke proxy route ${routeName} failed: ${errorMessage(error)}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function verifySmokeAccountWorkflows(
