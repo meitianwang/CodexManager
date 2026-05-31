@@ -31,6 +31,12 @@ interface Notice {
   tone: NoticeTone;
 }
 
+const noticeDismissDelayMs: Record<NoticeTone, number> = {
+  error: 5_000,
+  info: 3_000,
+  success: 3_000
+};
+
 function ToolbarActionContent({ iconClassName, label }: { iconClassName: string; label: string }): ReactElement {
   return (
     <>
@@ -105,6 +111,16 @@ function App(): ReactElement {
       setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
     });
   }, [loadData]);
+
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => {
+      setNotice((current) => (current === notice ? undefined : current));
+    }, noticeDismissDelayMs[notice.tone]);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   const reloadAccounts = useCallback(async () => {
     if (!api) {
@@ -497,7 +513,11 @@ function App(): ReactElement {
       </section>
       {notice && (
         <div className="notice-host">
-          <div className={`notice ${notice.tone}`}>{notice.text}</div>
+          <div className={`notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
+            <span className={`notice-icon ${notice.tone}`} aria-hidden="true" />
+            <span className="notice-text">{notice.text}</span>
+            <span className="notice-close-icon" aria-hidden="true" />
+          </div>
         </div>
       )}
       {transferDialog && (

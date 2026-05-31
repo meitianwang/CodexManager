@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appInfo as fallbackAppInfo } from "../src/shared/app-info";
 import type { AccountTransferSelectableItem } from "../src/shared/models/account-transfer";
@@ -12,6 +12,7 @@ import App from "../src/renderer/src/App";
 
 describe("Windows renderer app", () => {
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
     window.codexManager = undefined;
     vi.restoreAllMocks();
@@ -347,7 +348,7 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(api.proxy.stop).toHaveBeenCalledOnce());
-    expect(await screen.findByText("Proxy stopped", { selector: ".notice" })).toBeTruthy();
+    expect(await screen.findByText("Proxy stopped", { selector: ".notice-text" })).toBeTruthy();
     expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
 
@@ -425,6 +426,38 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "添加账号" }));
 
     expect(await screen.findByText("IPC 桥不可用")).toBeTruthy();
+  });
+
+  it("auto-dismisses notices with mac-compatible timing and banner chrome", async () => {
+    const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    render(<App />);
+
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
+    await flushRendererUpdates();
+
+    expect(screen.getByRole("status").textContent).toContain("Account imported: Current auth");
+    expect(document.querySelector(".notice .notice-icon.success")).toBeTruthy();
+    expect(document.querySelector(".notice .notice-close-icon")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(2_999));
+    expect(screen.getByText("Account imported: Current auth")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText("Account imported: Current auth")).toBeNull();
+
+    api.accounts.addViaLogin = vi.fn(async () => {
+      throw new Error("Login failed");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    await flushRendererUpdates();
+
+    expect(screen.getByRole("alert").textContent).toContain("Login failed");
+    expect(document.querySelector(".notice .notice-icon.error")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(4_999));
+    expect(screen.getByText("Login failed")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByText("Login failed")).toBeNull();
   });
 });
 
@@ -580,6 +613,14 @@ function codeBlockCopyButtons(): HTMLButtonElement[] {
 
 function rendererStyles(): string {
   return readFileSync("src/renderer/src/styles/app.css", "utf8");
+}
+
+async function flushRendererUpdates(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {

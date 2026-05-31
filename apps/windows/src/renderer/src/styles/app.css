@@ -299,28 +299,137 @@ select:focus {
 }
 
 .notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   max-width: min(560px, 100%);
-  padding: 9px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.11);
+  padding: 10px 13px;
+  border: 1px solid transparent;
   border-radius: 8px;
   color: #121217;
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.35;
 }
 
+.notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notice-icon,
+.notice-close-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+}
+
+.notice-icon {
+  width: 16px;
+  height: 16px;
+  color: #5933d6;
+}
+
+.notice-icon::before,
+.notice-icon::after,
+.notice-close-icon::before,
+.notice-close-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.notice-icon.success {
+  border-radius: 999px;
+  background: #1a9c47;
+}
+
+.notice-icon.success::before {
+  top: 4px;
+  left: 5px;
+  width: 4px;
+  height: 7px;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  transform: rotate(45deg);
+}
+
+.notice-icon.info {
+  border-radius: 999px;
+  background: #5933d6;
+}
+
+.notice-icon.info::before {
+  inset: 3px 7px 3px 7px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.notice-icon.info::after {
+  top: 3px;
+  left: 7px;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.notice-icon.error {
+  color: #e82b2e;
+}
+
+.notice-icon.error::before {
+  inset: 1px 0;
+  background: currentColor;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.notice-icon.error::after {
+  top: 6px;
+  left: 7px;
+  width: 2px;
+  height: 5px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 6px 0 #ffffff;
+}
+
+.notice-close-icon {
+  width: 11px;
+  height: 11px;
+  color: #575963;
+}
+
+.notice-close-icon::before,
+.notice-close-icon::after {
+  top: 5px;
+  left: 0;
+  width: 11px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.notice-close-icon::before {
+  transform: rotate(45deg);
+}
+
+.notice-close-icon::after {
+  transform: rotate(-45deg);
+}
+
 .notice.success {
-  border-color: rgba(26, 156, 71, 0.38);
-  background: rgba(26, 156, 71, 0.12);
+  border-color: rgba(26, 156, 71, 0.20);
+  background: #e8faed;
 }
 
 .notice.error {
-  border-color: rgba(232, 43, 46, 0.42);
-  background: rgba(232, 43, 46, 0.13);
+  border-color: rgba(232, 43, 46, 0.20);
+  background: #ffebeb;
 }
 
 .notice.info {
-  border-color: rgba(46, 107, 214, 0.36);
-  background: rgba(46, 107, 214, 0.12);
+  border-color: rgba(89, 51, 214, 0.20);
+  background: #ebf5ff;
 }
 
 .proxy-section,
