@@ -36,7 +36,12 @@ describe("Windows renderer app", () => {
     expect(container.querySelector(".brand-block .brand-mark")?.textContent).toBe("</>");
     expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
     expect(container.querySelector(".brand-block p")).toBeNull();
-    expect(container.querySelector(".workspace-header .eyebrow")).toBeNull();
+    expect(container.querySelector(".workspace-header")).toBeNull();
+    expect(container.querySelector(".accounts-action-bar")).toBeTruthy();
+    expect(container.querySelector(".content-region")).toBeNull();
+    expect(container.querySelector(".inspector")).toBeNull();
+    expect(rendererStyles()).not.toContain(".page-grid");
+    expect(rendererStyles()).not.toContain(".inspector");
     expect(screen.queryByText("CodexManager for Windows")).toBeNull();
     expect(container.querySelectorAll(".nav-list .nav-icon")).toHaveLength(3);
     expect(container.querySelector(".nav-list .accounts-nav-icon")).toBeTruthy();

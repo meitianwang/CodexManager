@@ -223,14 +223,7 @@ function App(): ReactElement {
         </div>
       </aside>
 
-      <section className="workspace" aria-labelledby="page-title">
-        <header className="workspace-header">
-          <div>
-            <h2 id="page-title">{currentPageLabel}</h2>
-          </div>
-          {notice && <div className={`notice ${notice.tone}`}>{notice.text}</div>}
-        </header>
-
+      <section className="workspace" aria-label={currentPageLabel}>
         {activePage === "accounts" && (
           <AccountsPage
             accounts={accounts}
@@ -502,6 +495,11 @@ function App(): ReactElement {
           />
         )}
       </section>
+      {notice && (
+        <div className="notice-host">
+          <div className={`notice ${notice.tone}`}>{notice.text}</div>
+        </div>
+      )}
       {transferDialog && (
         <AccountTransferSelectionDialog
           key={accountTransferDialogKey(transferDialog)}
@@ -562,10 +560,10 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
   }, [accountIds]);
 
   return (
-    <div className="page-grid accounts-grid">
-      <section className="content-region">
-        <div className="accounts-view-header">
-          <h3>{props.t("tab.accounts")}</h3>
+    <div className="accounts-layout">
+      <div className="accounts-action-bar">
+        <div className="accounts-action-title-row">
+          <h2 className="page-title">{props.t("tab.accounts")}</h2>
           <div className="accounts-view-controls">
             <div className="segmented-control" role="group" aria-label={props.t("accounts.action.view_mode")}>
               <button
@@ -644,37 +642,32 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             <span className="toolbar-action-icon refresh-icon" aria-hidden="true" />
           </button>
         </div>
+      </div>
 
-        {props.accounts.length === 0 ? (
-          <div className="empty-state">
-            <span>{props.t("accounts.empty.title")}</span>
-            <h3>{props.t("accounts.empty.message")}</h3>
-          </div>
-        ) : (
-          <div className={viewMode === "grid" ? "account-list grid" : "account-list list"}>
-            {props.accounts.map((account) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                isCollapsed={collapsedAccountIds.has(account.id)}
-                viewMode={viewMode}
-                onDelete={() => props.onDeleteAccount(account.id)}
-                onRefresh={() => props.onRefreshUsage(account.id)}
-                onSwitch={() => props.onSwitchAccount(account.id)}
-                onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
-                locale={props.locale}
-                t={props.t}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <aside className="inspector">
-        <h3>{props.t("accounts.status.title")}</h3>
-        <MetricRow label={props.t("accounts.status.accounts")} value={String(props.accounts.length)} />
-        <MetricRow label={props.t("accounts.status.current")} value={props.accounts.find((account) => account.isCurrent)?.label ?? props.t("common.none")} />
-      </aside>
+      {props.accounts.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-state-icon tray-icon" aria-hidden="true" />
+          <h3>{props.t("accounts.empty.title")}</h3>
+          <p>{props.t("accounts.empty.message")}</p>
+        </div>
+      ) : (
+        <div className={viewMode === "grid" ? "account-list grid" : "account-list list"}>
+          {props.accounts.map((account) => (
+            <AccountRow
+              key={account.id}
+              account={account}
+              isCollapsed={collapsedAccountIds.has(account.id)}
+              viewMode={viewMode}
+              onDelete={() => props.onDeleteAccount(account.id)}
+              onRefresh={() => props.onRefreshUsage(account.id)}
+              onSwitch={() => props.onSwitchAccount(account.id)}
+              onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
+              locale={props.locale}
+              t={props.t}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1066,6 +1059,8 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
 
   return (
     <div className="proxy-layout">
+      <h2 className="page-title">{props.t("tab.proxy")}</h2>
+
       <section className="proxy-section">
         <h3>{props.t("proxy.section.control")}</h3>
         <div className="proxy-control">
@@ -1208,6 +1203,8 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
 
   return (
     <div className="settings-layout">
+      <h2 className="page-title">{t("tab.settings")}</h2>
+
       <section className="settings-section">
         <h3>{t("settings.section.general")}</h3>
         <ToggleRow
@@ -1294,15 +1291,6 @@ function ToggleRow({ checked, label, onChange }: { checked: boolean; label: stri
       <span>{label}</span>
       <input checked={checked} type="checkbox" onChange={(event) => onChange(event.target.checked)} />
     </label>
-  );
-}
-
-function MetricRow({ label, value }: { label: string; value: string }): ReactElement {
-  return (
-    <div className="metric-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }
 
