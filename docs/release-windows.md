@@ -115,7 +115,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
 - Smart switch chooses the account with the most available quota.
 - Usage refresh updates 5-hour and weekly windows or shows a user-visible error.
 - Proxy page can start and stop the local proxy on the configured port.
-- `GET http://127.0.0.1:<port>/health` returns `{ "ok": true }`.
+- `GET http://127.0.0.1:<port>/health` returns `{ "status": "ok" }`.
 - Proxy routes reject missing or wrong API keys.
 - OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages requests route through the selected account.
 - Settings persist after app restart.

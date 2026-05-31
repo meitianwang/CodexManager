@@ -140,7 +140,7 @@ export class ProxyCoordinator {
 
     const url = new URL(request.url ?? "/", "http://localhost");
     if (request.method === "GET" && url.pathname === "/health") {
-      sendJson(response, 200, { ok: true });
+      sendJson(response, 200, { status: "ok" });
       return;
     }
 

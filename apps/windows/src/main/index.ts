@@ -530,8 +530,8 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
   try {
     const healthResponse = await fetch(`${proxyState.proxyURL}/health`);
-    const healthBody = await healthResponse.json() as { ok?: unknown };
-    if (!healthResponse.ok || healthBody.ok !== true) {
+    const healthBody = await healthResponse.json() as { status?: unknown };
+    if (!healthResponse.ok || healthBody.status !== "ok") {
       throw new Error(`Smoke proxy health failed with ${healthResponse.status}: ${JSON.stringify(healthBody)}`);
     }
 

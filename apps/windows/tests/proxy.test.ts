@@ -27,7 +27,7 @@ describe("local proxy", () => {
     const response = await fetch(`http://127.0.0.1:${context.port}/health`);
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true });
+    await expect(response.json()).resolves.toEqual({ status: "ok" });
   });
 
   it("rejects non-health requests without the configured API key", async () => {

@@ -606,7 +606,7 @@ if ($ProxyPort -le 0) {
   try {
     $baseUrl = "http://127.0.0.1:$ProxyPort"
     $health = Invoke-BoundedHttpRequest -Client $client -Method "GET" -Url "$baseUrl/health"
-    Add-Check "proxy.health" ($health.statusCode -eq 200 -and $health.bodyPreview -match '"ok"\s*:\s*true') $health
+    Add-Check "proxy.health" ($health.statusCode -eq 200 -and $health.bodyPreview -match '"status"\s*:\s*"ok"') $health
 
     $unauthorized = Invoke-BoundedHttpRequest `
       -Client $client `

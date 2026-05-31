@@ -68,7 +68,7 @@ jobs:
             request.on("end", () => {
               if (request.url === "/health") {
                 response.writeHead(200, { "content-type": "application/json" });
-                response.end(JSON.stringify({ ok: true }));
+                response.end(JSON.stringify({ status: "ok" }));
                 return;
               }
               const authorized = request.headers.authorization === `Bearer ${apiKey}` || request.headers["x-api-key"] === apiKey;

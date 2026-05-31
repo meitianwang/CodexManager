@@ -40,7 +40,7 @@ describe("Windows app context", () => {
 
       const response = await fetch(`${state.proxyURL}/health`);
       expect(response.ok).toBe(true);
-      await expect(response.json()).resolves.toEqual({ ok: true });
+      await expect(response.json()).resolves.toEqual({ status: "ok" });
     } finally {
       await context?.proxyRuntimeService.stop();
       restoreOptionalEnvironmentValue("CODEX_MANAGER_ELECTRON_SMOKE_ROOT", previousSmokeRoot);
