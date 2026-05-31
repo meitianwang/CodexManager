@@ -181,6 +181,12 @@ jobs:
             if ($Report.checks."paths.codexAuthJson".detail.summary.accountId -ne "acct-ci") {
               throw "Verification report did not include the expected current account summary."
             }
+            $RouteChecks = $Report.checks."proxy.routes".detail
+            foreach ($Route in @("models", "chatCompletions", "responses", "responsesCompact", "memoriesTraceSummarize", "alphaSearch", "messages")) {
+              if ($null -eq $RouteChecks.$Route -or $RouteChecks.$Route.statusCode -ne 200) {
+                throw "Verification report did not include a successful proxy route probe for $Route."
+              }
+            }
           } finally {
             if (-not $MockProxy.HasExited) {
               Stop-Process -Id $MockProxy.Id -Force

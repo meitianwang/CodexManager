@@ -104,7 +104,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -RequireComplete
 ```
 
-`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. `-UIParityEvidencePath` must point to a file or directory containing screenshots or notes from comparing the Windows app with the macOS app. The evidence must include separate file names containing `accounts`, `proxy`, and `settings`; PNG evidence is checked for non-trivial dimensions and byte size. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
+`-ProbeProxyRoutes` sends small real requests through the selected account for every supported proxy route: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. `-UIParityEvidencePath` must point to a file or directory containing screenshots or notes from comparing the Windows app with the macOS app. The evidence must include separate file names containing `accounts`, `proxy`, and `settings`; PNG evidence is checked for non-trivial dimensions and byte size. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
 
 - App launches and opens the Accounts page.
 - Accounts, Proxy, and Settings pages visually match the macOS app layout, labels, controls, density, and empty/error states; save screenshots or notes under `-UIParityEvidencePath` with `accounts`, `proxy`, and `settings` in the evidence file names.
@@ -117,7 +117,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
 - Proxy page can start and stop the local proxy on the configured port.
 - `GET http://127.0.0.1:<port>/health` returns `{ "status": "ok" }`.
 - Proxy routes reject missing or wrong API keys.
-- OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages requests route through the selected account.
+- Models, OpenAI Chat Completions, OpenAI Responses, Codex compact, memory trace summarize, alpha search, and Anthropic Messages requests route through the selected account.
 - Settings persist after app restart.
 - Launch-at-startup toggles Windows login item registration.
 - Editor restart detects supported installed editors and relaunches selected targets after account switching.

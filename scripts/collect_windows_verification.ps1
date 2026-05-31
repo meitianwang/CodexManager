@@ -529,6 +529,11 @@ function Test-ProxyRoutes {
   }
 
   return [ordered]@{
+    models = Invoke-BoundedHttpRequest `
+      -Client $Client `
+      -Method "GET" `
+      -Url "$BaseUrl/v1/models" `
+      -Headers @{ "Authorization" = "Bearer $ApiKey" }
     chatCompletions = Invoke-BoundedHttpRequest `
       -Client $Client `
       -Method "POST" `
@@ -541,6 +546,24 @@ function Test-ProxyRoutes {
       -Url "$BaseUrl/v1/responses" `
       -Headers $headers `
       -Body '{"model":"gpt-5","input":"Reply with exactly: ok"}'
+    responsesCompact = Invoke-BoundedHttpRequest `
+      -Client $Client `
+      -Method "POST" `
+      -Url "$BaseUrl/v1/responses/compact" `
+      -Headers $headers `
+      -Body '{"model":"gpt-5-codex","stream":false,"input":[{"role":"user","content":"compact this"}],"tools":[],"parallel_tool_calls":true}'
+    memoriesTraceSummarize = Invoke-BoundedHttpRequest `
+      -Client $Client `
+      -Method "POST" `
+      -Url "$BaseUrl/v1/memories/trace_summarize" `
+      -Headers $headers `
+      -Body '{"model":"gpt-5-codex","traces":[],"reasoning":{"effort":"low"}}'
+    alphaSearch = Invoke-BoundedHttpRequest `
+      -Client $Client `
+      -Method "POST" `
+      -Url "$BaseUrl/v1/alpha/search" `
+      -Headers $headers `
+      -Body '{"query":"codex","commands":[]}'
     messages = Invoke-BoundedHttpRequest `
       -Client $Client `
       -Method "POST" `
@@ -633,14 +656,18 @@ if ($ProxyPort -le 0) {
       } else {
         $routes = Test-ProxyRoutes -Client $client -BaseUrl $baseUrl -ApiKey $ProxyApiKey
         $routesPassed = (
+          $routes.models.statusCode -ge 200 -and $routes.models.statusCode -lt 300 -and
           $routes.chatCompletions.statusCode -ge 200 -and $routes.chatCompletions.statusCode -lt 300 -and
           $routes.responses.statusCode -ge 200 -and $routes.responses.statusCode -lt 300 -and
+          $routes.responsesCompact.statusCode -ge 200 -and $routes.responsesCompact.statusCode -lt 300 -and
+          $routes.memoriesTraceSummarize.statusCode -ge 200 -and $routes.memoriesTraceSummarize.statusCode -lt 300 -and
+          $routes.alphaSearch.statusCode -ge 200 -and $routes.alphaSearch.statusCode -lt 300 -and
           $routes.messages.statusCode -ge 200 -and $routes.messages.statusCode -lt 300
         )
         Add-Check "proxy.routes" $routesPassed $routes
       }
     } else {
-      Add-Check "proxy.routes" $false "Route probes were skipped. Add -ProbeProxyRoutes to verify /v1/chat/completions, /v1/responses, and /v1/messages."
+      Add-Check "proxy.routes" $false "Route probes were skipped. Add -ProbeProxyRoutes to verify /v1/models, /v1/chat/completions, /v1/responses, /v1/responses/compact, /v1/memories/trace_summarize, /v1/alpha/search, and /v1/messages."
     }
   } finally {
     $client.Dispose()
