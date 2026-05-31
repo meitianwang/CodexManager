@@ -75,8 +75,31 @@ describe("local proxy", () => {
     const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
     const context = await makeProxyContext({ upstream });
     const response = await rawAuthorizedFetch(context.port, "/v1/unknown", "{");
+    const body = await response.json() as { error?: { message?: string; type?: string } };
 
     expect(response.status).toBe(404);
+    expect(body.error).toMatchObject({
+      message: expect.stringContaining("Proxy only supports GET /health"),
+      type: "proxy_error"
+    });
+    expect(body.error?.message).toContain("POST /v1/responses");
+    expect(upstream.requests).toEqual([]);
+  });
+
+  it("returns the mac-compatible unsupported-route response for unsupported methods", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
+    const context = await makeProxyContext({ upstream });
+    const response = await fetch(`http://127.0.0.1:${context.port}/v1/responses`, {
+      method: "GET",
+      headers: { "x-api-key": "test-key" }
+    });
+    const body = await response.json() as { error?: { message?: string; type?: string } };
+
+    expect(response.status).toBe(404);
+    expect(body.error).toMatchObject({
+      message: expect.stringContaining("Proxy only supports GET /health"),
+      type: "proxy_error"
+    });
     expect(upstream.requests).toEqual([]);
   });
 

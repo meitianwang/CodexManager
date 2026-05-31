@@ -69,6 +69,8 @@ const supportedPostPaths = new Set([
   "/v1/memories/trace_summarize",
   "/v1/alpha/search"
 ]);
+const unsupportedRouteMessage =
+  "Proxy only supports GET /health, GET /v1/models, POST /v1/chat/completions, POST /v1/responses, POST /v1/responses/compact, POST /v1/memories/trace_summarize, POST /v1/alpha/search";
 const noAccountsAvailableMessage = "No accounts available for proxy. Add and authorize at least one account first.";
 
 interface ProxyAccountSelection {
@@ -164,12 +166,12 @@ export class ProxyCoordinator {
       }
 
       if (request.method !== "POST") {
-        sendJson(response, 405, { error: { message: "Method Not Allowed" } });
+        sendProxyError(response, 404, unsupportedRouteMessage);
         return;
       }
 
       if (!supportedPostPaths.has(url.pathname)) {
-        sendJson(response, 404, { error: { message: "Not Found" } });
+        sendProxyError(response, 404, unsupportedRouteMessage);
         return;
       }
 
