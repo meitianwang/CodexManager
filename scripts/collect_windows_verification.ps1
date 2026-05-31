@@ -7,6 +7,8 @@ param(
 
   [string] $ExpectedCurrentAccountId = "",
 
+  [string] $UIParityEvidencePath = "",
+
   [int] $ProxyPort = 0,
 
   [string] $ProxyApiKey = "",
@@ -14,6 +16,8 @@ param(
   [switch] $ProbeProxyRoutes,
 
   [switch] $AppLaunchVerified,
+
+  [switch] $UIParityVerified,
 
   [switch] $OAuthVerified,
 
@@ -263,6 +267,52 @@ function Get-JsonFileStatus {
   return $status
 }
 
+function Get-EvidencePathStatus {
+  param(
+    [string] $Path
+  )
+
+  $status = [ordered]@{
+    path = $Path
+    exists = $false
+    kind = $null
+    fileCount = 0
+    filesPreview = @()
+    error = $null
+  }
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    $status.error = "Evidence path was not provided."
+    return $status
+  }
+
+  try {
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+      $item = Get-Item -LiteralPath $Path
+      $status.exists = $true
+      $status.kind = "file"
+      $status.fileCount = 1
+      $status.filesPreview = @($item.Name)
+      return $status
+    }
+
+    if (Test-Path -LiteralPath $Path -PathType Container) {
+      $files = @(Get-ChildItem -LiteralPath $Path -File -ErrorAction Stop | Select-Object -First 20)
+      $status.exists = $true
+      $status.kind = "directory"
+      $status.fileCount = $files.Count
+      $status.filesPreview = @($files | ForEach-Object { $_.Name })
+      return $status
+    }
+
+    $status.error = "Evidence path does not exist."
+  } catch {
+    $status.error = $_.Exception.Message
+  }
+
+  return $status
+}
+
 function New-HttpClient {
   $client = [System.Net.Http.HttpClient]::new()
   $client.Timeout = [TimeSpan]::FromSeconds(90)
@@ -388,6 +438,11 @@ Add-Check "artifact.digest" ($ArtifactDigest -match "^sha256:[0-9a-fA-F]{64}$") 
 Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) "Manual verification must run on Windows."
 
 Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
+$uiEvidenceStatus = Get-EvidencePathStatus $UIParityEvidencePath
+Add-Check "manual.uiParity" ($UIParityVerified.IsPresent -and $uiEvidenceStatus.exists -and $uiEvidenceStatus.fileCount -gt 0) ([ordered]@{
+  instruction = "Pass -UIParityVerified only after comparing Accounts, Proxy, and Settings UI with the macOS app and storing screenshots or notes at -UIParityEvidencePath."
+  evidence = $uiEvidenceStatus
+})
 Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."
 Add-Check "manual.importCurrentAuth" $ImportCurrentAuthVerified.IsPresent "Pass -ImportCurrentAuthVerified only after importing the current Codex auth file."
 Add-Check "manual.importAuthFile" $ImportAuthFileVerified.IsPresent "Pass -ImportAuthFileVerified only after importing a selected auth.json file through Import file."

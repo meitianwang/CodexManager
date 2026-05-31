@@ -76,10 +76,12 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -ArtifactRunUrl "https://github.com/meitianwang/CodexManager/actions/runs/<run-id>" `
   -ArtifactDigest "sha256:<artifact-digest>" `
   -ExpectedCurrentAccountId "<account-id-after-switch-or-remove-this-line>" `
+  -UIParityEvidencePath ".\artifacts\windows-ui-parity" `
   -ProxyPort <port-from-proxy-page> `
   -ProxyApiKey "<api-key-from-proxy-page>" `
   -ProbeProxyRoutes `
   -AppLaunchVerified `
+  -UIParityVerified `
   -OAuthVerified `
   -ImportCurrentAuthVerified `
   -ImportAuthFileVerified `
@@ -96,9 +98,10 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -RequireComplete
 ```
 
-`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
+`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. `-UIParityEvidencePath` must point to a file or directory containing screenshots or notes from comparing the Windows app with the macOS app. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
 
 - App launches and opens the Accounts page.
+- Accounts, Proxy, and Settings pages visually match the macOS app layout, labels, controls, density, and empty/error states; save screenshots or notes under `-UIParityEvidencePath`.
 - Accounts page can import the current `%USERPROFILE%\.codex\auth.json`.
 - Accounts page can import a selected standalone `auth.json` through **Import file**.
 - ChatGPT OAuth opens the default browser, completes callback, imports the account, and surfaces errors on failure.

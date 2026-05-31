@@ -318,10 +318,11 @@ The existing macOS `swift test` remains a regression gate when shared files or d
 The Windows goal is complete only when current evidence proves all of the following:
 
 - A Windows app exists in the repository and can be installed or run from a packaged artifact.
+- Accounts, Proxy, and Settings UI parity with the macOS app is verified with screenshots or written comparison notes.
 - The app supports the account, proxy, settings, OAuth, import/export, smart switch, and editor restart workflows listed in this design.
 - macOS-only features are either absent from Windows UI or clearly marked unavailable.
 - Windows app data is persisted under `%APPDATA%\CodexManager`.
 - current Codex auth is written under `%USERPROFILE%\.codex`.
 - Unit and integration tests for the ported behavior pass.
-- A manual Windows verification run confirms OAuth, switching, Codex launch, proxy routes, and persistence.
+- A manual Windows verification run confirms UI parity, OAuth, switching, Codex launch, proxy routes, and persistence.
 - The existing macOS app still passes its Swift test suite.

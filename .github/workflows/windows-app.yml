@@ -144,16 +144,22 @@ jobs:
               }
             } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $env:USERPROFILE ".codex\auth.json") -Encoding UTF8
 
+            $UIEvidenceRoot = Join-Path $env:RUNNER_TEMP "codexmanager-ui-parity-evidence"
+            New-Item -ItemType Directory -Force -Path $UIEvidenceRoot | Out-Null
+            "CI verification collector self-test evidence placeholder." | Set-Content -LiteralPath (Join-Path $UIEvidenceRoot "ui-parity-notes.txt") -Encoding UTF8
+
             $ReportPath = Join-Path $env:RUNNER_TEMP "codexmanager-verification-report.json"
             .\scripts\collect_windows_verification.ps1 `
               -OutputPath $ReportPath `
               -ArtifactRunUrl "https://github.com/meitianwang/CodexManager/actions/runs/0" `
               -ArtifactDigest "sha256:0000000000000000000000000000000000000000000000000000000000000000" `
               -ExpectedCurrentAccountId "acct-ci" `
+              -UIParityEvidencePath $UIEvidenceRoot `
               -ProxyPort ([int] $Port) `
               -ProxyApiKey "sk-local-ci" `
               -ProbeProxyRoutes `
               -AppLaunchVerified `
+              -UIParityVerified `
               -OAuthVerified `
               -ImportCurrentAuthVerified `
               -ImportAuthFileVerified `

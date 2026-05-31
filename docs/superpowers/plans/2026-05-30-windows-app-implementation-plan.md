@@ -288,7 +288,7 @@ Run before claiming goal completion:
 
 - Automated Windows app unit and integration tests.
 - Packaged Windows artifact verification.
-- Manual Windows verification of OAuth, switching, Codex launch, proxy routes, persistence, startup registration, and editor restart.
+- Manual Windows verification of UI parity, OAuth, switching, Codex launch, proxy routes, persistence, startup registration, and editor restart.
 - Existing macOS `swift test`.
 
 ## Completion Boundary
