@@ -62,6 +62,8 @@ interface SmokeUIFingerprint {
     currentBadgeCount: number;
     hasSmokeAccount: boolean;
     hasSmokeEmail: boolean;
+    teamAliasLabels: string[];
+    teamAliasPlaceholders: string[];
     toolbarButtons: string[];
   };
   navItemCount: number;
@@ -592,6 +594,10 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
           currentBadgeCount: Array.from(document.querySelectorAll(".badge")).filter((element) => element.textContent?.trim() === "CURRENT").length,
           hasSmokeAccount: bodyText.includes("Smoke account") || bodyText.includes("Smoke Team") || bodyText.includes("smoke@example.com"),
           hasSmokeEmail: bodyText.includes("smoke@example.com"),
+          teamAliasLabels: labels(".alias-line input"),
+          teamAliasPlaceholders: Array.from(document.querySelectorAll(".alias-line input"))
+            .map((element) => element.getAttribute("placeholder") ?? "")
+            .filter((value) => value.length > 0),
           toolbarButtons: labels(".toolbar button")
         };
       }
@@ -639,6 +645,8 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
       fingerprint.accounts.currentBadgeCount === 1 &&
       fingerprint.accounts.hasSmokeAccount &&
       fingerprint.accounts.hasSmokeEmail &&
+      includesAll(fingerprint.accounts.teamAliasLabels, ["Set team name Smoke account"]) &&
+      includesAll(fingerprint.accounts.teamAliasPlaceholders, ["Set team name"]) &&
       includesAll(fingerprint.accounts.toolbarButtons, [
         "Export accounts",
         "Import file",
