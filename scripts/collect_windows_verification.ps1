@@ -523,6 +523,17 @@ function Add-SmokeResultChecks {
     (Get-StringValue (Get-PropertyValue $persistence "settingsLocale")) -eq "en"
   ) $persistence
 
+  $accountWorkflows = Get-PropertyValue $workflows "accounts"
+  Add-Check "automated.accountWorkflows" (
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "importCurrentAuthAccountId")) -eq "acct-import" -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "importCurrentAuthLabel")) -eq "Imported smoke account" -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "importPackageInsertedCount")) -eq 1 -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "importPackageUpdatedCount")) -eq 0 -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "exportPackageAccountCount")) -eq 3 -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "smartSwitchAccountId")) -eq "acct-package" -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "restoredAccountCount")) -eq 1
+  ) $accountWorkflows
+
   Add-Check "automated.proxySmoke" (
     (Get-BoolValue (Get-PropertyValue $workflows "proxyHealthOK")) -and
     (Get-NumberValue (Get-PropertyValue $workflows "proxyPort")) -gt 0 -and

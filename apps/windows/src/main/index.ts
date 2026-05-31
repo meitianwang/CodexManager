@@ -6,6 +6,10 @@ import { appInfo } from "../shared/app-info";
 import { ipcChannels } from "../shared/ipc/schema";
 import type { AccountSummary } from "../shared/models/accounts";
 import type { StoredAccount } from "../shared/models/accounts";
+import {
+  accountsTransferCurrentVersion,
+  accountsTransferFormatIdentifier
+} from "../shared/models/account-transfer";
 import type { JSONValue } from "../shared/models/json-value";
 import { createWindowsAppContext, type WindowsAppContext } from "./app-context";
 import { registerIpcHandlers } from "./ipc/handlers";
@@ -80,12 +84,23 @@ interface SmokeUIFingerprint {
 }
 
 interface SmokeWorkflowState {
+  accounts: SmokeAccountWorkflowState;
   persistence: SmokePersistenceState;
   proxyHealthOK: boolean;
   proxyPort: number;
   proxyUnauthorizedStatus: number;
   settingsLocale: string;
   switchedAccountId: string;
+}
+
+interface SmokeAccountWorkflowState {
+  exportPackageAccountCount: number;
+  importCurrentAuthAccountId: string;
+  importCurrentAuthLabel: string;
+  importPackageInsertedCount: number;
+  importPackageUpdatedCount: number;
+  restoredAccountCount: number;
+  smartSwitchAccountId: string;
 }
 
 interface SmokePersistenceState {
@@ -669,18 +684,16 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   const smokeEmail = "smoke@example.com";
   const authJson = makeSmokeAuth(smokeChatGPTAccountId, smokeEmail);
   const now = Math.floor(Date.now() / 1000);
-  const account: StoredAccount = {
+  const account = makeSmokeStoredAccount({
+    accountId: smokeChatGPTAccountId,
+    authJson,
+    email: smokeEmail,
     id: smokeAccountId,
     label: "Smoke account",
-    email: smokeEmail,
-    accountId: smokeChatGPTAccountId,
-    planType: "plus",
-    teamName: "Smoke Team",
-    authJson,
-    addedAt: now,
-    updatedAt: now,
-    principalId: smokeEmail
-  };
+    now,
+    oneWeekUsedPercent: 100,
+    teamName: "Smoke Team"
+  });
 
   await context.storeRepository.saveStore({
     version: 1,
@@ -695,14 +708,18 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   }
 
   await context.settingsCoordinator.updateSettings({
+    launchCodexAfterSwitch: false,
     locale: "en",
     proxyPort: 0,
-    proxyApiKey: "sk-local-smoke"
+    proxyApiKey: "sk-local-smoke",
+    restartEditorsOnSwitch: false
   });
   const settings = await context.settingsCoordinator.currentSettings();
   if (settings.locale !== "en" || settings.proxyApiKey !== "sk-local-smoke") {
     throw new Error(`Smoke settings did not persist: ${JSON.stringify(settings)}`);
   }
+
+  const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now);
 
   const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
   try {
@@ -738,6 +755,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
     }
 
     return {
+      accounts: accountWorkflows,
       persistence,
       proxyHealthOK: true,
       proxyPort: proxyState.port,
@@ -748,6 +766,82 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   } finally {
     await context.proxyRuntimeService.stop();
   }
+}
+
+async function verifySmokeAccountWorkflows(
+  context: WindowsAppContext,
+  primaryAccount: StoredAccount,
+  now: number
+): Promise<SmokeAccountWorkflowState> {
+  const importedAccountAuth = makeSmokeAuth("acct-import", "import@example.com");
+  await context.authRepository.writeCurrentAuth(importedAccountAuth);
+  const importedAccount = await context.accountsCoordinator.importCurrentAuthAccount("Imported smoke account");
+  if (importedAccount.accountId !== "acct-import" || importedAccount.label !== "Imported smoke account") {
+    throw new Error(`Smoke import current auth failed: ${JSON.stringify(importedAccount)}`);
+  }
+
+  const packageAccount = makeSmokeStoredAccount({
+    accountId: "acct-package",
+    authJson: makeSmokeAuth("acct-package", "package@example.com"),
+    email: "package@example.com",
+    id: "package-account",
+    label: "Package smoke account",
+    now,
+    oneWeekUsedPercent: 10,
+    teamName: "Package Team"
+  });
+  const importPackageResult = await context.accountsCoordinator.importAccountsTransferPackage(
+    {
+      accounts: [packageAccount],
+      exportedAt: now,
+      format: accountsTransferFormatIdentifier,
+      version: accountsTransferCurrentVersion
+    },
+    new Set([packageAccount.id])
+  );
+  if (importPackageResult.insertedCount !== 1 || importPackageResult.updatedCount !== 0) {
+    throw new Error(`Smoke import package failed: ${JSON.stringify(importPackageResult)}`);
+  }
+
+  const exportPackage = await context.accountsCoordinator.makeAccountsTransferPackage(
+    new Set([primaryAccount.id, importedAccount.id, packageAccount.id])
+  );
+  if (
+    exportPackage.format !== accountsTransferFormatIdentifier ||
+    exportPackage.version !== accountsTransferCurrentVersion ||
+    exportPackage.accounts.length !== 3
+  ) {
+    throw new Error(`Smoke export package failed: ${JSON.stringify(exportPackage)}`);
+  }
+
+  await context.accountsCoordinator.switchAccount(primaryAccount.id);
+  const smartSwitch = await context.accountsCoordinator.smartSwitch();
+  if (!smartSwitch || smartSwitch.account.accountId !== packageAccount.accountId) {
+    throw new Error(`Smoke smart switch chose ${smartSwitch?.account.accountId ?? "none"}, expected ${packageAccount.accountId}`);
+  }
+
+  await context.storeRepository.saveStore({
+    version: 1,
+    accounts: [primaryAccount]
+  });
+  await context.accountsCoordinator.switchAccount(primaryAccount.id);
+  const restoredAccounts = await context.accountsCoordinator.listAccounts();
+  const restoredAccount = restoredAccounts[0];
+  publishAccounts(restoredAccounts);
+  if (restoredAccounts.length !== 1 || restoredAccount?.accountId !== primaryAccount.accountId || !restoredAccount.isCurrent) {
+    throw new Error(`Smoke account workflow restore failed: ${JSON.stringify(restoredAccounts)}`);
+  }
+
+  const smartSwitchAccountId = smartSwitch.account.accountId;
+  return {
+    exportPackageAccountCount: exportPackage.accounts.length,
+    importCurrentAuthAccountId: importedAccount.accountId,
+    importCurrentAuthLabel: importedAccount.label,
+    importPackageInsertedCount: importPackageResult.insertedCount,
+    importPackageUpdatedCount: importPackageResult.updatedCount,
+    restoredAccountCount: restoredAccounts.length,
+    smartSwitchAccountId
+  };
 }
 
 function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {
@@ -787,6 +881,44 @@ function readJSONFile(filePath: string): JSONValue {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function makeSmokeStoredAccount(options: {
+  accountId: string;
+  authJson: JSONValue;
+  email: string;
+  id: string;
+  label: string;
+  now: number;
+  oneWeekUsedPercent: number;
+  teamName: string;
+}): StoredAccount {
+  return {
+    id: options.id,
+    label: options.label,
+    email: options.email,
+    accountId: options.accountId,
+    planType: "plus",
+    teamName: options.teamName,
+    authJson: options.authJson,
+    addedAt: options.now,
+    updatedAt: options.now,
+    usage: {
+      fetchedAt: options.now,
+      fiveHour: {
+        resetAt: options.now + 60 * 60,
+        usedPercent: options.oneWeekUsedPercent,
+        windowSeconds: 5 * 60 * 60
+      },
+      oneWeek: {
+        resetAt: options.now + 7 * 24 * 60 * 60,
+        usedPercent: options.oneWeekUsedPercent,
+        windowSeconds: 7 * 24 * 60 * 60
+      },
+      planType: "plus"
+    },
+    principalId: options.email
+  };
 }
 
 function makeSmokeAuth(accountId: string, email: string): JSONValue {

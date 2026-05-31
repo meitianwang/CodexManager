@@ -243,6 +243,13 @@ jobs:
             $Result.workflows.proxyUnauthorizedStatus -ne 401
             $Result.workflows.settingsLocale -ne "en"
             $Result.workflows.switchedAccountId -ne "acct-smoke"
+            $Result.workflows.accounts.importCurrentAuthAccountId -ne "acct-import"
+            $Result.workflows.accounts.importCurrentAuthLabel -ne "Imported smoke account"
+            $Result.workflows.accounts.importPackageInsertedCount -ne 1
+            $Result.workflows.accounts.importPackageUpdatedCount -ne 0
+            $Result.workflows.accounts.exportPackageAccountCount -ne 3
+            $Result.workflows.accounts.smartSwitchAccountId -ne "acct-package"
+            $Result.workflows.accounts.restoredAccountCount -ne 1
             -not ([bool]$Result.workflows.persistence.accountsJsonExists)
             -not ([bool]$Result.workflows.persistence.settingsJsonExists)
             -not ([bool]$Result.workflows.persistence.codexAuthExists)
