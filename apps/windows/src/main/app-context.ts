@@ -34,7 +34,7 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
   const authRepository = new AuthFileRepository(paths);
   const settingsCoordinator = new SettingsCoordinator(
     settingsRepository,
-    new LaunchAtStartupService(electronApp)
+    new LaunchAtStartupService(electronApp, { isPackaged: electronApp.isPackaged })
   );
   const usageService = new DefaultUsageService(paths);
   const weeklyQuotaWarmupService = new DefaultWeeklyQuotaWarmupService(paths);

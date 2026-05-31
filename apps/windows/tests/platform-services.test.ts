@@ -9,7 +9,11 @@ import {
 } from "../src/main/platform/command-runner";
 import { CodexCLIService } from "../src/main/platform/codex-cli-service";
 import { EditorAppService } from "../src/main/platform/editor-app-service";
-import { LaunchAtStartupService, type LoginItemSettings } from "../src/main/platform/launch-at-startup-service";
+import {
+  LaunchAtStartupService,
+  type LoginItemSettings,
+  type LoginItemSettingsOptions
+} from "../src/main/platform/launch-at-startup-service";
 import { TrayService, type TrayActionID, type TrayMenuItem } from "../src/main/platform/tray-service";
 import type { AccountSummary } from "../src/shared/models/accounts";
 import { appLocales } from "../src/shared/models/settings";
@@ -219,6 +223,40 @@ describe("launch at startup service", () => {
     service.setEnabled(false);
 
     expect(updates).toEqual([{ openAtLogin: true }, { openAtLogin: false }]);
+  });
+
+  it("uses the Squirrel Update.exe stub for packaged Windows login items", () => {
+    const updates: LoginItemSettings[] = [];
+    const observedOptions: Array<LoginItemSettingsOptions | undefined> = [];
+    const adapter = {
+      enabled: false,
+      getLoginItemSettings(options?: LoginItemSettingsOptions) {
+        observedOptions.push(options);
+        return { openAtLogin: this.enabled };
+      },
+      setLoginItemSettings(settings: LoginItemSettings) {
+        updates.push(settings);
+        this.enabled = settings.openAtLogin;
+      }
+    };
+    const target = {
+      path: String.raw`C:\Users\me\AppData\Local\CodexManager\Update.exe`,
+      args: ["--processStart", "CodexManager.exe"]
+    };
+    const service = new LaunchAtStartupService(adapter, {
+      execPath: String.raw`C:\Users\me\AppData\Local\CodexManager\app-0.1.0\CodexManager.exe`,
+      isPackaged: true,
+      platform: "win32"
+    });
+
+    service.syncWithStoreValue(true);
+    service.setEnabled(false);
+
+    expect(observedOptions).toEqual([target]);
+    expect(updates).toEqual([
+      { openAtLogin: true, enabled: true, ...target },
+      { openAtLogin: false, enabled: false, ...target }
+    ]);
   });
 });
 
