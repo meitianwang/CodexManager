@@ -3,7 +3,7 @@ import type { AppSettings } from "../../shared/models/settings";
 
 export interface BackgroundAccountMaintenanceAccountsLike {
   autoSmartSwitchIfNeeded(): Promise<unknown>;
-  refreshAllUsage(): Promise<AccountSummary[]>;
+  refreshAllUsage(options?: { force?: boolean }): Promise<AccountSummary[]>;
   refreshWorkspaceMetadata(forceRemoteCheck: boolean): Promise<AccountSummary[]>;
 }
 
@@ -99,7 +99,7 @@ export class BackgroundAccountMaintenanceService {
     this.isTicking = true;
     try {
       const settings = await this.settingsCoordinator.currentSettings();
-      await this.accountsCoordinator.refreshAllUsage();
+      await this.accountsCoordinator.refreshAllUsage({ force: false });
       if (settings.autoSmartSwitch) {
         await this.accountsCoordinator.autoSmartSwitchIfNeeded();
       }

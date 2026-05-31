@@ -34,7 +34,7 @@ describe("background account maintenance service", () => {
 
     await service.runNow();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage", "autoSmartSwitchIfNeeded", "refreshWorkspaceMetadata:false"]);
+    expect(accounts.calls).toEqual(["refreshAllUsage:false", "autoSmartSwitchIfNeeded", "refreshWorkspaceMetadata:false"]);
     expect(updates).toEqual([accounts.metadataResult]);
   });
 
@@ -48,7 +48,7 @@ describe("background account maintenance service", () => {
 
     await service.runNow();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage", "refreshWorkspaceMetadata:false"]);
+    expect(accounts.calls).toEqual(["refreshAllUsage:false", "refreshWorkspaceMetadata:false"]);
   });
 
   it("reports refresh errors without publishing stale account data", async () => {
@@ -83,7 +83,7 @@ describe("background account maintenance service", () => {
     await secondRun;
     await Promise.resolve();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage"]);
+    expect(accounts.calls).toEqual(["refreshAllUsage:false"]);
     expect(releaseRefresh).toBeDefined();
 
     releaseRefresh?.([makeAccount("usage")]);
@@ -107,8 +107,8 @@ class FakeAccounts implements BackgroundAccountMaintenanceAccountsLike {
   refreshError: Error | undefined;
   refreshAllUsageHandler: (() => Promise<AccountSummary[]>) | undefined;
 
-  async refreshAllUsage(): Promise<AccountSummary[]> {
-    this.calls.push("refreshAllUsage");
+  async refreshAllUsage(options: { force?: boolean } = {}): Promise<AccountSummary[]> {
+    this.calls.push(`refreshAllUsage:${String(options.force)}`);
     if (this.refreshError) {
       throw this.refreshError;
     }

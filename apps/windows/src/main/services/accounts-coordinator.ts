@@ -43,6 +43,10 @@ export interface UsageServiceLike {
   fetchUsage(accessToken: string, accountId: string): Promise<UsageSnapshot>;
 }
 
+export interface UsageRefreshOptions {
+  force?: boolean;
+}
+
 export interface SettingsRepositoryLike {
   loadSettings(): Promise<AppSettings>;
 }
@@ -88,6 +92,8 @@ export interface AccountsCoordinatorOptions {
   dateProvider?: DateProviderLike;
   sourceDeviceID?: string;
 }
+
+const minimumUsageRefreshIntervalSeconds = 25;
 
 export class AccountsCoordinator {
   private readonly storeRepository: AccountsStoreRepositoryLike;
@@ -169,7 +175,7 @@ export class AccountsCoordinator {
     await this.updateCurrentAccountProjection(account.authJson);
   }
 
-  async refreshAccountUsage(id: string): Promise<AccountSummary> {
+  async refreshAccountUsage(id: string, options: UsageRefreshOptions = {}): Promise<AccountSummary> {
     if (!this.usageService) {
       throw new Error("Usage service is unavailable");
     }
@@ -181,16 +187,16 @@ export class AccountsCoordinator {
       throw new Error("Account was not found for usage refresh");
     }
 
-    const refreshed = await this.refreshStoredAccountUsage(account);
+    const refreshed = await this.refreshStoredAccountUsage(account, options.force ?? true);
     store.accounts[index] = refreshed;
     await this.storeRepository.saveStore(store);
     return toAccountSummary(refreshed, await this.currentAuthAccountKey());
   }
 
-  async refreshAllUsage(): Promise<AccountSummary[]> {
+  async refreshAllUsage(options: UsageRefreshOptions = {}): Promise<AccountSummary[]> {
     const accounts = await this.listAccounts();
     for (const account of accounts) {
-      await this.refreshAccountUsage(account.id);
+      await this.refreshAccountUsage(account.id, options);
     }
     return this.listAccounts();
   }
@@ -536,7 +542,12 @@ export class AccountsCoordinator {
     return result;
   }
 
-  private async refreshStoredAccountUsage(account: StoredAccount): Promise<StoredAccount> {
+  private async refreshStoredAccountUsage(account: StoredAccount, forceRefresh: boolean): Promise<StoredAccount> {
+    const now = this.dateProvider.unixSecondsNow();
+    if (!forceRefresh && !shouldRefreshUsage(account.usage, now)) {
+      return account;
+    }
+
     const updated: StoredAccount = { ...account };
     try {
       const extracted = this.authRepository.extractAuth(updated.authJson);
@@ -557,7 +568,7 @@ export class AccountsCoordinator {
       updated.usageError = errorMessage(error);
     }
 
-    updated.updatedAt = this.dateProvider.unixSecondsNow();
+    updated.updatedAt = now;
     return updated;
   }
 
@@ -874,6 +885,13 @@ function expectedPlan(account: StoredAccount): string | undefined {
 function shouldWarmUpResetWeeklyQuota(account: StoredAccount, now: number): boolean {
   const oneWeek = account.usage?.oneWeek;
   return oneWeek !== undefined && oneWeek.usedPercent >= 100 && oneWeek.resetAt !== undefined && oneWeek.resetAt <= now;
+}
+
+function shouldRefreshUsage(snapshot: UsageSnapshot | undefined, now: number): boolean {
+  if (!snapshot) {
+    return true;
+  }
+  return now - snapshot.fetchedAt >= minimumUsageRefreshIntervalSeconds;
 }
 
 function shouldLookupRemoteWorkspaceName(

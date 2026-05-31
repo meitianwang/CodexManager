@@ -474,6 +474,74 @@ describe("accounts coordinator", () => {
     expect(storeRepository.store.accounts[0]?.usageError).toBe("warmup failed");
   });
 
+  it("throttles non-forced usage refreshes while keeping forced refreshes immediate", async () => {
+    const freshUsage = {
+      ...makeUsageSnapshot("team", 60, 70),
+      fetchedAt: 1_779_999_980
+    };
+    const account = makeStoredAccount({
+      id: "target",
+      accountId: "acct-target",
+      usage: freshUsage,
+      updatedAt: 123
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const usageService = new FakeUsageService("team");
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository: new FakeAuthRepository(undefined),
+      usageService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.refreshAllUsage({ force: false });
+
+    expect(usageService.calls).toEqual([]);
+    expect(storeRepository.store.accounts[0]?.usage).toEqual(freshUsage);
+    expect(storeRepository.store.accounts[0]?.updatedAt).toBe(123);
+
+    await coordinator.refreshAccountUsage("target");
+
+    expect(usageService.calls).toEqual([{ accessToken: "access-acct-target", accountId: "acct-target" }]);
+    expect(storeRepository.store.accounts[0]?.usage?.fiveHour?.usedPercent).toBe(10);
+    expect(storeRepository.store.accounts[0]?.usage?.oneWeek?.usedPercent).toBe(20);
+    expect(storeRepository.store.accounts[0]?.updatedAt).toBe(1_780_000_000);
+  });
+
+  it("refreshes stale usage snapshots during non-forced background refreshes", async () => {
+    const staleUsage = {
+      ...makeUsageSnapshot("team", 60, 70),
+      fetchedAt: 1_779_999_975
+    };
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [
+        makeStoredAccount({
+          id: "target",
+          accountId: "acct-target",
+          usage: staleUsage
+        })
+      ]
+    });
+    const usageService = new FakeUsageService("team");
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository: new FakeAuthRepository(undefined),
+      usageService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.refreshAllUsage({ force: false });
+
+    expect(usageService.calls).toEqual([{ accessToken: "access-acct-target", accountId: "acct-target" }]);
+    expect(storeRepository.store.accounts[0]?.usage?.fetchedAt).toBe(1_780_000_000);
+    expect(storeRepository.store.accounts[0]?.usage?.fiveHour?.usedPercent).toBe(10);
+    expect(storeRepository.store.accounts[0]?.usage?.oneWeek?.usedPercent).toBe(20);
+  });
+
   it("refreshes ChatGPT tokens and retries usage after an unauthorized response", async () => {
     const account = makeStoredAccount({ id: "target", accountId: "acct-target" });
     const storeRepository = new MemoryStoreRepository({
@@ -592,9 +660,12 @@ class FakeAuthRepository implements AuthRepositoryLike {
 }
 
 class FakeUsageService implements UsageServiceLike {
+  public readonly calls: Array<{ accessToken: string; accountId: string }> = [];
+
   constructor(private readonly planType: string) {}
 
-  async fetchUsage(): Promise<UsageSnapshot> {
+  async fetchUsage(accessToken: string, accountId: string): Promise<UsageSnapshot> {
+    this.calls.push({ accessToken, accountId });
     return makeUsageSnapshot(this.planType, 10, 20);
   }
 }
