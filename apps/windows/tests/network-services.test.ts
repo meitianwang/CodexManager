@@ -198,8 +198,14 @@ describe("weekly quota warmup service", () => {
     expect(upstream.requests[0]?.accessToken).toBe("access-token");
     expect(upstream.requests[0]?.accountId).toBe("acct-1");
     expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toMatchObject({
-      model: "gpt-5",
+      model: "gpt-5.4-mini",
       stream: true,
+      store: false,
+      tool_choice: "none",
+      parallel_tool_calls: false,
+      tools: [],
+      include: [],
+      reasoning: { effort: "low" },
       input: [{ type: "message", role: "user" }]
     });
   });
@@ -220,11 +226,19 @@ describe("weekly quota warmup service", () => {
   });
 
   it("keeps the warmup body stable", () => {
-    expect(JSON.parse(makeWarmupBodyBuffer().toString("utf8"))).toMatchObject({
-      model: "gpt-5",
+    const body = JSON.parse(makeWarmupBodyBuffer().toString("utf8")) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      model: "gpt-5.4-mini",
+      stream: true,
+      store: false,
       instructions: "Reply with OK.",
-      reasoning: { effort: "low", summary: "auto" }
+      tool_choice: "none",
+      parallel_tool_calls: false,
+      tools: [],
+      include: [],
+      reasoning: { effort: "low" }
     });
+    expect((body.reasoning as Record<string, unknown>).summary).toBeUndefined();
   });
 });
 

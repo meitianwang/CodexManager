@@ -5,7 +5,7 @@ import { removeSuffix, resolveChatGPTBaseOrigin } from "./chatgpt-base-origin";
 import { CodexUpstreamClient, type CodexUpstreamClientLike, type CodexUpstreamResult } from "../proxy/upstream-client";
 
 const scope = "weekly-quota-warmup";
-const warmupModel = "gpt-5";
+const warmupModel = "gpt-5.4-mini";
 
 export interface WeeklyQuotaWarmupServiceOptions {
   endpointPreferenceStore?: EndpointPreferenceStore;
@@ -75,12 +75,11 @@ export function makeWarmupBodyBuffer(): Buffer {
       store: false,
       instructions: "Reply with OK.",
       tools: [],
-      tool_choice: "auto",
+      tool_choice: "none",
       parallel_tool_calls: false,
       include: [],
       reasoning: {
-        effort: "low",
-        summary: "auto"
+        effort: "low"
       },
       input: [
         {
