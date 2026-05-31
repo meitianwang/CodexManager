@@ -66,7 +66,7 @@ type TrayMessageKey =
 
 const trayMessages: Record<AppLocaleID, Record<TrayMessageKey, string>> = {
   en: {
-    showWindow: "Show Window",
+    showWindow: "Open Main Panel",
     refreshAccounts: "Refresh Accounts",
     smartSwitch: "Smart Switch",
     startProxy: "Start Proxy",
@@ -80,7 +80,7 @@ const trayMessages: Record<AppLocaleID, Record<TrayMessageKey, string>> = {
     title: "5h {five} / 1w {week}"
   },
   "zh-Hans": {
-    showWindow: "显示窗口",
+    showWindow: "打开主面板",
     refreshAccounts: "刷新账号",
     smartSwitch: "智能切换",
     startProxy: "启动代理",
@@ -108,7 +108,7 @@ const trayMessages: Record<AppLocaleID, Record<TrayMessageKey, string>> = {
     title: "5h {five} / 1w {week}"
   },
   ja: {
-    showWindow: "ウィンドウを表示",
+    showWindow: "メインパネルを開く",
     refreshAccounts: "アカウントを更新",
     smartSwitch: "スマート切替",
     startProxy: "プロキシを開始",
@@ -116,13 +116,13 @@ const trayMessages: Record<AppLocaleID, Record<TrayMessageKey, string>> = {
     quit: "終了",
     currentAccount: "使用中: {account}",
     noAccount: "アカウント未選択",
-    accountsCount: "{count} 件のアカウント",
+    accountsCount: "{count} 個のアカウント",
     remaining: "残り {remaining}",
     titlePlaceholder: "5h -- / 1w --",
     title: "5h {five} / 1w {week}"
   },
   ko: {
-    showWindow: "창 표시",
+    showWindow: "메인 패널 열기",
     refreshAccounts: "계정 새로고침",
     smartSwitch: "스마트 전환",
     startProxy: "프록시 시작",
@@ -130,7 +130,7 @@ const trayMessages: Record<AppLocaleID, Record<TrayMessageKey, string>> = {
     quit: "종료",
     currentAccount: "사용 중: {account}",
     noAccount: "선택된 계정 없음",
-    accountsCount: "계정 {count}개",
+    accountsCount: "{count}개 계정",
     remaining: "{remaining} 남음",
     titlePlaceholder: "5h -- / 1w --",
     title: "5h {five} / 1w {week}"

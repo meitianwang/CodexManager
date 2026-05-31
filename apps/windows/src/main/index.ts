@@ -1200,7 +1200,7 @@ async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<Smok
 
     const initialActionLabels = adapter.actionLabels();
     const initialActionIDs = adapter.actionIDs();
-    if (!includesAll(initialActionLabels, ["Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit"])) {
+    if (!includesAll(initialActionLabels, ["Open Main Panel", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit"])) {
       throw new Error(`Smoke tray initial menu labels were unexpected: ${JSON.stringify(initialActionLabels)}`);
     }
 

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CommandTimeoutError,
   environmentWithPrependedPath,
@@ -16,7 +19,10 @@ import {
 } from "../src/main/platform/launch-at-startup-service";
 import { TrayService, type TrayActionID, type TrayMenuItem } from "../src/main/platform/tray-service";
 import type { AccountSummary } from "../src/shared/models/accounts";
-import { appLocales } from "../src/shared/models/settings";
+import { appLocales, type AppLocaleID } from "../src/shared/models/settings";
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const macTrayLocalizedLocales = ["en", "zh-Hans", "ja", "ko"] as const satisfies readonly AppLocaleID[];
 
 describe("command runner", () => {
   it("throws promptly when a command times out", async () => {
@@ -272,7 +278,7 @@ describe("tray service", () => {
 
     expect(adapter.tooltip).toBe("CodexManager - 5h -- / 1w --");
     expect(actionLabels(adapter.items)).toEqual([
-      "Show Window",
+      "Open Main Panel",
       "Refresh Accounts",
       "Smart Switch",
       "Start Proxy",
@@ -298,12 +304,12 @@ describe("tray service", () => {
 
     expect(menuLabels(adapter.items)).toContain("未选择账号");
     expect(menuLabels(adapter.items)).toContain("0 个账号");
-    expect(actionLabels(adapter.items)).toEqual(["显示窗口", "刷新账号", "智能切换", "启动代理", "退出"]);
+    expect(actionLabels(adapter.items)).toEqual(["打开主面板", "刷新账号", "智能切换", "启动代理", "退出"]);
 
     service.updateState({ locale: "en", proxyRunning: true });
     expect(menuLabels(adapter.items)).toContain("No account selected");
     expect(menuLabels(adapter.items)).toContain("0 accounts");
-    expect(actionLabels(adapter.items)).toEqual(["Show Window", "Refresh Accounts", "Smart Switch", "Stop Proxy", "Quit"]);
+    expect(actionLabels(adapter.items)).toEqual(["Open Main Panel", "Refresh Accounts", "Smart Switch", "Stop Proxy", "Quit"]);
   });
 
   it("renders account quota status and updates the tooltip", () => {
@@ -325,7 +331,7 @@ describe("tray service", () => {
 
     expect(adapter.tooltip).toBe("CodexManager - 5h 88% / 1w 55%");
     expect(menuLabels(adapter.items)).toEqual([
-      "Show Window",
+      "Open Main Panel",
       "Using: user@example.com",
       "1 accounts",
       "88% remaining",
@@ -346,6 +352,45 @@ describe("tray service", () => {
     expect(adapter.tooltip).toBe("CodexManager - 5h -- / 1w --");
     expect(menuLabels(adapter.items)).toContain("No account selected");
     expect(menuLabels(adapter.items)).toContain("1 accounts");
+  });
+
+  it("keeps shared tray labels aligned with macOS localizations", () => {
+    for (const locale of macTrayLocalizedLocales) {
+      const macMessages = readMacLocalization(locale);
+      const adapter = new FakeTrayAdapter();
+      new TrayService({
+        adapter,
+        actions: trayActions([]),
+        initialState: {
+          accounts: [
+            accountSummary({
+              email: "user@example.com",
+              isCurrent: true,
+              usage: {
+                fetchedAt: 1,
+                fiveHour: { usedPercent: 12.4, windowSeconds: 18_000 },
+                oneWeek: { usedPercent: 45.2, windowSeconds: 604_800 }
+              }
+            })
+          ],
+          locale,
+          proxyRunning: false
+        }
+      });
+
+      const labels = menuLabels(adapter.items);
+      expect(labels, locale).toContain(requiredMacMessage(macMessages, "tray.action.open_panel"));
+      expect(labels, locale).toContain(requiredMacMessage(macMessages, "tray.action.quit"));
+      expect(labels, locale).toContain(
+        formatMacMessage(requiredMacMessage(macMessages, "tray.status.current_format"), "user@example.com")
+      );
+      expect(labels, locale).toContain(
+        formatMacMessage(requiredMacMessage(macMessages, "tray.status.accounts_count_format"), "1")
+      );
+      expect(labels, locale).toContain(
+        formatMacMessage(requiredMacMessage(macMessages, "tray.status.remaining_format"), "88%")
+      );
+    }
   });
 
   it("has non-empty tray menu labels for every supported locale", () => {
@@ -528,4 +573,34 @@ function accountSummary(patch: Partial<AccountSummary> = {}): AccountSummary {
     shouldDisplayWorkspaceTag: false,
     ...patch
   };
+}
+
+function readMacLocalization(locale: string): Map<string, string> {
+  const stringsPath = resolve(repositoryRoot, "Sources/CodexManager/Resources", `${locale}.lproj`, "Localizable.strings");
+  const contents = readFileSync(stringsPath, "utf8");
+  const messages = new Map<string, string>();
+  const pattern = /"((?:\\.|[^"\\])*)"\s*=\s*"((?:\\.|[^"\\])*)";/g;
+  for (const match of contents.matchAll(pattern)) {
+    messages.set(unescapeAppleString(match[1] ?? ""), unescapeAppleString(match[2] ?? ""));
+  }
+  return messages;
+}
+
+function unescapeAppleString(value: string): string {
+  return value
+    .replaceAll("\\\\", "\\")
+    .replaceAll('\\"', '"')
+    .replaceAll("\\n", "\n");
+}
+
+function requiredMacMessage(messages: ReadonlyMap<string, string>, key: string): string {
+  const message = messages.get(key);
+  if (message === undefined) {
+    throw new Error(`Expected macOS tray localization ${key} was not found`);
+  }
+  return message;
+}
+
+function formatMacMessage(template: string, value: string): string {
+  return template.replace("%@", value);
 }
