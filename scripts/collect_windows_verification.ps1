@@ -5,6 +5,8 @@ param(
 
   [string] $ArtifactDigest = "",
 
+  [string] $SmokeResultPath = "",
+
   [string] $ExpectedCurrentAccountId = "",
 
   [string] $UIParityEvidencePath = "",
@@ -44,6 +46,8 @@ param(
   [switch] $EditorRestartVerified,
 
   [switch] $TrayMenuVerified,
+
+  [switch] $RequireAutomated,
 
   [switch] $RequireComplete
 )
@@ -115,6 +119,46 @@ function Get-ArrayCount {
   }
 
   return @($Value).Count
+}
+
+function Get-BoolValue {
+  param(
+    [object] $Value
+  )
+
+  return $Value -eq $true
+}
+
+function Get-NumberValue {
+  param(
+    [object] $Value
+  )
+
+  if ($null -eq $Value) {
+    return 0
+  }
+
+  try {
+    return [double] $Value
+  } catch {
+    return 0
+  }
+}
+
+function Test-ContainsAll {
+  param(
+    [object] $Values,
+    [string[]] $ExpectedValues
+  )
+
+  $items = @($Values | ForEach-Object { [string] $_ })
+  foreach ($expectedValue in $ExpectedValues) {
+    if ($items -notcontains $expectedValue) {
+      return $false
+    }
+  }
+
+  return $true
 }
 
 function Decode-JwtPayload {
@@ -265,6 +309,225 @@ function Get-JsonFileStatus {
   }
 
   return $status
+}
+
+function Get-SmokeResultStatus {
+  param(
+    [string] $Path
+  )
+
+  $status = [ordered]@{
+    path = $Path
+    exists = $false
+    sizeBytes = 0
+    validJson = $false
+    result = $null
+    summary = $null
+    error = $null
+  }
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    $status.error = "Smoke result path was not provided."
+    return $status
+  }
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    $status.error = "Smoke result file does not exist."
+    return $status
+  }
+
+  $item = Get-Item -LiteralPath $Path
+  $status.exists = $true
+  $status.sizeBytes = $item.Length
+
+  if ($item.Length -gt $JsonReadLimitBytes) {
+    $status.error = "Smoke result is larger than $JsonReadLimitBytes bytes; skipped JSON parsing."
+    return $status
+  }
+
+  try {
+    $raw = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop
+    $parsed = $raw | ConvertFrom-Json -ErrorAction Stop
+    $status.validJson = $true
+    $status.result = $parsed
+    $state = Get-PropertyValue $parsed "state"
+    $workflows = Get-PropertyValue $parsed "workflows"
+    $status.summary = [ordered]@{
+      status = Get-StringValue (Get-PropertyValue $parsed "status")
+      activePage = Get-StringValue (Get-PropertyValue $state "activePage")
+      pageTitle = Get-StringValue (Get-PropertyValue $state "pageTitle")
+      hasBridge = Get-PropertyValue $state "hasBridge"
+      uiSnapshotCount = Get-ArrayCount (Get-PropertyValue $parsed "uiSnapshots")
+      proxyPort = Get-PropertyValue $workflows "proxyPort"
+      switchedAccountId = Get-StringValue (Get-PropertyValue $workflows "switchedAccountId")
+    }
+  } catch {
+    $status.error = $_.Exception.Message
+  }
+
+  return $status
+}
+
+function Get-SmokeSnapshot {
+  param(
+    [object] $Result,
+    [string] $Page
+  )
+
+  $snapshots = Get-PropertyValue $Result "uiSnapshots"
+  if ($null -eq $snapshots) {
+    return $null
+  }
+
+  foreach ($snapshot in @($snapshots)) {
+    if ((Get-StringValue (Get-PropertyValue $snapshot "page")) -eq $Page) {
+      return $snapshot
+    }
+  }
+
+  return $null
+}
+
+function Test-SmokeResultPassed {
+  param(
+    [object] $Result
+  )
+
+  return (Get-StringValue (Get-PropertyValue $Result "status")) -eq "passed"
+}
+
+function Add-SmokeResultChecks {
+  param(
+    [string] $Path
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return
+  }
+
+  $smokeStatus = Get-SmokeResultStatus $Path
+  $smokeResult = $smokeStatus["result"]
+  $smokeResultPassed = $smokeStatus["exists"] -and $smokeStatus["validJson"] -and (Test-SmokeResultPassed $smokeResult)
+  Add-Check "automated.smokeResultJson" $smokeResultPassed $smokeStatus
+  if (-not $smokeResultPassed) {
+    return
+  }
+
+  $result = $smokeResult
+  $state = Get-PropertyValue $result "state"
+  Add-Check "automated.packagedAppLaunch" (
+    (Get-BoolValue (Get-PropertyValue $state "hasBridge")) -and
+    (Get-StringValue (Get-PropertyValue $state "activePage")) -eq "accounts" -and
+    (Get-StringValue (Get-PropertyValue $state "pageTitle")) -eq "Accounts" -and
+    (Get-NumberValue (Get-PropertyValue $state "bodyLength")) -gt 100
+  ) $state
+
+  $screenshotDetails = [ordered]@{}
+  $screenshotsPassed = $true
+  foreach ($page in @("accounts", "proxy", "settings")) {
+    $snapshot = Get-SmokeSnapshot $result $page
+    $screenshotPath = Get-StringValue (Get-PropertyValue $snapshot "screenshotPath")
+    $fileLength = 0
+    $fileExists = $false
+    if (-not [string]::IsNullOrWhiteSpace($screenshotPath) -and (Test-Path -LiteralPath $screenshotPath -PathType Leaf)) {
+      $item = Get-Item -LiteralPath $screenshotPath
+      $fileExists = $true
+      $fileLength = $item.Length
+    }
+    $pagePassed = (
+      $null -ne $snapshot -and
+      $fileExists -and
+      (Get-NumberValue (Get-PropertyValue $snapshot "screenshotWidth")) -ge 900 -and
+      (Get-NumberValue (Get-PropertyValue $snapshot "screenshotHeight")) -ge 450 -and
+      (Get-NumberValue (Get-PropertyValue $snapshot "screenshotByteLength")) -ge 10000 -and
+      $fileLength -ge 10000
+    )
+    if (-not $pagePassed) {
+      $screenshotsPassed = $false
+    }
+    $screenshotDetails[$page] = [ordered]@{
+      passed = $pagePassed
+      path = $screenshotPath
+      fileExists = $fileExists
+      fileLength = $fileLength
+      width = Get-PropertyValue $snapshot "screenshotWidth"
+      height = Get-PropertyValue $snapshot "screenshotHeight"
+      byteLength = Get-PropertyValue $snapshot "screenshotByteLength"
+    }
+  }
+  Add-Check "automated.uiScreenshots" $screenshotsPassed $screenshotDetails
+
+  $fingerprintDetails = [ordered]@{}
+  $fingerprintsPassed = $true
+  foreach ($page in @("accounts", "proxy", "settings")) {
+    $snapshot = Get-SmokeSnapshot $result $page
+    $fingerprint = Get-PropertyValue $snapshot "fingerprint"
+    $pagePassed = (
+      $null -ne $fingerprint -and
+      (Get-NumberValue (Get-PropertyValue $fingerprint "navItemCount")) -eq 3 -and
+      (Get-StringValue (Get-PropertyValue $fingerprint "sidebarBrand")) -eq "CodexManager" -and
+      (Get-StringValue (Get-PropertyValue $fingerprint "sidebarStatus")) -match "^Proxy:"
+    )
+
+    if ($page -eq "accounts") {
+      $accounts = Get-PropertyValue $fingerprint "accounts"
+      $pagePassed = $pagePassed -and
+        (Get-NumberValue (Get-PropertyValue $accounts "accountCount")) -eq 1 -and
+        (Get-NumberValue (Get-PropertyValue $accounts "currentBadgeCount")) -eq 1 -and
+        (Get-BoolValue (Get-PropertyValue $accounts "hasSmokeEmail")) -and
+        (Test-ContainsAll (Get-PropertyValue $accounts "toolbarButtons") @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota")) -and
+        (Test-ContainsAll (Get-PropertyValue $accounts "actionButtons") @("Switch", "Refresh", "Delete"))
+    } elseif ($page -eq "proxy") {
+      $proxy = Get-PropertyValue $fingerprint "proxy"
+      $pagePassed = $pagePassed -and
+        (Test-ContainsAll (Get-PropertyValue $proxy "sectionHeadings") @("Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage")) -and
+        (Test-ContainsAll (Get-PropertyValue $proxy "endpointPaths") @("/v1/chat/completions", "/v1/responses", "/v1/messages")) -and
+        (Test-ContainsAll (Get-PropertyValue $proxy "formLabels") @("Port", "API key")) -and
+        (Test-ContainsAll (Get-PropertyValue $proxy "actionButtons") @("Start")) -and
+        (Get-NumberValue (Get-PropertyValue $proxy "codeCopyButtonCount")) -eq 2 -and
+        (Get-NumberValue (Get-PropertyValue $proxy "modelChipCount")) -ge 3 -and
+        (Get-StringValue (Get-PropertyValue $proxy "statusText")) -eq "Stopped"
+    } else {
+      $settings = Get-PropertyValue $fingerprint "settings"
+      $pagePassed = $pagePassed -and
+        (Test-ContainsAll (Get-PropertyValue $settings "sectionHeadings") @("Settings", "General", "Switch Behavior", "Language")) -and
+        (Test-ContainsAll (Get-PropertyValue $settings "toggleLabels") @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")) -and
+        (Test-ContainsAll (Get-PropertyValue $settings "selectLabels") @("Editor restart target", "Language")) -and
+        (Test-ContainsAll (Get-PropertyValue $settings "footerButtons") @("GitHub Star", "Quit")) -and
+        (Get-NumberValue (Get-PropertyValue $settings "languageOptionCount")) -eq 11
+    }
+
+    if (-not $pagePassed) {
+      $fingerprintsPassed = $false
+    }
+    $fingerprintDetails[$page] = [ordered]@{
+      passed = $pagePassed
+      fingerprint = $fingerprint
+    }
+  }
+  Add-Check "automated.uiFingerprints" $fingerprintsPassed $fingerprintDetails
+
+  $workflows = Get-PropertyValue $result "workflows"
+  $persistence = Get-PropertyValue $workflows "persistence"
+  $expectedAccountId = "acct-smoke"
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedCurrentAccountId)) {
+    $expectedAccountId = $ExpectedCurrentAccountId
+  }
+  Add-Check "automated.persistence" (
+    (Get-BoolValue (Get-PropertyValue $persistence "accountsJsonExists")) -and
+    (Get-BoolValue (Get-PropertyValue $persistence "settingsJsonExists")) -and
+    (Get-BoolValue (Get-PropertyValue $persistence "codexAuthExists")) -and
+    (Get-NumberValue (Get-PropertyValue $persistence "accountsCount")) -eq 1 -and
+    (Get-StringValue (Get-PropertyValue $persistence "currentSelectionAccountId")) -eq $expectedAccountId -and
+    (Get-StringValue (Get-PropertyValue $persistence "codexAuthAccountId")) -eq $expectedAccountId -and
+    (Get-StringValue (Get-PropertyValue $persistence "settingsLocale")) -eq "en"
+  ) $persistence
+
+  Add-Check "automated.proxySmoke" (
+    (Get-BoolValue (Get-PropertyValue $workflows "proxyHealthOK")) -and
+    (Get-NumberValue (Get-PropertyValue $workflows "proxyPort")) -gt 0 -and
+    (Get-NumberValue (Get-PropertyValue $workflows "proxyUnauthorizedStatus")) -eq 401
+  ) $workflows
 }
 
 function Get-EvidencePathStatus {
@@ -576,6 +839,7 @@ function Test-ProxyRoutes {
 Add-Check "artifact.runUrl" ($ArtifactRunUrl -match "^https://github\.com/.+/actions/runs/\d+$") "CI run URL for the Windows artifact under test."
 Add-Check "artifact.digest" ($ArtifactDigest -match "^sha256:[0-9a-fA-F]{64}$") "Expected format: sha256:<64 hex chars>."
 Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) "Manual verification must run on Windows."
+Add-SmokeResultChecks $SmokeResultPath
 
 Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
 $uiEvidenceStatus = Get-UIParityEvidenceStatus $UIParityEvidencePath
@@ -703,6 +967,13 @@ if ($failedChecks.Count -gt 0) {
   Write-Host "Incomplete checks:"
   foreach ($check in $failedChecks) {
     Write-Host " - $($check.Key)"
+  }
+}
+
+if ($RequireAutomated.IsPresent) {
+  $failedAutomatedChecks = @($failedChecks | Where-Object { $_.Key -match "^(artifact|environment|automated|paths)\." })
+  if ($failedAutomatedChecks.Count -gt 0) {
+    exit 1
   }
 }
 

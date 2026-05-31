@@ -332,6 +332,7 @@ jobs:
           Write-Host "CodexManager Windows smoke test passed: $(Get-Content -Raw $ResultPath)"
 
       - name: Upload Windows smoke screenshots
+        id: smoke-screenshots
         uses: actions/upload-artifact@v4
         with:
           name: CodexManager-Windows-Smoke-Screenshots
@@ -340,6 +341,7 @@ jobs:
           path: ${{ runner.temp }}/codexmanager-smoke/screenshots/*.png
 
       - name: Upload Squirrel.Windows artifacts
+        id: squirrel-artifact
         uses: actions/upload-artifact@v4
         with:
           name: CodexManager-Windows-x64-Squirrel
@@ -349,3 +351,35 @@ jobs:
             apps/windows/out/make/squirrel.windows/x64/CodexManagerSetup.exe
             apps/windows/out/make/squirrel.windows/x64/*.nupkg
             apps/windows/out/make/squirrel.windows/x64/RELEASES
+
+      - name: Write automated Windows verification report
+        shell: pwsh
+        run: |
+          $SmokeRoot = Join-Path $env:RUNNER_TEMP "codexmanager-smoke"
+          $ReportRoot = Join-Path $env:RUNNER_TEMP "codexmanager-verification"
+          New-Item -ItemType Directory -Force -Path $ReportRoot | Out-Null
+          Copy-Item -LiteralPath (Join-Path $SmokeRoot "smoke-result.json") -Destination (Join-Path $ReportRoot "smoke-result.json")
+
+          $ArtifactDigest = "${{ steps.squirrel-artifact.outputs.artifact-digest }}"
+          if ($ArtifactDigest -notmatch "^sha256:") {
+            $ArtifactDigest = "sha256:$ArtifactDigest"
+          }
+
+          $env:APPDATA = Join-Path $SmokeRoot "app-data"
+          $env:USERPROFILE = Join-Path $SmokeRoot "user"
+          .\scripts\collect_windows_verification.ps1 `
+            -OutputPath (Join-Path $ReportRoot "automated-verification.json") `
+            -ArtifactRunUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" `
+            -ArtifactDigest $ArtifactDigest `
+            -SmokeResultPath (Join-Path $SmokeRoot "smoke-result.json") `
+            -ExpectedCurrentAccountId "acct-smoke" `
+            -UIParityEvidencePath (Join-Path $SmokeRoot "screenshots") `
+            -RequireAutomated
+
+      - name: Upload automated Windows verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexManager-Windows-Automated-Verification
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/codexmanager-verification/*.json
