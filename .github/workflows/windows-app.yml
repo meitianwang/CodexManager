@@ -194,6 +194,186 @@ jobs:
                 throw "Verification report did not include a successful proxy route probe for $Route."
               }
             }
+
+            $AutomatedEvidenceRoot = Join-Path $env:RUNNER_TEMP "codexmanager-template-automated-evidence"
+            $SmokeScreenshotRoot = Join-Path $AutomatedEvidenceRoot "screenshots"
+            New-Item -ItemType Directory -Force -Path $AutomatedEvidenceRoot, $SmokeScreenshotRoot | Out-Null
+            $ScreenshotBytes = [byte[]]::new(12000)
+            $SmokeScreenshotPaths = @{}
+            foreach ($Page in @("accounts", "proxy", "settings")) {
+              $ScreenshotPath = Join-Path $SmokeScreenshotRoot "$Page.png"
+              [System.IO.File]::WriteAllBytes($ScreenshotPath, $ScreenshotBytes)
+              $SmokeScreenshotPaths[$Page] = $ScreenshotPath
+            }
+
+            $SmokeResult = @{
+              status = "passed"
+              state = @{
+                activePage = "accounts"
+                bodyLength = 236
+                hasBridge = $true
+                pageTitle = "Accounts"
+              }
+              uiSnapshots = @(
+                @{
+                  activePage = "accounts"
+                  bodyLength = 305
+                  fingerprint = @{
+                    navItemCount = 3
+                    sidebarBrand = "CodexManager"
+                    sidebarStatus = "Proxy: Stopped"
+                    accounts = @{
+                      accountCount = 1
+                      actionButtons = @("Switch", "Refresh", "Delete")
+                      currentBadgeCount = 1
+                      hasSmokeAccount = $true
+                      hasSmokeEmail = $true
+                      toolbarButtons = @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota", "Refresh usage")
+                    }
+                  }
+                  page = "accounts"
+                  pageTitle = "Accounts"
+                  screenshotByteLength = 12000
+                  screenshotHeight = 471
+                  screenshotPath = $SmokeScreenshotPaths["accounts"]
+                  screenshotWidth = 944
+                },
+                @{
+                  activePage = "proxy"
+                  bodyLength = 613
+                  fingerprint = @{
+                    navItemCount = 3
+                    sidebarBrand = "CodexManager"
+                    sidebarStatus = "Proxy: Stopped"
+                    proxy = @{
+                      actionButtons = @("Start")
+                      codeCopyButtonCount = 2
+                      endpointPaths = @("/v1/chat/completions", "/v1/responses", "/v1/messages")
+                      formLabels = @("Port", "API key")
+                      modelChipCount = 3
+                      sectionHeadings = @("Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage")
+                      statusText = "Stopped"
+                    }
+                  }
+                  page = "proxy"
+                  pageTitle = "Proxy"
+                  screenshotByteLength = 12000
+                  screenshotHeight = 471
+                  screenshotPath = $SmokeScreenshotPaths["proxy"]
+                  screenshotWidth = 944
+                },
+                @{
+                  activePage = "settings"
+                  bodyLength = 383
+                  fingerprint = @{
+                    navItemCount = 3
+                    sidebarBrand = "CodexManager"
+                    sidebarStatus = "Proxy: Stopped"
+                    settings = @{
+                      footerButtons = @("GitHub Star", "Quit")
+                      languageOptionCount = 11
+                      sectionHeadings = @("Settings", "General", "Switch Behavior", "Language")
+                      selectLabels = @("Editor restart target", "Language")
+                      toggleLabels = @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")
+                    }
+                  }
+                  page = "settings"
+                  pageTitle = "Settings"
+                  screenshotByteLength = 12000
+                  screenshotHeight = 471
+                  screenshotPath = $SmokeScreenshotPaths["settings"]
+                  screenshotWidth = 944
+                }
+              )
+              workflows = @{
+                accounts = @{
+                  exportPackageAccountCount = 5
+                  importAuthFileAccountId = "acct-file"
+                  importAuthFileKind = "auth"
+                  importAuthFileLabel = "file@example.com"
+                  importCurrentAuthAccountId = "acct-import"
+                  importCurrentAuthLabel = "Imported smoke account"
+                  importPackageDraftAccountCount = 1
+                  importPackageDraftAccountId = "acct-package"
+                  importPackageFileKind = "package"
+                  importPackageInsertedCount = 1
+                  importPackageUpdatedCount = 0
+                  oauthAccountId = "acct-oauth"
+                  oauthLabel = "OAuth smoke account"
+                  oauthSignInCount = 1
+                  oauthTimeoutSeconds = 7
+                  restoredAccountCount = 1
+                  smartSwitchAccountId = "acct-package"
+                }
+                persistence = @{
+                  accountsCount = 1
+                  accountsJsonExists = $true
+                  codexAuthAccountId = "acct-ci"
+                  codexAuthExists = $true
+                  currentSelectionAccountId = "acct-ci"
+                  settingsJsonExists = $true
+                  settingsLocale = "en"
+                  settingsProxyPort = 0
+                }
+                platform = @{
+                  codexLaunchCount = 1
+                  codexWorkspacePath = 'C:\smoke-workspace'
+                  editorRestartCount = 1
+                  restartedEditorApps = @("cursor")
+                  startupSetEnabledValues = @($true, $false)
+                  startupSyncValues = @($false)
+                  usedFallbackCLI = $true
+                }
+                proxyHealthOK = $true
+                proxyPort = [int] $Port
+                proxyRoutes = @{
+                  alphaSearchStatus = 200
+                  chatCompletionsStatus = 200
+                  memoriesTraceSummarizeStatus = 200
+                  messagesStatus = 200
+                  modelsStatus = 200
+                  responsesCompactStatus = 200
+                  responsesStatus = 200
+                  upstreamAccountIds = @("acct-smoke")
+                  upstreamPathCount = 7
+                  upstreamPaths = @("models", "responses", "responses", "responses/compact", "memories/trace_summarize", "alpha/search", "responses")
+                }
+                proxyUnauthorizedStatus = 401
+                proxyWrongApiKeyStatus = 401
+                settingsLocale = "en"
+                switchedAccountId = "acct-ci"
+                tray = @{
+                  actionLabels = @("Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")
+                  completedActions = @("showWindow", "showWindow", "refreshAccounts", "smartSwitch", "startProxy", "stopProxy", "quit")
+                  menuActionIDs = @("showWindow", "refreshAccounts", "smartSwitch", "startProxy", "quit")
+                  primaryClickShowWindowCount = 2
+                  proxyToggleSequence = @($true, $false)
+                  quitRequested = $true
+                  refreshAccountCount = 1
+                  smartSwitchAccountId = "acct-ci"
+                  tooltip = "CodexManager - 5h 0% / 1w 0%"
+                }
+              }
+            }
+            $SmokeResult | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath (Join-Path $AutomatedEvidenceRoot "smoke-result.json") -Encoding UTF8
+
+            $TemplateReportPath = Join-Path $env:RUNNER_TEMP "codexmanager-template-verification-report.json"
+            .\scripts\windows_manual_verification_template.ps1 `
+              -ArtifactRunUrl "https://github.com/meitianwang/CodexManager/actions/runs/0" `
+              -ArtifactDigest "sha256:0000000000000000000000000000000000000000000000000000000000000000" `
+              -RepoRoot $PWD `
+              -AutomatedEvidencePath $AutomatedEvidenceRoot `
+              -UIParityEvidencePath $UIEvidenceRoot `
+              -ProxyPort ([int] $Port) `
+              -ProxyApiKey "sk-local-ci" `
+              -ExpectedCurrentAccountId "acct-ci" `
+              -OutputPath $TemplateReportPath
+            $TemplateReport = Get-Content -Raw $TemplateReportPath | ConvertFrom-Json
+            $FailedTemplateChecks = @($TemplateReport.checks.PSObject.Properties | Where-Object { -not $_.Value.passed })
+            if ($FailedTemplateChecks.Count -gt 0) {
+              $FailedNames = ($FailedTemplateChecks | ForEach-Object { $_.Name }) -join ", "
+              throw "Manual verification template self-test left failed checks: $FailedNames"
+            }
           } finally {
             if (-not $MockProxy.HasExited) {
               Stop-Process -Id $MockProxy.Id -Force
