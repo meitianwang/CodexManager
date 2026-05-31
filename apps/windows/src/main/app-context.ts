@@ -5,6 +5,7 @@ import { AuthFileRepository } from "./repositories/auth-repository";
 import { resolveWindowsFileSystemPaths, type FileSystemPaths } from "./repositories/file-system-paths";
 import { SettingsFileRepository } from "./repositories/settings-repository";
 import { ProxyCoordinator } from "./proxy/proxy-coordinator";
+import type { CodexUpstreamClientLike, CodexUpstreamRequest, CodexUpstreamResult } from "./proxy/upstream-client";
 import { AccountsCoordinator } from "./services/accounts-coordinator";
 import { OpenAIChatGPTOAuthLoginService } from "./services/oauth/openai-chatgpt-oauth-service";
 import { ProxyRuntimeService } from "./services/proxy-runtime-service";
@@ -31,6 +32,13 @@ export interface SmokePlatformSideEffectLog {
     accountId: string;
     allowedWorkspaceId?: string;
     timeoutSeconds: number;
+  }>;
+  proxyUpstreamRequests: Array<{
+    accountId: string;
+    bodyLength: number;
+    isStream: boolean;
+    method: string;
+    normalizedPath: string;
   }>;
   startupSetEnabledValues: boolean[];
   startupSyncValues: boolean[];
@@ -90,7 +98,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
       authRepository,
       codexConfigPath: paths.codexConfigPath,
       chatGPTOAuthLoginService,
-      modelCatalogService: remoteModelCatalogService
+      modelCatalogService: remoteModelCatalogService,
+      upstreamClient: smokePlatformSideEffects?.proxyUpstreamClient
     }),
     settingsCoordinator,
     { modelCatalogService: remoteModelCatalogService }
@@ -161,6 +170,7 @@ function createSmokePlatformSideEffects():
         setEnabled(enabled: boolean): void;
         syncWithStoreValue(enabled: boolean): void;
       };
+      proxyUpstreamClient: CodexUpstreamClientLike;
     })
   | undefined {
   if (!process.env.CODEX_MANAGER_ELECTRON_SMOKE_ROOT) {
@@ -171,6 +181,7 @@ function createSmokePlatformSideEffects():
     codexLaunches: [],
     editorRestarts: [],
     oauthSignIns: [],
+    proxyUpstreamRequests: [],
     startupSetEnabledValues: [],
     startupSyncValues: []
   };
@@ -214,6 +225,47 @@ function createSmokePlatformSideEffects():
         log.startupSyncValues.push(enabled);
       }
     },
+    proxyUpstreamClient: {
+      async execute(request: CodexUpstreamRequest): Promise<CodexUpstreamResult> {
+        const normalizedPath = normalizedSmokeUpstreamPath(request.url);
+        log.proxyUpstreamRequests.push({
+          accountId: request.accountId,
+          bodyLength: request.body.byteLength,
+          isStream: request.isStream,
+          method: request.method,
+          normalizedPath
+        });
+
+        switch (normalizedPath) {
+          case "models":
+            return smokeJSONUpstreamResult({
+              data: [
+                { id: "gpt-5", object: "model" },
+                { id: "gpt-5-codex", object: "model" }
+              ]
+            });
+          case "responses":
+            return smokeSSEUpstreamResult("ok", {
+              id: "resp-smoke",
+              output: [
+                {
+                  type: "message",
+                  content: [{ type: "output_text", text: "ok" }]
+                }
+              ],
+              usage: { input_tokens: 1, output_tokens: 1 }
+            });
+          case "responses/compact":
+            return smokeJSONUpstreamResult({ id: "compact-smoke", compacted: true });
+          case "memories/trace_summarize":
+            return smokeJSONUpstreamResult({ id: "memory-smoke", summary: "ok" });
+          case "alpha/search":
+            return smokeJSONUpstreamResult({ results: [{ id: "search-smoke", title: "ok" }] });
+          default:
+            return smokeJSONUpstreamResult({ id: "smoke", path: normalizedPath });
+        }
+      }
+    },
     snapshot(): SmokePlatformSideEffectLog {
       return {
         codexLaunches: log.codexLaunches.map((entry) => ({ ...entry })),
@@ -222,10 +274,47 @@ function createSmokePlatformSideEffects():
           targets: [...entry.targets]
         })),
         oauthSignIns: log.oauthSignIns.map((entry) => ({ ...entry })),
+        proxyUpstreamRequests: log.proxyUpstreamRequests.map((entry) => ({ ...entry })),
         startupSetEnabledValues: [...log.startupSetEnabledValues],
         startupSyncValues: [...log.startupSyncValues]
       };
     }
+  };
+}
+
+function normalizedSmokeUpstreamPath(url: string): string {
+  const path = new URL(url).pathname;
+  const marker = "/backend-api/codex/";
+  const markerIndex = path.indexOf(marker);
+  return markerIndex >= 0 ? path.slice(markerIndex + marker.length) : path.replace(/^\/+/, "");
+}
+
+function smokeJSONUpstreamResult(body: unknown): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8"
+    },
+    body: Buffer.from(JSON.stringify(body), "utf8")
+  };
+}
+
+function smokeSSEUpstreamResult(text: string, response: Record<string, unknown>): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8"
+    },
+    body: Buffer.from(
+      [
+        `data: ${JSON.stringify({ type: "response.output_text.delta", delta: text })}`,
+        "",
+        `data: ${JSON.stringify({ type: "response.completed", response })}`,
+        "",
+        ""
+      ].join("\n"),
+      "utf8"
+    )
   };
 }
 

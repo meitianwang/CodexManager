@@ -91,7 +91,9 @@ interface SmokeWorkflowState {
   platform: SmokePlatformWorkflowState;
   proxyHealthOK: boolean;
   proxyPort: number;
+  proxyRoutes: SmokeProxyRouteWorkflowState;
   proxyUnauthorizedStatus: number;
+  proxyWrongApiKeyStatus: number;
   settingsLocale: string;
   switchedAccountId: string;
   tray: SmokeTrayWorkflowState;
@@ -126,6 +128,19 @@ interface SmokePlatformWorkflowState {
   startupSetEnabledValues: boolean[];
   startupSyncValues: boolean[];
   usedFallbackCLI: boolean;
+}
+
+interface SmokeProxyRouteWorkflowState {
+  alphaSearchStatus: number;
+  chatCompletionsStatus: number;
+  memoriesTraceSummarizeStatus: number;
+  messagesStatus: number;
+  modelsStatus: number;
+  responsesCompactStatus: number;
+  responsesStatus: number;
+  upstreamAccountIds: string[];
+  upstreamPathCount: number;
+  upstreamPaths: string[];
 }
 
 interface SmokeTrayWorkflowState {
@@ -778,6 +793,20 @@ async function verifySmokeWorkflows(context: WindowsAppContext, browserWindow: B
     if (unauthorizedResponse.status !== 401) {
       throw new Error(`Smoke proxy auth expected 401, got ${unauthorizedResponse.status}`);
     }
+    await unauthorizedResponse.arrayBuffer();
+    const wrongApiKeyResponse = await fetch(`${proxyState.proxyURL}/v1/responses`, {
+      body: JSON.stringify({ input: [], model: "gpt-5" }),
+      headers: {
+        Authorization: "Bearer sk-local-wrong",
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    });
+    if (wrongApiKeyResponse.status !== 401) {
+      throw new Error(`Smoke proxy wrong API key expected 401, got ${wrongApiKeyResponse.status}`);
+    }
+    await wrongApiKeyResponse.arrayBuffer();
+    const proxyRoutes = await verifySmokeProxyRoutes(context, proxyState.proxyURL, "sk-local-smoke");
 
     const persistence = readSmokePersistenceState(context, smokeChatGPTAccountId);
     if (
@@ -799,7 +828,9 @@ async function verifySmokeWorkflows(context: WindowsAppContext, browserWindow: B
       platform,
       proxyHealthOK: true,
       proxyPort: proxyState.port,
+      proxyRoutes,
       proxyUnauthorizedStatus: unauthorizedResponse.status,
+      proxyWrongApiKeyStatus: wrongApiKeyResponse.status,
       settingsLocale: settings.locale,
       switchedAccountId: currentAuth.accountId,
       tray
@@ -807,6 +838,101 @@ async function verifySmokeWorkflows(context: WindowsAppContext, browserWindow: B
   } finally {
     await context.proxyRuntimeService.stop();
   }
+}
+
+async function verifySmokeProxyRoutes(
+  context: WindowsAppContext,
+  proxyURL: string,
+  apiKey: string
+): Promise<SmokeProxyRouteWorkflowState> {
+  const commonHeaders = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json"
+  };
+  const anthropicHeaders = {
+    "Content-Type": "application/json",
+    "anthropic-version": "2023-06-01",
+    "x-api-key": apiKey
+  };
+  const statuses = {
+    modelsStatus: await smokeProxyStatus(proxyURL, "/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` }
+    }),
+    chatCompletionsStatus: await smokeProxyStatus(proxyURL, "/v1/chat/completions", {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({
+        model: "gpt-5",
+        messages: [{ role: "user", content: "Reply with exactly: ok" }],
+        stream: false
+      })
+    }),
+    responsesStatus: await smokeProxyStatus(proxyURL, "/v1/responses", {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({ model: "gpt-5", input: "Reply with exactly: ok", stream: false })
+    }),
+    responsesCompactStatus: await smokeProxyStatus(proxyURL, "/v1/responses/compact", {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({
+        model: "gpt-5-codex",
+        stream: false,
+        input: [{ role: "user", content: "compact this" }],
+        tools: [],
+        parallel_tool_calls: true
+      })
+    }),
+    memoriesTraceSummarizeStatus: await smokeProxyStatus(proxyURL, "/v1/memories/trace_summarize", {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({ model: "gpt-5-codex", traces: [], reasoning: { effort: "low" } })
+    }),
+    alphaSearchStatus: await smokeProxyStatus(proxyURL, "/v1/alpha/search", {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({ query: "codex", commands: [] })
+    }),
+    messagesStatus: await smokeProxyStatus(proxyURL, "/v1/messages", {
+      method: "POST",
+      headers: anthropicHeaders,
+      body: JSON.stringify({
+        model: "gpt-5",
+        max_tokens: 16,
+        messages: [{ role: "user", content: "Reply with exactly: ok" }]
+      })
+    })
+  };
+
+  for (const [route, status] of Object.entries(statuses)) {
+    if (status < 200 || status >= 300) {
+      throw new Error(`Smoke proxy route ${route} returned HTTP ${status}`);
+    }
+  }
+
+  const upstreamRequests = context.smokePlatformSideEffects?.snapshot().proxyUpstreamRequests ?? [];
+  const upstreamPaths = upstreamRequests.map((request) => request.normalizedPath);
+  if (!includesAll(upstreamPaths, ["models", "responses", "responses/compact", "memories/trace_summarize", "alpha/search"])) {
+    throw new Error(`Smoke proxy routes did not reach all expected upstream paths: ${JSON.stringify(upstreamRequests)}`);
+  }
+  const responsePathCount = upstreamPaths.filter((pathName) => pathName === "responses").length;
+  if (responsePathCount < 3) {
+    throw new Error(`Smoke proxy routes did not translate chat/responses/messages through responses: ${JSON.stringify(upstreamRequests)}`);
+  }
+
+  return {
+    ...statuses,
+    upstreamAccountIds: [...new Set(upstreamRequests.map((request) => request.accountId))],
+    upstreamPathCount: upstreamPaths.length,
+    upstreamPaths
+  };
+}
+
+async function smokeProxyStatus(proxyURL: string, pathName: string, init: RequestInit): Promise<number> {
+  const response = await fetch(`${proxyURL}${pathName}`, init);
+  await response.arrayBuffer();
+  return response.status;
 }
 
 async function verifySmokeAccountWorkflows(

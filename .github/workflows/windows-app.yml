@@ -241,6 +241,27 @@ jobs:
             -not ([bool]$Result.workflows.proxyHealthOK)
             $Result.workflows.proxyPort -le 0
             $Result.workflows.proxyUnauthorizedStatus -ne 401
+            $Result.workflows.proxyWrongApiKeyStatus -ne 401
+            $Result.workflows.proxyRoutes.modelsStatus -lt 200
+            $Result.workflows.proxyRoutes.modelsStatus -ge 300
+            $Result.workflows.proxyRoutes.chatCompletionsStatus -lt 200
+            $Result.workflows.proxyRoutes.chatCompletionsStatus -ge 300
+            $Result.workflows.proxyRoutes.responsesStatus -lt 200
+            $Result.workflows.proxyRoutes.responsesStatus -ge 300
+            $Result.workflows.proxyRoutes.responsesCompactStatus -lt 200
+            $Result.workflows.proxyRoutes.responsesCompactStatus -ge 300
+            $Result.workflows.proxyRoutes.memoriesTraceSummarizeStatus -lt 200
+            $Result.workflows.proxyRoutes.memoriesTraceSummarizeStatus -ge 300
+            $Result.workflows.proxyRoutes.alphaSearchStatus -lt 200
+            $Result.workflows.proxyRoutes.alphaSearchStatus -ge 300
+            $Result.workflows.proxyRoutes.messagesStatus -lt 200
+            $Result.workflows.proxyRoutes.messagesStatus -ge 300
+            $Result.workflows.proxyRoutes.upstreamPathCount -lt 7
+            @($Result.workflows.proxyRoutes.upstreamPaths) -notcontains "models"
+            @($Result.workflows.proxyRoutes.upstreamPaths) -notcontains "responses"
+            @($Result.workflows.proxyRoutes.upstreamPaths) -notcontains "responses/compact"
+            @($Result.workflows.proxyRoutes.upstreamPaths) -notcontains "memories/trace_summarize"
+            @($Result.workflows.proxyRoutes.upstreamPaths) -notcontains "alpha/search"
             $Result.workflows.settingsLocale -ne "en"
             $Result.workflows.switchedAccountId -ne "acct-smoke"
             $Result.workflows.accounts.importCurrentAuthAccountId -ne "acct-import"

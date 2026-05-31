@@ -589,8 +589,30 @@ function Add-SmokeResultChecks {
   Add-Check "automated.proxySmoke" (
     (Get-BoolValue (Get-PropertyValue $workflows "proxyHealthOK")) -and
     (Get-NumberValue (Get-PropertyValue $workflows "proxyPort")) -gt 0 -and
-    (Get-NumberValue (Get-PropertyValue $workflows "proxyUnauthorizedStatus")) -eq 401
+    (Get-NumberValue (Get-PropertyValue $workflows "proxyUnauthorizedStatus")) -eq 401 -and
+    (Get-NumberValue (Get-PropertyValue $workflows "proxyWrongApiKeyStatus")) -eq 401
   ) $workflows
+
+  $proxyRoutes = Get-PropertyValue $workflows "proxyRoutes"
+  Add-Check "automated.proxyRoutes" (
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "modelsStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "modelsStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "chatCompletionsStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "chatCompletionsStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "responsesStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "responsesStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "responsesCompactStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "responsesCompactStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "memoriesTraceSummarizeStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "memoriesTraceSummarizeStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "alphaSearchStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "alphaSearchStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "messagesStatus")) -ge 200 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "messagesStatus")) -lt 300 -and
+    (Get-NumberValue (Get-PropertyValue $proxyRoutes "upstreamPathCount")) -ge 7 -and
+    (Test-ContainsAll (Get-PropertyValue $proxyRoutes "upstreamPaths") @("models", "responses", "responses/compact", "memories/trace_summarize", "alpha/search")) -and
+    (Test-ContainsAll (Get-PropertyValue $proxyRoutes "upstreamAccountIds") @("acct-smoke"))
+  ) $proxyRoutes
 }
 
 function Get-EvidencePathStatus {
