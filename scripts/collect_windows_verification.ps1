@@ -19,6 +19,8 @@ param(
 
   [switch] $ImportCurrentAuthVerified,
 
+  [switch] $ImportAuthFileVerified,
+
   [switch] $ImportExportPackageVerified,
 
   [switch] $SwitchVerified,
@@ -388,6 +390,7 @@ Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.P
 Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
 Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."
 Add-Check "manual.importCurrentAuth" $ImportCurrentAuthVerified.IsPresent "Pass -ImportCurrentAuthVerified only after importing the current Codex auth file."
+Add-Check "manual.importAuthFile" $ImportAuthFileVerified.IsPresent "Pass -ImportAuthFileVerified only after importing a selected auth.json file through Import file."
 Add-Check "manual.importExportPackage" $ImportExportPackageVerified.IsPresent "Pass -ImportExportPackageVerified only after exporting and importing an account transfer package."
 Add-Check "manual.switch" $SwitchVerified.IsPresent "Pass -SwitchVerified only after switching accounts and checking the active auth."
 Add-Check "manual.smartSwitch" $SmartSwitchVerified.IsPresent "Pass -SmartSwitchVerified only after confirming Smart Switch chooses the best available account."

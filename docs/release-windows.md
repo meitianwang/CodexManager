@@ -82,6 +82,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -AppLaunchVerified `
   -OAuthVerified `
   -ImportCurrentAuthVerified `
+  -ImportAuthFileVerified `
   -ImportExportPackageVerified `
   -SwitchVerified `
   -SmartSwitchVerified `
@@ -99,6 +100,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
 
 - App launches and opens the Accounts page.
 - Accounts page can import the current `%USERPROFILE%\.codex\auth.json`.
+- Accounts page can import a selected standalone `auth.json` through **Import file**.
 - ChatGPT OAuth opens the default browser, completes callback, imports the account, and surfaces errors on failure.
 - Switching accounts updates `%USERPROFILE%\.codex\auth.json`.
 - Smart switch chooses the account with the most available quota.

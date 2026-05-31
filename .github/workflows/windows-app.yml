@@ -156,6 +156,7 @@ jobs:
               -AppLaunchVerified `
               -OAuthVerified `
               -ImportCurrentAuthVerified `
+              -ImportAuthFileVerified `
               -ImportExportPackageVerified `
               -SwitchVerified `
               -SmartSwitchVerified `
