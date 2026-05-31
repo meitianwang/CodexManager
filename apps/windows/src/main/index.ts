@@ -774,6 +774,22 @@ async function verifySmokeWorkflows(context: WindowsAppContext, browserWindow: B
   const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now, browserWindow);
   const platform = await verifySmokePlatformSideEffects(context, account);
   const tray = await verifySmokeTrayWorkflow(context);
+  const proxyAccount = makeSmokeStoredAccount({
+    accountId: smokeChatGPTAccountId,
+    authJson,
+    email: smokeEmail,
+    id: smokeAccountId,
+    label: "Smoke account",
+    now,
+    oneWeekUsedPercent: 0,
+    teamName: "Smoke Team"
+  });
+  await context.storeRepository.saveStore({
+    version: 1,
+    accounts: [proxyAccount]
+  });
+  await context.accountsCoordinator.switchAccount(proxyAccount.id);
+  publishAccounts(await context.accountsCoordinator.listAccounts());
 
   const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
   try {
