@@ -254,6 +254,9 @@ jobs:
             $Result.workflows.accounts.importAuthFileKind -ne "auth"
             $Result.workflows.accounts.importAuthFileAccountId -ne "acct-file"
             $Result.workflows.accounts.importAuthFileLabel -ne "file@example.com"
+            $Result.workflows.accounts.importPackageFileKind -ne "package"
+            $Result.workflows.accounts.importPackageDraftAccountCount -ne 1
+            $Result.workflows.accounts.importPackageDraftAccountId -ne "acct-package"
             $Result.workflows.accounts.exportPackageAccountCount -ne 5
             $Result.workflows.accounts.smartSwitchAccountId -ne "acct-package"
             $Result.workflows.accounts.restoredAccountCount -ne 1

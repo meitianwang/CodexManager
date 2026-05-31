@@ -9,6 +9,7 @@ import type { StoredAccount } from "../shared/models/accounts";
 import {
   accountsTransferCurrentVersion,
   accountsTransferFormatIdentifier,
+  type AccountsImportResult,
   type AccountsImportFileResult
 } from "../shared/models/account-transfer";
 import type { JSONValue } from "../shared/models/json-value";
@@ -103,6 +104,9 @@ interface SmokeAccountWorkflowState {
   importAuthFileLabel: string;
   importCurrentAuthAccountId: string;
   importCurrentAuthLabel: string;
+  importPackageDraftAccountCount: number;
+  importPackageDraftAccountId: string;
+  importPackageFileKind: string;
   importPackageInsertedCount: number;
   importPackageUpdatedCount: number;
   oauthAccountId: string;
@@ -840,15 +844,8 @@ async function verifySmokeAccountWorkflows(
     oneWeekUsedPercent: 10,
     teamName: "Package Team"
   });
-  const importPackageResult = await context.accountsCoordinator.importAccountsTransferPackage(
-    {
-      accounts: [packageAccount],
-      exportedAt: now,
-      format: accountsTransferFormatIdentifier,
-      version: accountsTransferCurrentVersion
-    },
-    new Set([packageAccount.id])
-  );
+  const importPackageFileResult = await importSmokePackageThroughRenderer(context, browserWindow, packageAccount, now);
+  const importPackageResult = importPackageFileResult.importResult;
   if (importPackageResult.insertedCount !== 1 || importPackageResult.updatedCount !== 0) {
     throw new Error(`Smoke import package failed: ${JSON.stringify(importPackageResult)}`);
   }
@@ -890,6 +887,9 @@ async function verifySmokeAccountWorkflows(
     importAuthFileLabel: importAuthFileResult.account.label,
     importCurrentAuthAccountId: importedAccount.accountId,
     importCurrentAuthLabel: importedAccount.label,
+    importPackageDraftAccountCount: importPackageFileResult.importFileResult.draft.accounts.length,
+    importPackageDraftAccountId: importPackageFileResult.importFileResult.draft.accounts[0]?.accountId ?? "",
+    importPackageFileKind: importPackageFileResult.importFileResult.kind,
     importPackageInsertedCount: importPackageResult.insertedCount,
     importPackageUpdatedCount: importPackageResult.updatedCount,
     oauthAccountId: oauthAccount.accountId,
@@ -922,6 +922,60 @@ async function importSmokeAuthFileThroughRenderer(
       throw new Error(`Smoke Import file imported the wrong account: ${JSON.stringify(result.account)}`);
     }
     return result;
+  } finally {
+    delete process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH;
+  }
+}
+
+async function importSmokePackageThroughRenderer(
+  context: WindowsAppContext,
+  browserWindow: BrowserWindow,
+  packageAccount: StoredAccount,
+  exportedAt: number
+): Promise<{
+  importFileResult: Extract<AccountsImportFileResult, { kind: "package" }>;
+  importResult: AccountsImportResult;
+}> {
+  const importFilePath = path.join(context.paths.applicationSupportDirectory, "smoke-import-package.json");
+  mkdirSync(path.dirname(importFilePath), { recursive: true });
+  writeFileSync(
+    importFilePath,
+    JSON.stringify({
+      accounts: [packageAccount],
+      exportedAt,
+      format: accountsTransferFormatIdentifier,
+      version: accountsTransferCurrentVersion
+    }),
+    "utf8"
+  );
+
+  process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH = importFilePath;
+  try {
+    const importFileResult = await browserWindow.webContents.executeJavaScript(
+      `window.codexManager?.accounts.importFile() ?? Promise.reject(new Error("Preload IPC bridge is unavailable"))`,
+      true
+    );
+    if (!isSmokePackageImportFileResult(importFileResult)) {
+      throw new Error(`Smoke package Import file returned an unexpected result: ${JSON.stringify(importFileResult)}`);
+    }
+    const importedDraftAccount = importFileResult.draft.accounts[0];
+    if (
+      importFileResult.draft.accounts.length !== 1 ||
+      importedDraftAccount?.id !== packageAccount.id ||
+      importedDraftAccount.accountId !== packageAccount.accountId
+    ) {
+      throw new Error(`Smoke package Import file returned the wrong draft: ${JSON.stringify(importFileResult.draft)}`);
+    }
+
+    const importResult = await browserWindow.webContents.executeJavaScript(
+      `window.codexManager?.accounts.importPreparedPackage(${JSON.stringify(importFileResult.draft.draftId)}, ${JSON.stringify([packageAccount.id])}) ?? Promise.reject(new Error("Preload IPC bridge is unavailable"))`,
+      true
+    );
+    if (!isSmokeAccountsImportResult(importResult)) {
+      throw new Error(`Smoke package prepared import returned an unexpected result: ${JSON.stringify(importResult)}`);
+    }
+
+    return { importFileResult, importResult };
   } finally {
     delete process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH;
   }
@@ -1212,6 +1266,32 @@ function isSmokeAuthImportFileResult(value: unknown): value is Extract<AccountsI
     typeof account.id === "string" &&
     typeof account.accountId === "string" &&
     typeof account.label === "string"
+  );
+}
+
+function isSmokePackageImportFileResult(value: unknown): value is Extract<AccountsImportFileResult, { kind: "package" }> {
+  if (!isRecord(value) || value.kind !== "package" || !isRecord(value.draft)) {
+    return false;
+  }
+  const draft = value.draft;
+  return (
+    typeof draft.draftId === "string" &&
+    Array.isArray(draft.accounts) &&
+    draft.accounts.every(
+      (account) =>
+        isRecord(account) &&
+        typeof account.id === "string" &&
+        typeof account.accountId === "string" &&
+        typeof account.label === "string"
+    )
+  );
+}
+
+function isSmokeAccountsImportResult(value: unknown): value is AccountsImportResult {
+  return (
+    isRecord(value) &&
+    typeof value.insertedCount === "number" &&
+    typeof value.updatedCount === "number"
   );
 }
 

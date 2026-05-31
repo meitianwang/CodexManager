@@ -556,6 +556,9 @@ function Add-SmokeResultChecks {
     (Get-StringValue (Get-PropertyValue $accountWorkflows "importAuthFileKind")) -eq "auth" -and
     (Get-StringValue (Get-PropertyValue $accountWorkflows "importAuthFileAccountId")) -eq "acct-file" -and
     (Get-StringValue (Get-PropertyValue $accountWorkflows "importAuthFileLabel")) -eq "file@example.com" -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "importPackageFileKind")) -eq "package" -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "importPackageDraftAccountCount")) -eq 1 -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "importPackageDraftAccountId")) -eq "acct-package" -and
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "exportPackageAccountCount")) -eq 5 -and
     (Get-StringValue (Get-PropertyValue $accountWorkflows "smartSwitchAccountId")) -eq "acct-package" -and
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "restoredAccountCount")) -eq 1
