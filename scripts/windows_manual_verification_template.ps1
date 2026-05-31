@@ -42,12 +42,14 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 
 $CollectorPath = Join-Path $RepoRoot "scripts\collect_windows_verification.ps1"
 $SmokeResultPath = Join-Path $AutomatedEvidencePath "smoke-result.json"
+$ArtifactRunUrlPlaceholder = "__ARTIFACT" + "_RUN_URL__"
+$ArtifactDigestPlaceholder = "__ARTIFACT" + "_DIGEST__"
 
-if ($ArtifactRunUrl -eq "__ARTIFACT_RUN_URL__" -or [string]::IsNullOrWhiteSpace($ArtifactRunUrl)) {
+if ($ArtifactRunUrl -eq $ArtifactRunUrlPlaceholder -or [string]::IsNullOrWhiteSpace($ArtifactRunUrl)) {
   throw "Pass -ArtifactRunUrl, or use the prefilled template from the CodexManager-Windows-Automated-Verification artifact."
 }
 
-if ($ArtifactDigest -eq "__ARTIFACT_DIGEST__" -or [string]::IsNullOrWhiteSpace($ArtifactDigest)) {
+if ($ArtifactDigest -eq $ArtifactDigestPlaceholder -or [string]::IsNullOrWhiteSpace($ArtifactDigest)) {
   throw "Pass -ArtifactDigest, or use the prefilled template from the CodexManager-Windows-Automated-Verification artifact."
 }
 
