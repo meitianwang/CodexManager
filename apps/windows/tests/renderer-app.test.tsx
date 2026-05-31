@@ -341,7 +341,7 @@ describe("Windows renderer app", () => {
     expect(codeBlockCopyButtons()).toHaveLength(2);
     expect(codeBlockCopyButtons().every((button) => button.textContent === "")).toBe(true);
     expect(codeBlockCopyButtons().every((button) => button.querySelector(".copy-doc-icon"))).toBe(true);
-    const apiKeyControl = screen.getByLabelText("API key").closest(".api-key-field")?.querySelector(".api-key-control");
+    const apiKeyControl = screen.getByLabelText("API Key").closest(".api-key-field")?.querySelector(".api-key-control");
     expect(apiKeyControl).toBeTruthy();
     expect(within(apiKeyControl as HTMLElement).getByRole("button", { name: "Regenerate API Key" })).toBeTruthy();
     expect(directProxyControlButtonText()).toEqual(["Start"]);
@@ -349,7 +349,7 @@ describe("Windows renderer app", () => {
     expect(proxyUsageText()).not.toContain("sk-local-test");
 
     fireEvent.change(screen.getByLabelText("Port"), { target: { value: "17888" } });
-    fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-local-test" } });
+    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "sk-local-test" } });
     expect(proxyUsageText()).toContain("sk-local-...");
     expect(proxyUsageText()).not.toContain("sk-local-test");
 

@@ -663,7 +663,7 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
       fingerprint.proxy !== undefined &&
       includesAll(fingerprint.proxy.sectionHeadings, ["Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage"]) &&
       includesAll(fingerprint.proxy.endpointPaths, ["/v1/chat/completions", "/v1/responses", "/v1/messages"]) &&
-      includesAll(fingerprint.proxy.formLabels, ["Port", "API key"]) &&
+      includesAll(fingerprint.proxy.formLabels, ["Port", "API Key"]) &&
       includesAll(fingerprint.proxy.actionButtons, ["Start"]) &&
       fingerprint.proxy.codeCopyButtonCount === 2 &&
       fingerprint.proxy.modelChipCount >= 3 &&

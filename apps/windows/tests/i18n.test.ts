@@ -150,7 +150,19 @@ describe("renderer i18n", () => {
       expect(createTranslator(locale)("accounts.card.team_alias"), `${locale}:accounts.card.team_alias`).toBe(expected);
     }
   });
+
+  it("uses the macOS hard-coded proxy API key label for every locale", () => {
+    expect(readSwiftSource("Sources/CodexManager/Features/Proxy/ProxyPageView.swift")).toContain('ProxyFormRow(title: "API Key")');
+
+    for (const locale of appLocales) {
+      expect(createTranslator(locale)("proxy.api_key"), `${locale}:proxy.api_key`).toBe("API Key");
+    }
+  });
 });
+
+function readSwiftSource(relativePath: string): string {
+  return readFileSync(resolve(repositoryRoot, relativePath), "utf8");
+}
 
 function readMacLocalization(locale: string): Map<string, string> {
   const stringsPath = resolve(repositoryRoot, "Sources/CodexManager/Resources", `${locale}.lproj`, "Localizable.strings");
