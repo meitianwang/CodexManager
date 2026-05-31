@@ -476,6 +476,44 @@ describe("local proxy", () => {
     expect(events.at(-1)).toMatchObject({ event: "message_stop" });
   });
 
+  it("returns mac-compatible Anthropic errors for invalid Messages JSON", async () => {
+    const upstream = new FakeUpstreamClient([]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await rawAuthorizedFetch(context.port, "/v1/messages", "{");
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      type: "error",
+      error: {
+        type: "api_error",
+        message: "Request body must be a JSON object"
+      }
+    });
+    expect(upstream.requests).toEqual([]);
+  });
+
+  it("returns mac-compatible Anthropic errors for Messages requests without a model", async () => {
+    const upstream = new FakeUpstreamClient([]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/messages", {
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      type: "error",
+      error: {
+        type: "api_error",
+        message: "Missing required field: model"
+      }
+    });
+    expect(upstream.requests).toEqual([]);
+  });
+
   it("translates non-streaming Anthropic responses to Anthropic message JSON", async () => {
     const upstream = new FakeUpstreamClient([
       completedResponseResult({

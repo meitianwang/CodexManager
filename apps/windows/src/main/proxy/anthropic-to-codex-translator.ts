@@ -476,7 +476,7 @@ function buildAnthropicMessage(response: Record<string, unknown>, model: string)
   };
 }
 
-function anthropicErrorBody(message: string): Record<string, unknown> {
+export function anthropicErrorBody(message: string): Record<string, unknown> {
   return {
     type: "error",
     error: { type: "api_error", message }

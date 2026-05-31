@@ -17,6 +17,7 @@ import {
   translateCodexSSEToChatCompletionChunks
 } from "./chat-to-codex-translator";
 import {
+  anthropicErrorBody,
   translateAnthropicRequest,
   translateCodexSSEToAnthropicMessage,
   translateCodexSSEToAnthropicStream
@@ -177,13 +178,15 @@ export class ProxyCoordinator {
       }
 
       const body = await readRequestBody(request);
+      if (url.pathname === "/v1/messages") {
+        await this.handleAnthropicMessages(request, response, parseAnthropicJsonObject(body));
+        return;
+      }
+
       const json = parseJsonObject(body);
       switch (url.pathname) {
         case "/v1/chat/completions":
           await this.handleChatCompletions(request, response, json);
-          return;
-        case "/v1/messages":
-          await this.handleAnthropicMessages(request, response, json);
           return;
         case "/v1/responses":
           await this.forwardCodexJSON(request, response, "responses", json, true);
@@ -201,6 +204,10 @@ export class ProxyCoordinator {
     } catch (error) {
       if (error instanceof ProxyBadRequestError) {
         sendProxyError(response, 400, error.message);
+        return;
+      }
+      if (error instanceof ProxyAnthropicBadRequestError) {
+        sendJson(response, 400, anthropicErrorBody(error.message));
         return;
       }
       if (error instanceof ProxyResponseError) {
@@ -264,7 +271,7 @@ export class ProxyCoordinator {
   ): Promise<void> {
     const translation = translateAnthropicRequest(json);
     if (!translation) {
-      sendJson(response, 400, { error: { message: "Invalid Anthropic request" } });
+      sendJson(response, 400, anthropicErrorBody("Missing required field: model"));
       return;
     }
 
@@ -658,10 +665,28 @@ function parseJsonObject(body: Buffer): Record<string, unknown> {
   return parsed;
 }
 
+function parseAnthropicJsonObject(body: Buffer): Record<string, unknown> {
+  try {
+    return parseJsonObject(body);
+  } catch (error) {
+    if (error instanceof ProxyBadRequestError) {
+      throw new ProxyAnthropicBadRequestError(error.message);
+    }
+    throw error;
+  }
+}
+
 class ProxyBadRequestError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ProxyBadRequestError";
+  }
+}
+
+class ProxyAnthropicBadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProxyAnthropicBadRequestError";
   }
 }
 
