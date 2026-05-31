@@ -450,20 +450,30 @@ describe("accounts coordinator", () => {
     expect(storeRepository.store.accounts[0]?.teamName).toBe("Workspace Alpha");
   });
 
-  it("warms expired exhausted weekly quota accounts and refreshes usage", async () => {
-    const target = makeStoredAccount({
-      id: "target",
-      accountId: "acct-target",
+  it("warms fresh reset and expired exhausted weekly quota accounts", async () => {
+    const fresh = makeStoredAccount({
+      id: "fresh",
+      accountId: "acct-fresh",
+      usage: freshResetWeeklyUsage(1_780_000_001)
+    });
+    const expired = makeStoredAccount({
+      id: "expired",
+      accountId: "acct-expired",
       usage: exhaustedWeeklyUsage(1_779_999_999)
     });
-    const future = makeStoredAccount({
-      id: "future",
-      accountId: "acct-future",
+    const futureExhausted = makeStoredAccount({
+      id: "future-exhausted",
+      accountId: "acct-future-exhausted",
       usage: exhaustedWeeklyUsage(1_780_000_001)
+    });
+    const partial = makeStoredAccount({
+      id: "partial",
+      accountId: "acct-partial",
+      usage: partialWeeklyUsage(1_779_999_999)
     });
     const storeRepository = new MemoryStoreRepository({
       version: 1,
-      accounts: [target, future]
+      accounts: [fresh, expired, futureExhausted, partial]
     });
     const warmupService = new FakeWeeklyQuotaWarmupService();
     const coordinator = new AccountsCoordinator({
@@ -476,11 +486,15 @@ describe("accounts coordinator", () => {
 
     const result = await coordinator.warmUpResetWeeklyQuotaAccounts();
 
-    expect(result.targetCount).toBe(1);
-    expect(result.succeededCount).toBe(1);
+    expect(result.targetCount).toBe(2);
+    expect(result.succeededCount).toBe(2);
     expect(result.failures).toEqual([]);
-    expect(warmupService.calls).toEqual([{ accessToken: "access-acct-target", accountId: "acct-target" }]);
-    expect(storeRepository.store.accounts.find((account) => account.id === "target")?.usage?.oneWeek?.usedPercent).toBe(20);
+    expect(warmupService.calls).toEqual([
+      { accessToken: "access-acct-fresh", accountId: "acct-fresh" },
+      { accessToken: "access-acct-expired", accountId: "acct-expired" }
+    ]);
+    expect(storeRepository.store.accounts.find((account) => account.id === "fresh")?.usage?.oneWeek?.usedPercent).toBe(20);
+    expect(storeRepository.store.accounts.find((account) => account.id === "expired")?.usage?.oneWeek?.usedPercent).toBe(20);
   });
 
   it("stores weekly quota warmup failures on the account", async () => {
@@ -797,11 +811,23 @@ function makeUsageSnapshotWithReset(resetAt: number): UsageSnapshot {
 }
 
 function exhaustedWeeklyUsage(resetAt: number): UsageSnapshot {
+  return weeklyUsage(100, resetAt);
+}
+
+function freshResetWeeklyUsage(resetAt: number): UsageSnapshot {
+  return weeklyUsage(0, resetAt);
+}
+
+function partialWeeklyUsage(resetAt: number): UsageSnapshot {
+  return weeklyUsage(50, resetAt);
+}
+
+function weeklyUsage(oneWeekUsedPercent: number, resetAt: number): UsageSnapshot {
   return {
     fetchedAt: 1_779_999_000,
     planType: "team",
     fiveHour: { usedPercent: 10, windowSeconds: 5 * 60 * 60, resetAt: 1_780_001_000 },
-    oneWeek: { usedPercent: 100, windowSeconds: 7 * 24 * 60 * 60, resetAt }
+    oneWeek: { usedPercent: oneWeekUsedPercent, windowSeconds: 7 * 24 * 60 * 60, resetAt }
   };
 }
 

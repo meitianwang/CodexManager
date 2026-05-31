@@ -892,7 +892,14 @@ function expectedPlan(account: StoredAccount): string | undefined {
 
 function shouldWarmUpResetWeeklyQuota(account: StoredAccount, now: number): boolean {
   const oneWeek = account.usage?.oneWeek;
-  return oneWeek !== undefined && oneWeek.usedPercent >= 100 && oneWeek.resetAt !== undefined && oneWeek.resetAt <= now;
+  if (!oneWeek || oneWeek.resetAt === undefined) {
+    return false;
+  }
+
+  const usedPercent = Math.round(Math.max(0, Math.min(100, oneWeek.usedPercent)));
+  const hasFreshResetQuota = usedPercent <= 0 && oneWeek.resetAt > now;
+  const hasExpiredExhaustedQuota = usedPercent >= 100 && oneWeek.resetAt <= now;
+  return hasFreshResetQuota || hasExpiredExhaustedQuota;
 }
 
 function shouldRefreshUsage(snapshot: UsageSnapshot | undefined, now: number): boolean {
