@@ -8,7 +8,8 @@ import type { AccountSummary } from "../shared/models/accounts";
 import type { StoredAccount } from "../shared/models/accounts";
 import {
   accountsTransferCurrentVersion,
-  accountsTransferFormatIdentifier
+  accountsTransferFormatIdentifier,
+  type AccountsImportFileResult
 } from "../shared/models/account-transfer";
 import type { JSONValue } from "../shared/models/json-value";
 import { createWindowsAppContext, type WindowsAppContext } from "./app-context";
@@ -97,6 +98,9 @@ interface SmokeWorkflowState {
 
 interface SmokeAccountWorkflowState {
   exportPackageAccountCount: number;
+  importAuthFileAccountId: string;
+  importAuthFileKind: string;
+  importAuthFileLabel: string;
   importCurrentAuthAccountId: string;
   importCurrentAuthLabel: string;
   importPackageInsertedCount: number;
@@ -398,7 +402,7 @@ function createSmokeTestController(context: WindowsAppContext): { attach: (brows
       if (!state.pageTitle || state.bodyLength < 100) {
         throw new Error(`Renderer did not finish painting the workspace: ${JSON.stringify(state)}`);
       }
-      const workflows = await verifySmokeWorkflows(context);
+      const workflows = await verifySmokeWorkflows(context, browserWindow);
       const uiSnapshots = await captureSmokeUISnapshots(browserWindow);
       writeSmokeResult({ state, uiSnapshots, workflows, status: "passed" });
       console.log(`CodexManager Windows smoke test passed: ${JSON.stringify({ state, uiSnapshots, workflows })}`);
@@ -707,7 +711,7 @@ function smokeScreenshotDirectory(): string | undefined {
   return value;
 }
 
-async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWorkflowState> {
+async function verifySmokeWorkflows(context: WindowsAppContext, browserWindow: BrowserWindow): Promise<SmokeWorkflowState> {
   const smokeAccountId = "smoke-account";
   const smokeChatGPTAccountId = "acct-smoke";
   const smokeEmail = "smoke@example.com";
@@ -748,7 +752,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
     throw new Error(`Smoke settings did not persist: ${JSON.stringify(settings)}`);
   }
 
-  const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now);
+  const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now, browserWindow);
   const platform = await verifySmokePlatformSideEffects(context, account);
   const tray = await verifySmokeTrayWorkflow(context);
 
@@ -804,7 +808,8 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
 async function verifySmokeAccountWorkflows(
   context: WindowsAppContext,
   primaryAccount: StoredAccount,
-  now: number
+  now: number,
+  browserWindow: BrowserWindow
 ): Promise<SmokeAccountWorkflowState> {
   const oauthAccount = await context.accountsCoordinator.addAccountViaLogin("OAuth smoke account", 7);
   if (oauthAccount.accountId !== "acct-oauth" || oauthAccount.label !== "OAuth smoke account") {
@@ -815,6 +820,8 @@ async function verifySmokeAccountWorkflows(
   if (oauthSignIn?.accountId !== "acct-oauth" || oauthSignIn.timeoutSeconds !== 7) {
     throw new Error(`Smoke OAuth sign-in side effect failed: ${JSON.stringify(oauthSignIns)}`);
   }
+
+  const importAuthFileResult = await importSmokeAuthFileThroughRenderer(context, browserWindow);
 
   const importedAccountAuth = makeSmokeAuth("acct-import", "import@example.com");
   await context.authRepository.writeCurrentAuth(importedAccountAuth);
@@ -847,12 +854,12 @@ async function verifySmokeAccountWorkflows(
   }
 
   const exportPackage = await context.accountsCoordinator.makeAccountsTransferPackage(
-    new Set([primaryAccount.id, oauthAccount.id, importedAccount.id, packageAccount.id])
+    new Set([primaryAccount.id, oauthAccount.id, importAuthFileResult.account.id, importedAccount.id, packageAccount.id])
   );
   if (
     exportPackage.format !== accountsTransferFormatIdentifier ||
     exportPackage.version !== accountsTransferCurrentVersion ||
-    exportPackage.accounts.length !== 4
+    exportPackage.accounts.length !== 5
   ) {
     throw new Error(`Smoke export package failed: ${JSON.stringify(exportPackage)}`);
   }
@@ -878,6 +885,9 @@ async function verifySmokeAccountWorkflows(
   const smartSwitchAccountId = smartSwitch.account.accountId;
   return {
     exportPackageAccountCount: exportPackage.accounts.length,
+    importAuthFileAccountId: importAuthFileResult.account.accountId,
+    importAuthFileKind: importAuthFileResult.kind,
+    importAuthFileLabel: importAuthFileResult.account.label,
     importCurrentAuthAccountId: importedAccount.accountId,
     importCurrentAuthLabel: importedAccount.label,
     importPackageInsertedCount: importPackageResult.insertedCount,
@@ -889,6 +899,32 @@ async function verifySmokeAccountWorkflows(
     restoredAccountCount: restoredAccounts.length,
     smartSwitchAccountId
   };
+}
+
+async function importSmokeAuthFileThroughRenderer(
+  context: WindowsAppContext,
+  browserWindow: BrowserWindow
+): Promise<Extract<AccountsImportFileResult, { kind: "auth" }>> {
+  const importFilePath = path.join(context.paths.applicationSupportDirectory, "smoke-import-auth.json");
+  mkdirSync(path.dirname(importFilePath), { recursive: true });
+  writeFileSync(importFilePath, JSON.stringify(makeSmokeAuth("acct-file", "file@example.com")), "utf8");
+
+  process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH = importFilePath;
+  try {
+    const result = await browserWindow.webContents.executeJavaScript(
+      `window.codexManager?.accounts.importFile() ?? Promise.reject(new Error("Preload IPC bridge is unavailable"))`,
+      true
+    );
+    if (!isSmokeAuthImportFileResult(result)) {
+      throw new Error(`Smoke Import file returned an unexpected result: ${JSON.stringify(result)}`);
+    }
+    if (result.account.accountId !== "acct-file" || result.account.label !== "file@example.com") {
+      throw new Error(`Smoke Import file imported the wrong account: ${JSON.stringify(result.account)}`);
+    }
+    return result;
+  } finally {
+    delete process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH;
+  }
 }
 
 async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<SmokeTrayWorkflowState> {
@@ -1165,6 +1201,18 @@ async function waitForSmokeTrayActionCount(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isSmokeAuthImportFileResult(value: unknown): value is Extract<AccountsImportFileResult, { kind: "auth" }> {
+  if (!isRecord(value) || value.kind !== "auth" || !isRecord(value.account)) {
+    return false;
+  }
+  const account = value.account;
+  return (
+    typeof account.id === "string" &&
+    typeof account.accountId === "string" &&
+    typeof account.label === "string"
+  );
 }
 
 function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {

@@ -116,12 +116,8 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
   });
 
   ipcMain.handle(ipcChannels.accountsImportFile, async (): Promise<AccountsImportFileResult | undefined> => {
-    const result = await dialog.showOpenDialog({
-      filters: [{ name: "CodexManager account package or auth.json", extensions: ["json"] }],
-      properties: ["openFile"]
-    });
-    const path = result.filePaths[0];
-    if (result.canceled || !path) {
+    const path = await resolveAccountsImportFilePath();
+    if (!path) {
       return undefined;
     }
 
@@ -187,6 +183,22 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     const { text } = parseIpcInput(clipboardWriteTextSchema, input);
     clipboard.writeText(text);
   });
+}
+
+async function resolveAccountsImportFilePath(): Promise<string | undefined> {
+  const smokeImportPath = process.env.CODEX_MANAGER_ELECTRON_SMOKE_IMPORT_FILE_PATH?.trim();
+  if (smokeImportPath) {
+    return smokeImportPath;
+  }
+
+  const result = await dialog.showOpenDialog({
+    filters: [{ name: "CodexManager account package or auth.json", extensions: ["json"] }],
+    properties: ["openFile"]
+  });
+  if (result.canceled) {
+    return undefined;
+  }
+  return result.filePaths[0];
 }
 
 function rememberAccountImportDraft(drafts: Map<string, AccountsTransferPackage>, accountPackage: AccountsTransferPackage): string {

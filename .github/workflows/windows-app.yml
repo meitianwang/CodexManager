@@ -251,7 +251,10 @@ jobs:
             $Result.workflows.accounts.oauthLabel -ne "OAuth smoke account"
             $Result.workflows.accounts.oauthSignInCount -lt 1
             $Result.workflows.accounts.oauthTimeoutSeconds -ne 7
-            $Result.workflows.accounts.exportPackageAccountCount -ne 4
+            $Result.workflows.accounts.importAuthFileKind -ne "auth"
+            $Result.workflows.accounts.importAuthFileAccountId -ne "acct-file"
+            $Result.workflows.accounts.importAuthFileLabel -ne "file@example.com"
+            $Result.workflows.accounts.exportPackageAccountCount -ne 5
             $Result.workflows.accounts.smartSwitchAccountId -ne "acct-package"
             $Result.workflows.accounts.restoredAccountCount -ne 1
             -not ([bool]$Result.workflows.platform.usedFallbackCLI)
