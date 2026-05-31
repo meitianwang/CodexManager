@@ -175,6 +175,29 @@ describe("accounts coordinator", () => {
     expect(storeRepository.store.accounts[0]?.principalId).toBe("new@example.com");
   });
 
+  it("imports arbitrary auth JSON payloads into the account store", async () => {
+    const storeRepository = new MemoryStoreRepository({ version: 1, accounts: [] });
+    const authRepository = new FakeAuthRepository(undefined);
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      usageService: new FakeUsageService("pro"),
+      dateProvider: fixedDateProvider()
+    });
+    const authJson = fakeAuth("acct-file", "file@example.com", "plus", "file@example.com");
+
+    const summary = await coordinator.importAccount(authJson, " File auth ");
+
+    expect(summary.label).toBe("File auth");
+    expect(summary.accountId).toBe("acct-file");
+    expect(summary.email).toBe("file@example.com");
+    expect(summary.planType).toBe("pro");
+    expect(storeRepository.store.accounts).toHaveLength(1);
+    expect(storeRepository.store.accounts[0]?.authJson).toEqual(authJson);
+    expect(storeRepository.store.accounts[0]?.addedAt).toBe(1_780_000_000);
+    expect(storeRepository.store.accounts[0]?.updatedAt).toBe(1_780_000_000);
+  });
+
   it("switches accounts by recording selection and writing Codex auth", async () => {
     const accountA = makeStoredAccount({ id: "a", accountId: "acct-a", email: "a@example.com" });
     const accountB = makeStoredAccount({ id: "b", accountId: "acct-b", email: "b@example.com" });

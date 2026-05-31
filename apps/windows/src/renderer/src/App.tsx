@@ -303,10 +303,16 @@ function App(): ReactElement {
                   if (!api) {
                     throw new Error(t("error.ipc_bridge_unavailable"));
                   }
-                  const draft = await api.accounts.prepareImportPackage();
-                  if (draft) {
-                    setTransferDialog({ mode: "import", draft });
+                  const result = await api.accounts.importFile();
+                  if (!result) {
+                    return;
                   }
+                  if (result.kind === "package") {
+                    setTransferDialog({ mode: "import", draft: result.draft });
+                    return;
+                  }
+                  await reloadAccounts();
+                  setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: result.account.label }) });
                 },
                 { silentSuccess: true }
               )

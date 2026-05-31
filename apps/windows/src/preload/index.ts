@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { AppInfo } from "../shared/app-info";
-import type { AccountsImportDraftDescriptor, AccountsImportResult } from "../shared/models/account-transfer";
+import type { AccountsImportFileResult, AccountsImportResult } from "../shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/accounts";
 import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../shared/models/app";
 import type { AppSettings, AppSettingsPatch } from "../shared/models/settings";
@@ -18,10 +18,10 @@ export interface CodexManagerAPI {
     delete: (id: string) => Promise<void>;
     exportPackage: (accountIds: string[]) => Promise<{ canceled: boolean; path?: string }>;
     importCurrentAuth: () => Promise<AccountSummary>;
+    importFile: () => Promise<AccountsImportFileResult | undefined>;
     importPreparedPackage: (draftId: string, accountIds: string[]) => Promise<AccountsImportResult>;
     list: () => Promise<AccountSummary[]>;
     onChanged: (listener: (accounts: AccountSummary[]) => void) => () => void;
-    prepareImportPackage: () => Promise<AccountsImportDraftDescriptor | undefined>;
     refreshAllUsage: () => Promise<AccountSummary[]>;
     refreshUsage: (id: string) => Promise<AccountSummary>;
     smartSwitch: () => Promise<SmartSwitchResult | undefined>;
@@ -57,6 +57,7 @@ const api: CodexManagerAPI = {
     exportPackage: (accountIds) =>
       invoke<{ canceled: boolean; path?: string }>(ipcChannels.accountsExportPackage, { accountIds }),
     importCurrentAuth: () => invoke<AccountSummary>(ipcChannels.accountsImportCurrentAuth),
+    importFile: () => invoke<AccountsImportFileResult | undefined>(ipcChannels.accountsImportFile),
     importPreparedPackage: (draftId, accountIds) =>
       invoke<AccountsImportResult>(ipcChannels.accountsImportPreparedPackage, { draftId, accountIds }),
     list: () => invoke<AccountSummary[]>(ipcChannels.accountsList),
@@ -67,7 +68,6 @@ const api: CodexManagerAPI = {
       ipcRenderer.on(ipcChannels.accountsChanged, handler);
       return () => ipcRenderer.off(ipcChannels.accountsChanged, handler);
     },
-    prepareImportPackage: () => invoke<AccountsImportDraftDescriptor | undefined>(ipcChannels.accountsPrepareImportPackage),
     refreshAllUsage: () => invoke<AccountSummary[]>(ipcChannels.accountsRefreshAllUsage),
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
     smartSwitch: () => invoke<SmartSwitchResult | undefined>(ipcChannels.accountsSmartSwitch),

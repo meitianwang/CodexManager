@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import type { IpcMain } from "electron";
 import { app, clipboard, dialog, shell } from "electron";
 import type { WindowsAppContext } from "../app-context";
 import { appInfo } from "../../shared/app-info";
 import { toAccountSummary } from "../../shared/domain/accounts-store";
 import type {
-  AccountsImportDraftDescriptor,
+  AccountsImportFileResult,
   AccountsTransferPackage,
   AccountTransferSelectableItem
 } from "../../shared/models/account-transfer";
+import { accountsTransferFormatIdentifier } from "../../shared/models/account-transfer";
 import type { AccountSummary } from "../../shared/models/accounts";
+import { parseJsonValue } from "../../shared/models/json-value";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import type { AppSettings } from "../../shared/models/settings";
 import {
@@ -25,6 +27,8 @@ import {
   switchAccountSchema,
   updateTeamAliasSchema
 } from "../../shared/ipc/schema";
+import { parseAccountsTransferPackage } from "../repositories/store-parsers";
+import { validateAccountsTransferPackage } from "../services/accounts-coordinator";
 
 export interface IpcHandlerOptions {
   onAccountsChanged?: (accounts: AccountSummary[]) => void;
@@ -111,9 +115,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     return { canceled: false, path: result.filePath };
   });
 
-  ipcMain.handle(ipcChannels.accountsPrepareImportPackage, async (): Promise<AccountsImportDraftDescriptor | undefined> => {
+  ipcMain.handle(ipcChannels.accountsImportFile, async (): Promise<AccountsImportFileResult | undefined> => {
     const result = await dialog.showOpenDialog({
-      filters: [{ name: "CodexManager account package", extensions: ["json"] }],
+      filters: [{ name: "CodexManager account package or auth.json", extensions: ["json"] }],
       properties: ["openFile"]
     });
     const path = result.filePaths[0];
@@ -121,12 +125,23 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
       return undefined;
     }
 
-    const accountPackage = await context.accountsCoordinator.loadAccountsTransferPackage(path);
-    const draftId = rememberAccountImportDraft(accountImportDrafts, accountPackage);
-    return {
-      draftId,
-      accounts: accountPackage.accounts.map(accountTransferSelectableItem)
-    };
+    const json = JSON.parse(await readFile(path, "utf8")) as unknown;
+    if (isAccountsTransferPackageCandidate(json)) {
+      const accountPackage = parseAccountsTransferPackage(json);
+      validateAccountsTransferPackage(accountPackage);
+      const draftId = rememberAccountImportDraft(accountImportDrafts, accountPackage);
+      return {
+        kind: "package",
+        draft: {
+          draftId,
+          accounts: accountPackage.accounts.map(accountTransferSelectableItem)
+        }
+      };
+    }
+
+    const account = await context.accountsCoordinator.importAccount(parseJsonValue(json, "auth JSON"));
+    await publishLatestAccounts(context, options);
+    return { kind: "auth", account };
   });
 
   ipcMain.handle(ipcChannels.accountsImportPreparedPackage, async (_event, input: unknown) => {
@@ -205,4 +220,13 @@ function accountTransferSelectableItem(account: AccountsTransferPackage["account
     teamName: summary.displayTeamName,
     isCurrent: false
   };
+}
+
+function isAccountsTransferPackageCandidate(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).format === accountsTransferFormatIdentifier
+  );
 }

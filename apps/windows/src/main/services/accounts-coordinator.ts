@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import type { JSONValue } from "../../shared/models/json-value";
 import type { AccountsImportResult, AccountsTransferPackage } from "../../shared/models/account-transfer";
@@ -19,7 +18,6 @@ import { pickAutoSwitchTarget, sortByRemaining } from "../../shared/domain/accou
 import { applyAccountsTransferMerge } from "../../shared/domain/accounts-transfer-merge";
 import { tokenObjectFromAuth } from "../repositories/auth-parsing";
 import { stableStringify } from "../repositories/stable-json";
-import { parseAccountsTransferPackage } from "../repositories/store-parsers";
 import { UnauthorizedError } from "./network-errors";
 
 export interface AccountsStoreRepositoryLike {
@@ -317,12 +315,6 @@ export class AccountsCoordinator {
 
   async encodeAccountsTransferPackage(accountIds: ReadonlySet<string>): Promise<string> {
     return stableStringify(await this.makeAccountsTransferPackage(accountIds));
-  }
-
-  async loadAccountsTransferPackage(path: string): Promise<AccountsTransferPackage> {
-    const packageJson = parseAccountsTransferPackage(JSON.parse(await readFile(path, "utf8")));
-    validateAccountsTransferPackage(packageJson);
-    return packageJson;
   }
 
   async importAccountsTransferPackage(

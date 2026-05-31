@@ -1,4 +1,4 @@
-import type { StoredAccount } from "./accounts";
+import type { AccountSummary, StoredAccount } from "./accounts";
 
 export const accountsTransferFormatIdentifier = "com.nik.mei.codexmanager.accounts";
 export const accountsTransferCurrentVersion = 1;
@@ -19,6 +19,10 @@ export interface AccountsImportDraftDescriptor {
   draftId: string;
   accounts: AccountTransferSelectableItem[];
 }
+
+export type AccountsImportFileResult =
+  | { kind: "auth"; account: AccountSummary }
+  | { kind: "package"; draft: AccountsImportDraftDescriptor };
 
 export interface AccountTransferSelectableItem {
   id: string;

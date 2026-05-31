@@ -127,7 +127,7 @@ describe("Windows renderer app", () => {
     expect(await screen.findByText("Account imported: Current auth")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
-    await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
+    await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
     const importDialog = await screen.findByRole("dialog", { name: "Choose accounts to import" });
     expect((within(importDialog).getByLabelText("Selected Package") as HTMLInputElement).checked).toBe(true);
     fireEvent.click(within(importDialog).getByRole("button", { name: "Import" }));
@@ -180,14 +180,29 @@ describe("Windows renderer app", () => {
 
   it("does not show a success notice when importing an account file is canceled", async () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
-    api.accounts.prepareImportPackage = vi.fn(async () => undefined);
+    api.accounts.importFile = vi.fn(async () => undefined);
     render(<App />);
 
     expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
-    await waitFor(() => expect(api.accounts.prepareImportPackage).toHaveBeenCalledOnce());
+    await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
 
     expect(screen.queryByText("Import file complete")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Choose accounts to import" })).toBeNull();
+  });
+
+  it("imports an auth file directly through the shared Import file action", async () => {
+    const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    const imported = makeAccount("auth-file", "Auth file");
+    api.accounts.importFile = vi.fn(async () => ({ kind: "auth" as const, account: imported }));
+    render(<App />);
+
+    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+
+    await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
+    await waitFor(() => expect(api.accounts.list).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Account imported: Auth file")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "Choose accounts to import" })).toBeNull();
   });
 
@@ -488,9 +503,12 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
       }),
       list: vi.fn(async () => accounts),
       onChanged: vi.fn(() => () => undefined),
-      prepareImportPackage: vi.fn(async () => ({
-        draftId: "draft-1",
-        accounts: [accountSummaryToTransferSelectableItem(makeAccount("package", "Package"))]
+      importFile: vi.fn(async () => ({
+        kind: "package" as const,
+        draft: {
+          draftId: "draft-1",
+          accounts: [accountSummaryToTransferSelectableItem(makeAccount("package", "Package"))]
+        }
       })),
       refreshAllUsage: vi.fn(async () => {
         accounts = accounts.map((account) => ({ ...account, usage: makeUsage(12, 34) }));
