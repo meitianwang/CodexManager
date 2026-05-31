@@ -28,7 +28,7 @@ import { collectCompletedResponseFromSSE, firstPreflightCodexSSEError } from "./
 const maxRequestBytes = 50 * 1024 * 1024;
 const accountCooldownSeconds = 60;
 const authCooldownSeconds = 5 * 60;
-const shortCooldownSeconds = 30;
+const shortCooldownSeconds = 15;
 const corsAllowedHeaders = [
   "Content-Type",
   "Authorization",

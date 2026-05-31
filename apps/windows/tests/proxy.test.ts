@@ -556,6 +556,64 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
   });
 
+  it("uses the mac-compatible short cooldown for exhausted accounts with unknown reset time", async () => {
+    let now = 1_780_000_000;
+    const accountA = makeAccount("a", "acct-a", "access-a", 1);
+    const accountB = makeAccount("b", "acct-b", "access-b", 2);
+    accountA.usage = {
+      fetchedAt: 1,
+      fiveHour: { usedPercent: 100, windowSeconds: 5 * 60 * 60 },
+      oneWeek: { usedPercent: 0, windowSeconds: 7 * 24 * 60 * 60 }
+    };
+    accountB.usage = {
+      fetchedAt: 1,
+      fiveHour: { usedPercent: 50, windowSeconds: 5 * 60 * 60 },
+      oneWeek: { usedPercent: 50, windowSeconds: 7 * 24 * 60 * 60 }
+    };
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [accountA, accountB]
+    });
+    const upstream = new FakeUpstreamClient([
+      successResult({ id: "resp-b-first" }),
+      successResult({ id: "resp-b-second" }),
+      successResult({ id: "resp-a" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      storeRepository,
+      dateProvider: { unixSecondsNow: () => now }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    storeRepository.store.accounts[0] = {
+      ...accountA,
+      usage: {
+        fetchedAt: 2,
+        fiveHour: { usedPercent: 0, windowSeconds: 5 * 60 * 60 },
+        oneWeek: { usedPercent: 0, windowSeconds: 7 * 24 * 60 * 60 }
+      }
+    };
+    now += 14;
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    now += 1;
+    const third = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(third.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-b", "acct-b", "acct-a"]);
+  });
+
   it("skips accounts whose plan does not support the requested catalog model", async () => {
     const upstream = new FakeUpstreamClient([successResult({ id: "resp-pro" })]);
     const context = await makeProxyContext({
@@ -633,6 +691,7 @@ async function makeProxyContext(options: {
   authRepository?: FakeAuthRepository;
   refreshService?: FakeRefreshTokenService;
   modelCatalogService?: FakeModelCatalogService;
+  dateProvider?: { unixSecondsNow(): number };
 } = {}) {
   const store = options.store ?? {
     version: 1,
@@ -648,7 +707,7 @@ async function makeProxyContext(options: {
     chatGPTOAuthLoginService: options.refreshService,
     modelCatalogService: options.modelCatalogService,
     upstreamClient: upstream,
-    dateProvider: { unixSecondsNow: () => 1_780_000_000 }
+    dateProvider: options.dateProvider ?? { unixSecondsNow: () => 1_780_000_000 }
   });
   const port = await proxy.start(0);
   running.push(proxy);
