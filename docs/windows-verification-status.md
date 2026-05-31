@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26721843576
-- Commit: `4002c7bbacaca4d067edc5c79b5bdddbcf3ffeb9`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26722231292
+- Commit: `38fc2d11f77216ace8a13f3b3bf9fb7a721fda91`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:ffd001d077d3a9cb2fc20f828c4a05ca13de0bd5d8e1343a9ff650d53a12479f`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:8c0f19b529396ac1fbfe8d25441ddc648c7da041b8b231e1408fc3c288cb015c`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:b146b2d1e088360398db9f8131125de3373864e6caa44170ae02ff1e5c783807`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:f9a575f0ce35058b6183f759f5982ef7ee024d26bccdd2c5d127f0d28f68ff10`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:f02af9fcbec0158ca4bbc56284c4d66b45cb189e60856552cebf51ff318a0779`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:2584bdf6828096fcd991dab485b27e215de4c5ba55ae2f93130b2551f3dbdf4f`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
@@ -19,8 +19,10 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer tests now compare shared English UI labels against the macOS `en.lproj/Localizable.strings` source for Accounts, Proxy, and Settings labels, and verify the team-name placeholder wording for all 11 locales.
 - Windows source parity tests now compare proxy models, proxy endpoint paths, language choices, and editor restart target IDs against the macOS Swift source.
 - Windows renderer tests now verify the Proxy API key label stays `API Key` for all locales, matching the macOS hard-coded `ProxyFormRow(title: "API Key")`.
+- Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
 - Packaged smoke now records and asserts the Accounts team-name input label `Set team name Smoke account` and placeholder `Set team name`.
 - Packaged smoke now records and asserts the Proxy form labels `Port` and `API Key`.
+- Packaged smoke and the Windows verification collector now assert the shared tray action labels include `Open Main Panel`, `Refresh Accounts`, `Smart Switch`, `Start Proxy`, and `Quit`.
 - Packaged smoke result: passed.
 - Packaged UI screenshots: Accounts, Proxy, and Settings screenshots were recorded at `944x471` with non-trivial file sizes.
 - Packaged Proxy route smoke: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages` all returned `200` through smoke-safe upstream routing.
