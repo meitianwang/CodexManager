@@ -27,6 +27,12 @@ describe("Windows renderer app", () => {
     expect(rendererStyles()).toContain("padding: 18px 22px 22px;");
     expect(rendererStyles()).toContain("margin-bottom: 14px;");
     expect(rendererStyles()).toContain("font-size: 20px;");
+    expect(rendererStyles()).toContain("background: #fafafc;");
+    expect(rendererStyles()).toContain("background: #f7f5fc;");
+    expect(rendererStyles()).toContain("background: #5933d6;");
+    expect(rendererStyles()).toContain("color: #121217;");
+    expect(rendererStyles()).not.toContain("#12130f");
+    expect(rendererStyles()).not.toContain("rgba(214, 240, 95");
     expect(container.querySelector(".brand-block .brand-mark")?.textContent).toBe("</>");
     expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
     expect(container.querySelector(".brand-block p")).toBeNull();
@@ -60,7 +66,10 @@ describe("Windows renderer app", () => {
 
     expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("a@example.com")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("Pro");
+    expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("PRO");
+    expect(accountRow("Work").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
+    expect(rendererStyles()).toContain(".badge.plan.pro-plan.compact-plan");
+    expect(rendererStyles()).toContain("background: #e8e0ff;");
     expect(accountRow("Work").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
     expect(accountRow("Work").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
     expect(accountRow("Work").querySelector(".account-identifier")).toBeNull();
@@ -528,7 +537,7 @@ function makeAccount(id: string, label: string): AccountSummary {
     email: `${id}@example.com`,
     isCurrent: false,
     label,
-    normalizedPlanLabel: "Pro",
+    normalizedPlanLabel: "PRO",
     shouldDisplayWorkspaceTag: true,
     updatedAt: 2
   };

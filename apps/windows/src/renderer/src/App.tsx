@@ -735,18 +735,22 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
         {isCollapsed ? (
           <div className="account-compact-header">
             <div className="account-tag-line">
-              <span className="badge plan">{account.normalizedPlanLabel}</span>
-              {workspaceTag && <span className="badge plan muted">{workspaceTag}</span>}
+              <span className={`badge plan compact-plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>
+                {account.normalizedPlanLabel}
+              </span>
+              {workspaceTag && (
+                <span className={`badge plan muted compact-plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{workspaceTag}</span>
+              )}
             </div>
             <h3>{accountTitle}</h3>
           </div>
         ) : (
           <>
             <div className="account-card-header">
-              <span className="badge plan">{account.normalizedPlanLabel}</span>
+              <span className={`badge plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{account.normalizedPlanLabel}</span>
               <span className="header-spacer" />
               {account.isCurrent ? (
-                <span className="badge">{t("accounts.card.current")}</span>
+                <span className="badge current-badge">{t("accounts.card.current")}</span>
               ) : (
                 <span className="ellipsis-icon" aria-hidden="true">...</span>
               )}
@@ -831,6 +835,22 @@ function accountCardClassName(
   ].filter(Boolean).join(" ");
 }
 
+function planBadgeClassName(planLabel: string): string {
+  switch (planLabel.trim().toUpperCase()) {
+    case "PLUS":
+      return "plus-plan";
+    case "FREE":
+      return "free-plan";
+    case "ENTERPRISE":
+    case "BUSINESS":
+      return "enterprise-plan";
+    case "PRO":
+      return "pro-plan";
+    default:
+      return "team-plan";
+  }
+}
+
 function shortAccountName(account: AccountSummary): string {
   const displayValue = fullAccountName(account);
   const atIndex = displayValue.indexOf("@");
@@ -905,7 +925,7 @@ function AccountTransferSelectionDialog({
                 <span>{account.teamName ?? account.accountId}</span>
               </span>
               <span className="transfer-plan">{account.planLabel}</span>
-              {account.isCurrent && <span className="badge">{t("accounts.card.current")}</span>}
+              {account.isCurrent && <span className="badge current-badge">{t("accounts.card.current")}</span>}
             </label>
           ))}
         </div>
