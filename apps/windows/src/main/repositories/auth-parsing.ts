@@ -1,6 +1,7 @@
 import type { JSONValue } from "../../shared/models/json-value";
 import { asJsonObject, isJsonObject, parseJsonValue } from "../../shared/models/json-value";
 import { normalizedPrincipalId } from "../../shared/domain/account-identity";
+import { displayTier, isPaidPlan, normalizedPlanType } from "../../shared/domain/account-plan-resolver";
 
 export function tokenObjectFromAuth(auth: JSONValue): Record<string, JSONValue> | undefined {
   const root = asJsonObject(auth, "auth JSON");
@@ -14,6 +15,30 @@ export function tokenObjectFromAuth(auth: JSONValue): Record<string, JSONValue> 
   }
 
   return undefined;
+}
+
+export function codexVisiblePlanFromAuth(auth: JSONValue): string | undefined {
+  const tokens = tokenObjectFromAuth(auth);
+  return planFromJwtToken(tokens?.access_token) ?? planFromJwtToken(tokens?.id_token);
+}
+
+export function refreshTokenFromAuth(auth: JSONValue): string | undefined {
+  const tokens = tokenObjectFromAuth(auth);
+  return normalizedString(typeof tokens?.refresh_token === "string" ? tokens.refresh_token : undefined);
+}
+
+export function authTokenNeedsPlanRepair(codexVisiblePlan: string | undefined, expectedPlan: string | undefined): boolean {
+  if (!isPaidPlan(expectedPlan)) {
+    return false;
+  }
+
+  const visibleTier = displayTier(codexVisiblePlan);
+  if (!visibleTier) {
+    return true;
+  }
+
+  const expectedTier = displayTier(expectedPlan);
+  return visibleTier === "free" || (expectedTier !== undefined && visibleTier !== expectedTier);
 }
 
 export function decodeJwtPayload(token: string): JSONValue {
@@ -31,6 +56,21 @@ export function decodeJwtPayload(token: string): JSONValue {
 
   const decoded = Buffer.from(base64, "base64").toString("utf8");
   return parseJsonValue(JSON.parse(decoded), "JWT payload");
+}
+
+function planFromJwtToken(token: JSONValue | undefined): string | undefined {
+  if (typeof token !== "string") {
+    return undefined;
+  }
+
+  try {
+    const payload = decodeJwtPayload(token);
+    return normalizedPlanType(
+      stringAtPath(["https://api.openai.com/auth", "chatgpt_plan_type"], payload) ?? stringAtPath(["plan_type"], payload)
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 export function normalizedString(value: string | undefined): string | undefined {

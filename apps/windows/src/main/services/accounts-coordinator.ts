@@ -16,7 +16,11 @@ import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
 import { accountSummaries, toAccountSummary } from "../../shared/domain/accounts-store";
 import { pickAutoSwitchTarget, sortByRemaining } from "../../shared/domain/account-ranking";
 import { applyAccountsTransferMerge } from "../../shared/domain/accounts-transfer-merge";
-import { tokenObjectFromAuth } from "../repositories/auth-parsing";
+import {
+  authTokenNeedsPlanRepair,
+  codexVisiblePlanFromAuth,
+  refreshTokenFromAuth
+} from "../repositories/auth-parsing";
 import { stableStringify } from "../repositories/stable-json";
 import { UnauthorizedError } from "./network-errors";
 
@@ -408,7 +412,91 @@ export class AccountsCoordinator {
     if (!account) {
       throw new Error("Account was not found for switch");
     }
-    return account;
+    if (!this.accountNeedsCodexVisibleAuthRepair(account)) {
+      return account;
+    }
+
+    const repairedAccount = await this.repairCodexVisibleAuth(account);
+    const latestStore = await this.storeRepository.loadStore();
+    const index = latestStore.accounts.findIndex((candidate) => candidate.id === id);
+    const latestAccount = latestStore.accounts[index];
+    if (index < 0 || !latestAccount) {
+      throw new Error("Account was not found for switch");
+    }
+
+    latestStore.accounts[index] = mergePreparedAccount(repairedAccount, latestAccount);
+    await this.storeRepository.saveStore(latestStore);
+    return latestStore.accounts[index];
+  }
+
+  private accountNeedsCodexVisibleAuthRepair(account: StoredAccount): boolean {
+    return authTokenNeedsPlanRepair(codexVisiblePlanFromAuth(account.authJson), expectedPlan(account));
+  }
+
+  private async repairCodexVisibleAuth(account: StoredAccount): Promise<StoredAccount> {
+    const refreshToken = refreshTokenFromAuth(account.authJson);
+    if (refreshToken && this.chatGPTOAuthLoginService) {
+      try {
+        const refreshed = await this.refreshStoredAccountAuth(account, refreshToken);
+        if (!this.accountNeedsCodexVisibleAuthRepair(refreshed)) {
+          return refreshed;
+        }
+      } catch {
+        // Fall through to a bounded interactive OAuth repair, matching the macOS switch path.
+      }
+    }
+
+    if (!this.chatGPTOAuthLoginService) {
+      throw new Error("ChatGPT OAuth login service is unavailable");
+    }
+
+    const tokens = await this.chatGPTOAuthLoginService.signInWithChatGPT(10 * 60, account.accountId);
+    const reauthorized = await this.storedAccountReplacingTokens(account, tokens);
+    if (this.accountNeedsCodexVisibleAuthRepair(reauthorized)) {
+      throw new UnauthorizedError(
+        `Codex token plan mismatch: expected ${expectedPlan(reauthorized) ?? "paid"}, got ${codexVisiblePlanFromAuth(reauthorized.authJson) ?? "unknown"}`
+      );
+    }
+    return reauthorized;
+  }
+
+  private async refreshStoredAccountAuth(account: StoredAccount, refreshToken: string): Promise<StoredAccount> {
+    if (!this.chatGPTOAuthLoginService) {
+      throw new Error("ChatGPT OAuth login service is unavailable");
+    }
+    const tokens = await this.chatGPTOAuthLoginService.refreshChatGPTTokens(refreshToken);
+    return this.storedAccountReplacingTokens(account, tokens);
+  }
+
+  private async storedAccountReplacingTokens(
+    account: StoredAccount,
+    tokens: ChatGPTOAuthTokens
+  ): Promise<StoredAccount> {
+    const authJson = this.authRepository.replacingChatGPTTokens(account.authJson, tokens);
+    let extracted = this.authRepository.extractAuth(authJson);
+    if (normalizedAccountId(extracted.accountId) !== normalizedAccountId(account.accountId)) {
+      throw new UnauthorizedError(`OAuth workspace mismatch: expected ${account.accountId}`);
+    }
+
+    const remoteWorkspaceName = await this.resolveRemoteWorkspaceName(extracted, true);
+    if (remoteWorkspaceName) {
+      extracted = { ...extracted, teamName: remoteWorkspaceName };
+    }
+
+    const { usage, usageError } = await this.fetchUsage(extracted);
+    const teamName = normalizeTeamName(extracted.teamName);
+    return {
+      ...account,
+      email: extracted.email ?? account.email,
+      accountId: extracted.accountId,
+      planType: preferredPlanType(extracted.planType, usage?.planType, account.planType),
+      teamName: teamName ?? account.teamName,
+      authJson,
+      updatedAt: this.dateProvider.unixSecondsNow(),
+      usage: usage ?? account.usage,
+      usageError,
+      principalId: extracted.principalId
+    };
   }
 
   private async updateCurrentAccountProjection(authJson: JSONValue): Promise<void> {
@@ -760,14 +848,27 @@ function normalizeTeamName(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function refreshTokenFromAuth(auth: JSONValue): string | undefined {
-  const tokens = tokenObjectFromAuth(auth);
-  const refreshToken = tokens?.refresh_token;
-  return typeof refreshToken === "string" && refreshToken.length > 0 ? refreshToken : undefined;
-}
-
 function accountMatchesCurrentAuth(account: StoredAccount, currentAccountKey: string | undefined): boolean {
   return currentAccountKey !== undefined && accountKeyForStoredAccount(account) === currentAccountKey;
+}
+
+function mergePreparedAccount(prepared: StoredAccount, latest: StoredAccount): StoredAccount {
+  return {
+    ...latest,
+    email: prepared.email,
+    accountId: prepared.accountId,
+    planType: prepared.planType,
+    teamName: prepared.teamName ?? latest.teamName,
+    authJson: prepared.authJson,
+    updatedAt: prepared.updatedAt,
+    usage: prepared.usage,
+    usageError: prepared.usageError,
+    principalId: prepared.principalId
+  };
+}
+
+function expectedPlan(account: StoredAccount): string | undefined {
+  return preferredPlanType(account.planType, account.usage?.planType);
 }
 
 function shouldWarmUpResetWeeklyQuota(account: StoredAccount, now: number): boolean {

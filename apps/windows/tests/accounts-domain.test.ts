@@ -223,6 +223,75 @@ describe("accounts coordinator", () => {
     expect(authRepository.currentAuth).toEqual(accountB.authJson);
   });
 
+  it("repairs stale Codex-visible auth by refreshing tokens before switching accounts", async () => {
+    const staleAuth = fakeAuth("acct-b", "b@example.com", "team", "b@example.com", "free");
+    const account = makeStoredAccount({
+      id: "b",
+      accountId: "acct-b",
+      email: "b@example.com",
+      authJson: staleAuth
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(undefined);
+    const refreshedTokens = fakeTokensForPlan("acct-b", "team", "refresh-new");
+    const loginService = new FakeChatGPTLoginService(refreshedTokens);
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      usageService: new FakeUsageService("team"),
+      chatGPTOAuthLoginService: loginService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.switchAccount("b");
+
+    expect(loginService.refreshes).toEqual(["refresh-acct-b"]);
+    expect(loginService.signIns).toEqual([]);
+    expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({
+      accessToken: refreshedTokens.accessToken,
+      refreshToken: refreshedTokens.refreshToken
+    });
+    expect(storeRepository.store.accounts[0]?.usage?.oneWeek?.usedPercent).toBe(20);
+    expect(authRepository.currentAuth).toEqual(storeRepository.store.accounts[0]?.authJson);
+  });
+
+  it("falls back to interactive login when token refresh keeps a stale visible plan", async () => {
+    const staleAuth = fakeAuth("acct-b", "b@example.com", "team", "b@example.com", "free");
+    const account = makeStoredAccount({
+      id: "b",
+      accountId: "acct-b",
+      email: "b@example.com",
+      authJson: staleAuth
+    });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(undefined);
+    const refreshedTokens = fakeTokensForPlan("acct-b", "free", "refresh-stale");
+    const interactiveTokens = fakeTokensForPlan("acct-b", "team", "refresh-interactive");
+    const loginService = new FakeChatGPTLoginService(interactiveTokens, refreshedTokens);
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      chatGPTOAuthLoginService: loginService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.switchAccount("b");
+
+    expect(loginService.refreshes).toEqual(["refresh-acct-b"]);
+    expect(loginService.signIns).toEqual([{ timeoutSeconds: 600, allowedWorkspaceId: "acct-b" }]);
+    expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({
+      accessToken: interactiveTokens.accessToken,
+      refreshToken: interactiveTokens.refreshToken
+    });
+    expect(authRepository.currentAuth).toEqual(storeRepository.store.accounts[0]?.authJson);
+  });
+
   it("applies launch and editor restart side effects after switching accounts", async () => {
     const account = makeStoredAccount({ id: "b", accountId: "acct-b", email: "b@example.com" });
     const storeRepository = new MemoryStoreRepository({
@@ -572,15 +641,26 @@ class FakeWorkspaceMetadataService implements WorkspaceMetadataServiceLike {
 
 class FakeChatGPTLoginService implements ChatGPTOAuthLoginServiceLike {
   public readonly refreshes: string[] = [];
+  public readonly signIns: Array<{ timeoutSeconds: number; allowedWorkspaceId?: string }> = [];
 
-  constructor(private readonly tokens: ChatGPTOAuthTokens) {}
+  constructor(
+    private readonly tokens: ChatGPTOAuthTokens,
+    private readonly refreshOverride?: ChatGPTOAuthTokens | Error
+  ) {}
 
-  async signInWithChatGPT(): Promise<ChatGPTOAuthTokens> {
+  async signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens> {
+    this.signIns.push({ timeoutSeconds, allowedWorkspaceId });
     return this.tokens;
   }
 
   async refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens> {
     this.refreshes.push(refreshToken);
+    if (this.refreshOverride instanceof Error) {
+      throw this.refreshOverride;
+    }
+    if (this.refreshOverride) {
+      return this.refreshOverride;
+    }
     return this.tokens;
   }
 }
@@ -652,7 +732,13 @@ function makeStoredAccount(overrides: Partial<StoredAccount> = {}): StoredAccoun
   };
 }
 
-function fakeAuth(accountId: string, email: string, planType: string, principalId: string): JSONValue {
+function fakeAuth(
+  accountId: string,
+  email: string,
+  planType: string,
+  principalId: string,
+  visiblePlanType = planType
+): JSONValue {
   return {
     accountId,
     accessToken: `access-${accountId}`,
@@ -661,9 +747,34 @@ function fakeAuth(accountId: string, email: string, planType: string, principalI
     planType,
     principalId,
     tokens: {
-      access_token: `access-${accountId}`,
+      access_token: fakePlanJwt(visiblePlanType),
       refresh_token: `refresh-${accountId}`,
-      id_token: `id-${accountId}`
+      id_token: fakePlanJwt(visiblePlanType)
     }
   };
+}
+
+function fakeTokensForPlan(accountId: string, planType: string, refreshToken: string): ChatGPTOAuthTokens {
+  return {
+    accessToken: fakePlanJwt(planType),
+    refreshToken,
+    idToken: fakePlanJwt(planType, { sub: accountId })
+  };
+}
+
+function fakePlanJwt(planType: string, extraClaims: Record<string, JSONValue> = {}): string {
+  return fakeJwt({
+    ...extraClaims,
+    "https://api.openai.com/auth": {
+      chatgpt_plan_type: planType
+    }
+  });
+}
+
+function fakeJwt(payload: Record<string, JSONValue>): string {
+  return `${base64UrlJson({ alg: "none", typ: "JWT" })}.${base64UrlJson(payload)}.`;
+}
+
+function base64UrlJson(value: Record<string, JSONValue>): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
 }
