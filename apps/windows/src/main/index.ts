@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions } from "electron";
 import started from "electron-squirrel-startup";
 import { appInfo } from "../shared/app-info";
@@ -49,11 +49,23 @@ interface SmokeUISnapshot {
 }
 
 interface SmokeWorkflowState {
+  persistence: SmokePersistenceState;
   proxyHealthOK: boolean;
   proxyPort: number;
   proxyUnauthorizedStatus: number;
   settingsLocale: string;
   switchedAccountId: string;
+}
+
+interface SmokePersistenceState {
+  accountsCount: number;
+  accountsJsonExists: boolean;
+  codexAuthAccountId: string;
+  codexAuthExists: boolean;
+  currentSelectionAccountId: string | null;
+  settingsJsonExists: boolean;
+  settingsLocale: string;
+  settingsProxyPort: number;
 }
 
 function rendererEntry(): string {
@@ -534,7 +546,22 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
       throw new Error(`Smoke proxy auth expected 401, got ${unauthorizedResponse.status}`);
     }
 
+    const persistence = readSmokePersistenceState(context, smokeChatGPTAccountId);
+    if (
+      !persistence.accountsJsonExists ||
+      !persistence.settingsJsonExists ||
+      !persistence.codexAuthExists ||
+      persistence.accountsCount !== 1 ||
+      persistence.currentSelectionAccountId !== smokeChatGPTAccountId ||
+      persistence.codexAuthAccountId !== smokeChatGPTAccountId ||
+      persistence.settingsLocale !== "en" ||
+      persistence.settingsProxyPort !== 0
+    ) {
+      throw new Error(`Smoke persistence check failed: ${JSON.stringify(persistence)}`);
+    }
+
     return {
+      persistence,
       proxyHealthOK: true,
       proxyPort: proxyState.port,
       proxyUnauthorizedStatus: unauthorizedResponse.status,
@@ -544,6 +571,45 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
   } finally {
     await context.proxyRuntimeService.stop();
   }
+}
+
+function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {
+  const accountsJsonExists = existsSync(context.paths.accountStorePath);
+  const settingsJsonExists = existsSync(context.paths.settingsStorePath);
+  const codexAuthExists = existsSync(context.paths.codexAuthPath);
+  const accountStore = accountsJsonExists ? readJSONFile(context.paths.accountStorePath) : {};
+  const settingsStore = settingsJsonExists ? readJSONFile(context.paths.settingsStorePath) : {};
+  const codexAuth = codexAuthExists ? readJSONFile(context.paths.codexAuthPath) : {};
+  const accountStoreObject = isRecord(accountStore) ? accountStore : {};
+  const settingsObject = isRecord(settingsStore) ? settingsStore : {};
+  const currentSelection = isRecord(accountStoreObject.currentSelection) ? accountStoreObject.currentSelection : {};
+  const accounts = Array.isArray(accountStoreObject.accounts) ? accountStoreObject.accounts : [];
+  const extractedAuth = codexAuthExists
+    ? context.authRepository.extractAuth(codexAuth)
+    : { accountId: "" };
+  const codexAuthAccountId = extractedAuth.accountId ?? "";
+  if (codexAuthExists && codexAuthAccountId !== expectedAccountId) {
+    throw new Error(`Smoke persisted auth account is ${codexAuthAccountId}, expected ${expectedAccountId}`);
+  }
+
+  return {
+    accountsCount: accounts.length,
+    accountsJsonExists,
+    codexAuthAccountId,
+    codexAuthExists,
+    currentSelectionAccountId: typeof currentSelection.accountId === "string" ? currentSelection.accountId : null,
+    settingsJsonExists,
+    settingsLocale: typeof settingsObject.locale === "string" ? settingsObject.locale : "",
+    settingsProxyPort: typeof settingsObject.proxyPort === "number" ? settingsObject.proxyPort : 0
+  };
+}
+
+function readJSONFile(filePath: string): JSONValue {
+  return JSON.parse(readFileSync(filePath, "utf8")) as JSONValue;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function makeSmokeAuth(accountId: string, email: string): JSONValue {

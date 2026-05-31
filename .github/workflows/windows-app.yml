@@ -234,6 +234,13 @@ jobs:
             $Result.workflows.proxyUnauthorizedStatus -ne 401
             $Result.workflows.settingsLocale -ne "en"
             $Result.workflows.switchedAccountId -ne "acct-smoke"
+            -not ([bool]$Result.workflows.persistence.accountsJsonExists)
+            -not ([bool]$Result.workflows.persistence.settingsJsonExists)
+            -not ([bool]$Result.workflows.persistence.codexAuthExists)
+            $Result.workflows.persistence.accountsCount -ne 1
+            $Result.workflows.persistence.currentSelectionAccountId -ne "acct-smoke"
+            $Result.workflows.persistence.codexAuthAccountId -ne "acct-smoke"
+            $Result.workflows.persistence.settingsLocale -ne "en"
             @($Result.uiSnapshots).Count -ne 3
           ) -contains $true
           if ($InvalidSmokeResult) {
