@@ -879,7 +879,7 @@ async function verifySmokeProxyRoutes(
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({
-        model: "gpt-5",
+        model: "gpt-5-codex",
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
         stream: false
       })
@@ -887,7 +887,7 @@ async function verifySmokeProxyRoutes(
     responsesStatus: await smokeProxyStatus(proxyURL, "/v1/responses", {
       method: "POST",
       headers: commonHeaders,
-      body: JSON.stringify({ model: "gpt-5", input: "Reply with exactly: ok", stream: false })
+      body: JSON.stringify({ model: "gpt-5-codex", input: "Reply with exactly: ok", stream: false })
     }),
     responsesCompactStatus: await smokeProxyStatus(proxyURL, "/v1/responses/compact", {
       method: "POST",
@@ -914,7 +914,7 @@ async function verifySmokeProxyRoutes(
       method: "POST",
       headers: anthropicHeaders,
       body: JSON.stringify({
-        model: "gpt-5",
+        model: "gpt-5-codex",
         max_tokens: 16,
         messages: [{ role: "user", content: "Reply with exactly: ok" }]
       })
