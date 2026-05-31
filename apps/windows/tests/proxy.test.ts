@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { AccountsStore } from "../src/shared/models/accounts";
 import type { AppSettings } from "../src/shared/models/settings";
+import { appInfo } from "../src/shared/app-info";
 import { defaultAppSettings } from "../src/shared/models/settings";
 import type { JSONValue } from "../src/shared/models/json-value";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../src/shared/models/auth";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../src/main/services/accounts-coordinator";
 import { ProxyCoordinator, type SettingsRepositoryLike } from "../src/main/proxy/proxy-coordinator";
 import {
+  CodexUpstreamClient,
   CodexUpstreamError,
   type CodexUpstreamClientLike,
   type CodexUpstreamRequest,
@@ -78,8 +80,38 @@ describe("local proxy", () => {
       method: "GET",
       isStream: false
     });
-    expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/models?limit=20");
+    expect(upstream.requests[0]?.url).toBe(`https://chatgpt.com/backend-api/codex/models?limit=20&client_version=${appInfo.version}`);
     expect(upstream.requests[0]?.body.byteLength).toBe(0);
+  });
+
+  it("preserves explicit Models client_version query parameters", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ data: [] })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await fetch(`http://127.0.0.1:${context.port}/v1/models?client_version=1.2.3`, {
+      headers: {
+        version: "9.9.9",
+        "x-api-key": "test-key"
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/models?client_version=1.2.3");
+  });
+
+  it("uses the client version header for Models requests without client_version", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ data: [] })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await fetch(`http://127.0.0.1:${context.port}/v1/models`, {
+      headers: {
+        version: "9.9.9",
+        "x-api-key": "test-key"
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/models?client_version=9.9.9");
   });
 
   it("preserves Codex JSON passthrough requests without forcing streaming", async () => {
@@ -422,6 +454,48 @@ describe("local proxy", () => {
   });
 });
 
+describe("Codex upstream client", () => {
+  it("adds the app version header when callers do not provide one", async () => {
+    let sentHeaders: Headers | undefined;
+    const client = new CodexUpstreamClient(async (_input, init) => {
+      sentHeaders = init?.headers instanceof Headers ? init.headers : undefined;
+      return jsonResponse({ ok: true });
+    });
+
+    await client.execute({
+      accessToken: "access",
+      accountId: "acct-1",
+      body: Buffer.alloc(0),
+      headers: {},
+      isStream: false,
+      method: "GET",
+      url: "https://chatgpt.com/backend-api/codex/models"
+    });
+
+    expect(sentHeaders?.get("version")).toBe(appInfo.version);
+  });
+
+  it("preserves a caller-provided version header", async () => {
+    let sentHeaders: Headers | undefined;
+    const client = new CodexUpstreamClient(async (_input, init) => {
+      sentHeaders = init?.headers instanceof Headers ? init.headers : undefined;
+      return jsonResponse({ ok: true });
+    });
+
+    await client.execute({
+      accessToken: "access",
+      accountId: "acct-1",
+      body: Buffer.alloc(0),
+      headers: { version: "9.9.9" },
+      isStream: false,
+      method: "GET",
+      url: "https://chatgpt.com/backend-api/codex/models"
+    });
+
+    expect(sentHeaders?.get("version")).toBe("9.9.9");
+  });
+});
+
 async function makeProxyContext(options: {
   store?: AccountsStore;
   storeRepository?: MemoryStoreRepository;
@@ -630,6 +704,15 @@ function successResult(body: unknown, headers: Record<string, string> = {}): Cod
     },
     body: Buffer.from(JSON.stringify(body))
   };
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8"
+    }
+  });
 }
 
 function sseResult(text: string): CodexUpstreamResult {

@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
 import type { AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
+import { appInfo } from "../../shared/app-info";
 import { accountSummaries } from "../../shared/domain/accounts-store";
 import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId } from "../../shared/domain/account-identity";
 import { effectivePlanType, preferredPlanType } from "../../shared/domain/account-plan-resolver";
@@ -111,7 +112,7 @@ export class ProxyCoordinator {
 
     try {
       if (request.method === "GET" && url.pathname === "/v1/models") {
-        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), false, "", true, url.search);
+        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), false, "", true, modelsQueryString(request, url));
         return;
       }
 
@@ -554,6 +555,15 @@ function requestHeaders(request: IncomingMessage): Record<string, string> {
     }
   }
   return headers;
+}
+
+function modelsQueryString(request: IncomingMessage, url: URL): string {
+  if (!url.searchParams.has("client_version")) {
+    const version = typeof request.headers.version === "string" ? request.headers.version.trim() : "";
+    url.searchParams.append("client_version", version.length > 0 ? version : appInfo.version);
+  }
+  const queryString = url.searchParams.toString();
+  return queryString ? `?${queryString}` : "";
 }
 
 function sendUpstream(response: ServerResponse, result: CodexUpstreamResult, contentType: string): void {

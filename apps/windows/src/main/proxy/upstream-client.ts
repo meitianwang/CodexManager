@@ -1,4 +1,5 @@
 import { boundedResponseText } from "../services/bounded-response";
+import { appInfo } from "../../shared/app-info";
 
 const maxResponseBytes = 50 * 1024 * 1024;
 const blockedForwardedHeaders = new Set([
@@ -80,6 +81,9 @@ export class CodexUpstreamClient implements CodexUpstreamClientLike {
     }
     if (!headers.has("originator")) {
       headers.set("originator", "codex_cli_rs");
+    }
+    if (!headers.has("version")) {
+      headers.set("version", appInfo.version);
     }
     headers.set("Accept", request.isStream ? "text/event-stream" : "application/json");
 
