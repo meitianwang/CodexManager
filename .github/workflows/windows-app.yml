@@ -258,6 +258,21 @@ jobs:
             (-not ([string]::IsNullOrWhiteSpace([string] $Result.workflows.platform.editorRestartError)))
             @($Result.workflows.platform.startupSetEnabledValues) -notcontains $true
             @($Result.workflows.platform.startupSetEnabledValues) -notcontains $false
+            @($Result.workflows.tray.actionLabels) -notcontains "Show Window"
+            @($Result.workflows.tray.actionLabels) -notcontains "Refresh Accounts"
+            @($Result.workflows.tray.actionLabels) -notcontains "Smart Switch"
+            @($Result.workflows.tray.actionLabels) -notcontains "Start Proxy"
+            @($Result.workflows.tray.actionLabels) -notcontains "Quit"
+            @($Result.workflows.tray.completedActions) -notcontains "showWindow"
+            @($Result.workflows.tray.completedActions) -notcontains "refreshAccounts"
+            @($Result.workflows.tray.completedActions) -notcontains "smartSwitch"
+            @($Result.workflows.tray.completedActions) -notcontains "startProxy"
+            @($Result.workflows.tray.completedActions) -notcontains "stopProxy"
+            @($Result.workflows.tray.completedActions) -notcontains "quit"
+            @($Result.workflows.tray.proxyToggleSequence) -notcontains $true
+            @($Result.workflows.tray.proxyToggleSequence) -notcontains $false
+            $Result.workflows.tray.primaryClickShowWindowCount -lt 2
+            -not ([bool]$Result.workflows.tray.quitRequested)
             -not ([bool]$Result.workflows.persistence.accountsJsonExists)
             -not ([bool]$Result.workflows.persistence.settingsJsonExists)
             -not ([bool]$Result.workflows.persistence.codexAuthExists)

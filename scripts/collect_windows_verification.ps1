@@ -565,6 +565,17 @@ function Add-SmokeResultChecks {
     ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $platform "editorRestartError"))))
   ) $platform
 
+  $tray = Get-PropertyValue $workflows "tray"
+  Add-Check "automated.traySmoke" (
+    (Test-ContainsAll (Get-PropertyValue $tray "actionLabels") @("Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")) -and
+    (Test-ContainsAll (Get-PropertyValue $tray "completedActions") @("showWindow", "refreshAccounts", "smartSwitch", "startProxy", "stopProxy", "quit")) -and
+    (Test-ContainsAllBooleans (Get-PropertyValue $tray "proxyToggleSequence") @($true, $false)) -and
+    (Get-NumberValue (Get-PropertyValue $tray "primaryClickShowWindowCount")) -ge 2 -and
+    (Get-BoolValue (Get-PropertyValue $tray "quitRequested")) -and
+    (Get-NumberValue (Get-PropertyValue $tray "refreshAccountCount")) -ge 1 -and
+    (-not ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $tray "smartSwitchAccountId")))))
+  ) $tray
+
   Add-Check "automated.proxySmoke" (
     (Get-BoolValue (Get-PropertyValue $workflows "proxyHealthOK")) -and
     (Get-NumberValue (Get-PropertyValue $workflows "proxyPort")) -gt 0 -and

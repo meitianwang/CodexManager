@@ -13,7 +13,7 @@ import {
 import type { JSONValue } from "../shared/models/json-value";
 import { createWindowsAppContext, type WindowsAppContext } from "./app-context";
 import { registerIpcHandlers } from "./ipc/handlers";
-import { TrayService, type TrayMenuItem } from "./platform/tray-service";
+import { TrayService, type TrayActionID, type TrayAdapter, type TrayMenuItem } from "./platform/tray-service";
 import { BackgroundAccountMaintenanceService } from "./services/background-account-maintenance-service";
 
 if (started) {
@@ -92,6 +92,7 @@ interface SmokeWorkflowState {
   proxyUnauthorizedStatus: number;
   settingsLocale: string;
   switchedAccountId: string;
+  tray: SmokeTrayWorkflowState;
 }
 
 interface SmokeAccountWorkflowState {
@@ -113,6 +114,18 @@ interface SmokePlatformWorkflowState {
   startupSetEnabledValues: boolean[];
   startupSyncValues: boolean[];
   usedFallbackCLI: boolean;
+}
+
+interface SmokeTrayWorkflowState {
+  actionLabels: string[];
+  completedActions: TrayActionID[];
+  menuActionIDs: TrayActionID[];
+  primaryClickShowWindowCount: number;
+  proxyToggleSequence: boolean[];
+  quitRequested: boolean;
+  refreshAccountCount: number;
+  smartSwitchAccountId: string;
+  tooltip: string;
 }
 
 interface SmokePersistenceState {
@@ -733,6 +746,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
 
   const accountWorkflows = await verifySmokeAccountWorkflows(context, account, now);
   const platform = await verifySmokePlatformSideEffects(context, account);
+  const tray = await verifySmokeTrayWorkflow(context);
 
   const proxyState = await context.proxyRuntimeService.start(0, "sk-local-smoke");
   try {
@@ -775,7 +789,8 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
       proxyPort: proxyState.port,
       proxyUnauthorizedStatus: unauthorizedResponse.status,
       settingsLocale: settings.locale,
-      switchedAccountId: currentAuth.accountId
+      switchedAccountId: currentAuth.accountId,
+      tray
     };
   } finally {
     await context.proxyRuntimeService.stop();
@@ -856,6 +871,120 @@ async function verifySmokeAccountWorkflows(
     restoredAccountCount: restoredAccounts.length,
     smartSwitchAccountId
   };
+}
+
+async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<SmokeTrayWorkflowState> {
+  const adapter = new SmokeTrayAdapter();
+  const completedActions: TrayActionID[] = [];
+  const proxyToggleSequence: boolean[] = [];
+  let showWindowCount = 0;
+  let refreshAccountCount = 0;
+  let quitRequested = false;
+  let smartSwitchAccountId = "";
+  let smokeTray: TrayService | undefined;
+  const actionErrors: string[] = [];
+
+  const initialProxyState = await context.proxyRuntimeService.getState();
+  const settings = await context.settingsCoordinator.currentSettings();
+  const accounts = await context.accountsCoordinator.listAccounts();
+
+  try {
+    smokeTray = new TrayService({
+      adapter,
+      initialState: { accounts, locale: settings.locale, proxyRunning: initialProxyState.isRunning },
+      actions: {
+        showWindow() {
+          showWindowCount += 1;
+          completedActions.push("showWindow");
+        },
+        async refreshAccounts() {
+          refreshAccountCount = (await context.accountsCoordinator.listAccounts()).length;
+          completedActions.push("refreshAccounts");
+        },
+        async smartSwitch() {
+          const result = await context.accountsCoordinator.smartSwitch();
+          smartSwitchAccountId = result?.account.accountId ?? "";
+          smokeTray?.updateState({ accounts: await context.accountsCoordinator.listAccounts() });
+          completedActions.push("smartSwitch");
+        },
+        async startProxy() {
+          const state = await context.proxyRuntimeService.getState();
+          const nextState = await context.proxyRuntimeService.start(state.port, state.apiKey);
+          proxyToggleSequence.push(nextState.isRunning);
+          smokeTray?.updateState({ proxyRunning: nextState.isRunning });
+          completedActions.push("startProxy");
+        },
+        async stopProxy() {
+          const nextState = await context.proxyRuntimeService.stop();
+          proxyToggleSequence.push(nextState.isRunning);
+          smokeTray?.updateState({ proxyRunning: nextState.isRunning });
+          completedActions.push("stopProxy");
+        },
+        quit() {
+          quitRequested = true;
+          completedActions.push("quit");
+        }
+      },
+      onActionError(action, error) {
+        actionErrors.push(`${action}: ${errorMessage(error)}`);
+      },
+      tooltip: appInfo.displayName
+    });
+
+    const initialActionLabels = adapter.actionLabels();
+    const initialActionIDs = adapter.actionIDs();
+    if (!includesAll(initialActionLabels, ["Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit"])) {
+      throw new Error(`Smoke tray initial menu labels were unexpected: ${JSON.stringify(initialActionLabels)}`);
+    }
+
+    adapter.click("showWindow");
+    await waitForSmokeTrayAction(completedActions, "showWindow");
+    adapter.primaryClick();
+    await waitForSmokeTrayActionCount(completedActions, "showWindow", 2);
+    adapter.click("refreshAccounts");
+    await waitForSmokeTrayAction(completedActions, "refreshAccounts");
+    adapter.click("smartSwitch");
+    await waitForSmokeTrayAction(completedActions, "smartSwitch");
+    adapter.click("startProxy");
+    await waitForSmokeTrayAction(completedActions, "startProxy");
+    if (!adapter.actionLabels().includes("Stop Proxy")) {
+      throw new Error(`Smoke tray menu did not switch to Stop Proxy: ${JSON.stringify(adapter.actionLabels())}`);
+    }
+    adapter.click("stopProxy");
+    await waitForSmokeTrayAction(completedActions, "stopProxy");
+    adapter.click("quit");
+    await waitForSmokeTrayAction(completedActions, "quit");
+
+    if (actionErrors.length > 0) {
+      throw new Error(`Smoke tray actions failed: ${JSON.stringify(actionErrors)}`);
+    }
+    if (!includesAll(completedActions, ["showWindow", "refreshAccounts", "smartSwitch", "startProxy", "stopProxy", "quit"])) {
+      throw new Error(`Smoke tray actions did not all complete: ${JSON.stringify(completedActions)}`);
+    }
+    if (!includesBooleanSequence(proxyToggleSequence, [true, false])) {
+      throw new Error(`Smoke tray proxy toggle sequence failed: ${JSON.stringify(proxyToggleSequence)}`);
+    }
+    if (!quitRequested || refreshAccountCount < 1 || smartSwitchAccountId.length === 0) {
+      throw new Error(
+        `Smoke tray workflow result failed: ${JSON.stringify({ quitRequested, refreshAccountCount, smartSwitchAccountId })}`
+      );
+    }
+
+    return {
+      actionLabels: initialActionLabels,
+      completedActions,
+      menuActionIDs: initialActionIDs,
+      primaryClickShowWindowCount: showWindowCount,
+      proxyToggleSequence,
+      quitRequested,
+      refreshAccountCount,
+      smartSwitchAccountId,
+      tooltip: adapter.tooltip
+    };
+  } finally {
+    smokeTray?.destroy();
+    await context.proxyRuntimeService.stop();
+  }
 }
 
 async function verifySmokePlatformSideEffects(
@@ -946,6 +1075,78 @@ function includesBooleanSequence(values: readonly boolean[], expectedSequence: r
     }
   }
   return false;
+}
+
+class SmokeTrayAdapter implements TrayAdapter {
+  public items: readonly TrayMenuItem[] = [];
+  public tooltip = "";
+  private primaryClickHandler: (() => void) | undefined;
+
+  setContextMenu(items: readonly TrayMenuItem[]): void {
+    this.items = items.map((item) => ({ ...item }));
+  }
+
+  setToolTip(value: string): void {
+    this.tooltip = value;
+  }
+
+  onPrimaryClick(handler: () => void): void {
+    this.primaryClickHandler = handler;
+  }
+
+  destroy(): void {
+    this.items = [];
+  }
+
+  actionLabels(): string[] {
+    return this.items.flatMap((item) => (item.id && item.label ? [item.label] : []));
+  }
+
+  actionIDs(): TrayActionID[] {
+    return this.items.flatMap((item) => (item.id ? [item.id] : []));
+  }
+
+  click(id: TrayActionID): void {
+    const item = this.items.find((candidate) => candidate.id === id);
+    if (!item?.click) {
+      throw new Error(`Smoke tray item was not clickable: ${id}`);
+    }
+    if (item.enabled === false) {
+      throw new Error(`Smoke tray item was disabled: ${id}`);
+    }
+    item.click();
+  }
+
+  primaryClick(): void {
+    if (!this.primaryClickHandler) {
+      throw new Error("Smoke tray primary click handler was not registered");
+    }
+    this.primaryClickHandler();
+  }
+}
+
+async function waitForSmokeTrayAction(completedActions: readonly TrayActionID[], action: TrayActionID): Promise<void> {
+  await waitForSmokeTrayActionCount(completedActions, action, 1);
+}
+
+async function waitForSmokeTrayActionCount(
+  completedActions: readonly TrayActionID[],
+  action: TrayActionID,
+  expectedCount: number
+): Promise<void> {
+  const deadline = Date.now() + smokeTestTimeoutMs;
+  while (Date.now() < deadline) {
+    const count = completedActions.filter((candidate) => candidate === action).length;
+    if (count >= expectedCount) {
+      return;
+    }
+    await delay(50);
+  }
+  throw new Error(`Smoke tray action ${action} did not complete ${expectedCount} time(s): ${JSON.stringify(completedActions)}`);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {
