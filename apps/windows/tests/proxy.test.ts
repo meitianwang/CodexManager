@@ -36,8 +36,13 @@ describe("local proxy", () => {
       method: "POST",
       body: JSON.stringify({ model: "gpt-5-codex", input: [] })
     });
+    const body = await response.json() as { error?: { message?: string; type?: string } };
 
     expect(response.status).toBe(401);
+    expect(body.error).toMatchObject({
+      message: "Invalid or missing API key. Use Authorization: Bearer <key> or x-api-key header.",
+      type: "proxy_error"
+    });
   });
 
   it("mirrors mac-compatible CORS headers for preflight requests", async () => {

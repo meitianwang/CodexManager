@@ -71,6 +71,7 @@ const supportedPostPaths = new Set([
 ]);
 const unsupportedRouteMessage =
   "Proxy only supports GET /health, GET /v1/models, POST /v1/chat/completions, POST /v1/responses, POST /v1/responses/compact, POST /v1/memories/trace_summarize, POST /v1/alpha/search";
+const invalidApiKeyMessage = "Invalid or missing API key. Use Authorization: Bearer <key> or x-api-key header.";
 const noAccountsAvailableMessage = "No accounts available for proxy. Add and authorize at least one account first.";
 
 interface ProxyAccountSelection {
@@ -155,7 +156,7 @@ export class ProxyCoordinator {
 
     const settings = await this.options.settingsRepository.loadSettings();
     if (!isAuthorized(request, settings.proxyApiKey)) {
-      sendJson(response, 401, { error: { message: "Unauthorized", type: "authentication_error" } });
+      sendProxyError(response, 401, invalidApiKeyMessage);
       return;
     }
 
