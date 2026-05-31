@@ -495,6 +495,8 @@ function Add-SmokeResultChecks {
         (Get-NumberValue (Get-PropertyValue $accounts "accountCount")) -eq 1 -and
         (Get-NumberValue (Get-PropertyValue $accounts "currentBadgeCount")) -eq 1 -and
         (Get-BoolValue (Get-PropertyValue $accounts "hasSmokeEmail")) -and
+        (Test-ContainsAll (Get-PropertyValue $accounts "teamAliasLabels") @("Set team name Smoke account")) -and
+        (Test-ContainsAll (Get-PropertyValue $accounts "teamAliasPlaceholders") @("Set team name")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "toolbarButtons") @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "actionButtons") @("Switch", "Refresh", "Delete"))
     } elseif ($page -eq "proxy") {
@@ -502,7 +504,7 @@ function Add-SmokeResultChecks {
       $pagePassed = $pagePassed -and
         (Test-ContainsAll (Get-PropertyValue $proxy "sectionHeadings") @("Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage")) -and
         (Test-ContainsAll (Get-PropertyValue $proxy "endpointPaths") @("/v1/chat/completions", "/v1/responses", "/v1/messages")) -and
-        (Test-ContainsAll (Get-PropertyValue $proxy "formLabels") @("Port", "API key")) -and
+        (Test-ContainsAll (Get-PropertyValue $proxy "formLabels") @("Port", "API Key")) -and
         (Test-ContainsAll (Get-PropertyValue $proxy "actionButtons") @("Start")) -and
         (Get-NumberValue (Get-PropertyValue $proxy "codeCopyButtonCount")) -eq 2 -and
         (Get-NumberValue (Get-PropertyValue $proxy "modelChipCount")) -ge 3 -and
@@ -577,7 +579,7 @@ function Add-SmokeResultChecks {
 
   $tray = Get-PropertyValue $workflows "tray"
   Add-Check "automated.traySmoke" (
-    (Test-ContainsAll (Get-PropertyValue $tray "actionLabels") @("Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")) -and
+    (Test-ContainsAll (Get-PropertyValue $tray "actionLabels") @("Open Main Panel", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")) -and
     (Test-ContainsAll (Get-PropertyValue $tray "completedActions") @("showWindow", "refreshAccounts", "smartSwitch", "startProxy", "stopProxy", "quit")) -and
     (Test-ContainsAllBooleans (Get-PropertyValue $tray "proxyToggleSequence") @($true, $false)) -and
     (Get-NumberValue (Get-PropertyValue $tray "primaryClickShowWindowCount")) -ge 2 -and
