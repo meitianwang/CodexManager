@@ -39,7 +39,9 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
   const usageService = new DefaultUsageService(paths);
   const weeklyQuotaWarmupService = new DefaultWeeklyQuotaWarmupService(paths);
   const workspaceMetadataService = new DefaultWorkspaceMetadataService(paths);
-  const chatGPTOAuthLoginService = new OpenAIChatGPTOAuthLoginService(paths);
+  const chatGPTOAuthLoginService = new OpenAIChatGPTOAuthLoginService(paths, {
+    localeProvider: async () => (await settingsRepository.loadSettings()).locale
+  });
   const editorAppService = new EditorAppService();
   const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({

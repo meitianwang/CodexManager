@@ -9,6 +9,7 @@ import { NetworkRequestError, UnauthorizedError } from "../network-errors";
 import type { FetchLike } from "../endpoint-request-coordinator";
 import { makePKCECodes, randomBase64URL, type PKCECodes } from "./pkce";
 import { ChatGPTRefreshTokenExchangeCoordinator } from "./refresh-token-exchange-coordinator";
+import { oauthMessage, type OAuthMessageKey } from "./oauth-messages";
 
 const issuer = "https://auth.openai.com";
 const clientID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -24,6 +25,7 @@ export interface OpenAIChatGPTOAuthLoginServiceOptions {
   refreshCoordinator?: ChatGPTRefreshTokenExchangeCoordinator;
   stateFactory?: () => string;
   pkceFactory?: () => PKCECodes;
+  localeProvider?: () => Promise<string | undefined> | string | undefined;
 }
 
 interface TokenExchangeResponse {
@@ -38,6 +40,7 @@ export class OpenAIChatGPTOAuthLoginService {
   private readonly refreshCoordinator: ChatGPTRefreshTokenExchangeCoordinator;
   private readonly stateFactory: () => string;
   private readonly pkceFactory: () => PKCECodes;
+  private readonly localeProvider: () => Promise<string | undefined> | string | undefined;
 
   constructor(
     private readonly paths: Pick<FileSystemPaths, "codexConfigPath">,
@@ -48,6 +51,7 @@ export class OpenAIChatGPTOAuthLoginService {
     this.refreshCoordinator = options.refreshCoordinator ?? new ChatGPTRefreshTokenExchangeCoordinator();
     this.stateFactory = options.stateFactory ?? (() => randomBase64URL(32));
     this.pkceFactory = options.pkceFactory ?? makePKCECodes;
+    this.localeProvider = options.localeProvider ?? (() => "en");
   }
 
   async signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens> {
@@ -67,9 +71,10 @@ export class OpenAIChatGPTOAuthLoginService {
     try {
       const didOpen = await this.openExternal(authorizeURL.toString());
       if (!didOpen) {
-        throw new Error("Failed to open browser for ChatGPT sign-in");
+        throw new Error(await this.message("browserOpenFailed"));
       }
-      return await callback.wait(timeoutSeconds * 1000, () => new Error("ChatGPT sign-in timed out"));
+      const timeoutMessage = await this.message("addAccountTimeout");
+      return await callback.wait(timeoutSeconds * 1000, () => new Error(timeoutMessage));
     } finally {
       await closeServer(server);
     }
@@ -96,7 +101,7 @@ export class OpenAIChatGPTOAuthLoginService {
     if (forcedWorkspaceId) {
       const accountId = extractAccountIDFromIDToken(tokenResponse.idToken);
       if (accountId !== forcedWorkspaceId) {
-        throw new UnauthorizedError(`OAuth workspace mismatch: expected ${forcedWorkspaceId}`);
+        throw new UnauthorizedError(await this.message("workspaceMismatchFormat", forcedWorkspaceId));
       }
     }
 
@@ -129,7 +134,7 @@ export class OpenAIChatGPTOAuthLoginService {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error("Failed to start OAuth callback server");
+    throw lastError instanceof Error ? lastError : new Error(await this.message("callbackServerStartFailed"));
   }
 
   private async handleCallback(
@@ -148,7 +153,7 @@ export class OpenAIChatGPTOAuthLoginService {
 
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
     if (requestUrl.pathname === "/cancel") {
-      const error = new Error("OAuth request was cancelled");
+      const error = new Error(await this.message("requestCancelled"));
       callback.fail(error);
       sendHTML(response, 200, errorPageHTML(error.message));
       return;
@@ -160,7 +165,7 @@ export class OpenAIChatGPTOAuthLoginService {
     }
 
     if (requestUrl.searchParams.get("state") !== state) {
-      const error = new UnauthorizedError("OAuth callback state mismatch");
+      const error = new UnauthorizedError(await this.message("callbackStateMismatch"));
       callback.fail(error);
       sendHTML(response, 400, errorPageHTML(error.message));
       return;
@@ -183,13 +188,13 @@ export class OpenAIChatGPTOAuthLoginService {
     if (errorCode) {
       const description = requestUrl.searchParams.get("error_description")?.trim();
       const message = description || errorCode;
-      const error = new UnauthorizedError(`OAuth callback failed: ${message}`);
+      const error = new UnauthorizedError(await this.message("callbackFailedFormat", message));
       callback.fail(error);
       sendHTML(response, 401, errorPageHTML(error.message));
       return;
     }
 
-    const error = new Error("OAuth callback is missing authorization code");
+    const error = new Error(await this.message("callbackMissingCode"));
     callback.fail(error);
     sendHTML(response, 400, errorPageHTML(error.message));
   }
@@ -248,10 +253,18 @@ export class OpenAIChatGPTOAuthLoginService {
 
     if (!response.ok) {
       const detail = await boundedResponseText(response);
-      throw new NetworkRequestError(`OAuth token exchange failed: ${detail || `HTTP ${response.status}`}`);
+      throw new NetworkRequestError(await this.message("tokenExchangeFailedFormat", detail || `HTTP ${response.status}`));
     }
 
     return parseTokenExchangeResponse(await response.json());
+  }
+
+  private async message(key: OAuthMessageKey, replacement?: string): Promise<string> {
+    try {
+      return oauthMessage(await this.localeProvider(), key, replacement);
+    } catch {
+      return oauthMessage("en", key, replacement);
+    }
   }
 }
 

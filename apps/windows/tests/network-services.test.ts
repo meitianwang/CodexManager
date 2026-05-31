@@ -99,12 +99,87 @@ describe("OAuth helpers", () => {
     );
 
     const signIn = service.signInWithChatGPT(2);
-    const rejection = expect(signIn).rejects.toThrow(/state mismatch/);
+    const rejection = expect(signIn).rejects.toThrow(/callback validation failed/);
     const callbackURL = await callbackURLFromOpenedAuthorizeURL(() => openedURL);
     const response = await fetch(`${callbackURL}state=wrong-state&code=code`);
 
     await rejection;
     expect(response.status).toBe(400);
+  });
+
+  it("localizes browser-open failures using the current app locale", async () => {
+    const service = new OpenAIChatGPTOAuthLoginService(
+      { codexConfigPath: "/missing-config.toml" },
+      {
+        fetchImpl: queuedFetch([]).fetchImpl,
+        localeProvider: () => "zh-Hans",
+        openExternal: () => false,
+        stateFactory: () => "state",
+        pkceFactory: () => ({ codeVerifier: "verifier", codeChallenge: "challenge" })
+      }
+    );
+
+    await expect(service.signInWithChatGPT(2)).rejects.toThrow("无法打开浏览器登录页");
+  });
+
+  it("localizes OAuth callback failures and callback pages", async () => {
+    let openedURL: string | undefined;
+    const service = new OpenAIChatGPTOAuthLoginService(
+      { codexConfigPath: "/missing-config.toml" },
+      {
+        fetchImpl: queuedFetch([]).fetchImpl,
+        localeProvider: () => "zh-Hans",
+        openExternal: (url) => {
+          openedURL = url;
+          return true;
+        },
+        stateFactory: () => "expected-state",
+        pkceFactory: () => ({ codeVerifier: "verifier", codeChallenge: "challenge" })
+      }
+    );
+
+    const signIn = service.signInWithChatGPT(2);
+    const rejection = expect(signIn).rejects.toThrow("登录回调校验失败，请重试");
+    const callbackURL = await callbackURLFromOpenedAuthorizeURL(() => openedURL);
+    const response = await fetch(`${callbackURL}state=wrong-state&code=code`);
+    const html = await response.text();
+
+    await rejection;
+    expect(response.status).toBe(400);
+    expect(html).toContain("登录回调校验失败，请重试");
+  });
+
+  it("localizes OAuth sign-in timeout errors", async () => {
+    const service = new OpenAIChatGPTOAuthLoginService(
+      { codexConfigPath: "/missing-config.toml" },
+      {
+        fetchImpl: queuedFetch([]).fetchImpl,
+        localeProvider: () => "zh-Hans",
+        openExternal: () => true,
+        stateFactory: () => "state",
+        pkceFactory: () => ({ codeVerifier: "verifier", codeChallenge: "challenge" })
+      }
+    );
+
+    await expect(service.signInWithChatGPT(0)).rejects.toThrow("等待浏览器登录完成超时，请重试");
+  });
+
+  it("localizes OAuth token exchange failures", async () => {
+    const service = new OpenAIChatGPTOAuthLoginService(
+      { codexConfigPath: "/missing-config.toml" },
+      {
+        fetchImpl: queuedFetch([new Response("bad request", { status: 400 })]).fetchImpl,
+        localeProvider: () => "zh-Hans"
+      }
+    );
+
+    await expect(
+      service.exchangeCodeForTokens(
+        "code",
+        "http://localhost:1455/auth/callback",
+        { codeVerifier: "verifier", codeChallenge: "challenge" }
+      )
+    ).rejects.toThrow("登录令牌交换失败：bad request");
   });
 });
 
