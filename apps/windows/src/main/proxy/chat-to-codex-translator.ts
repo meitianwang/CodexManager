@@ -1,4 +1,4 @@
-import { codexSSEErrorFromEvent, parseCodexSSEEvents } from "./codex-sse";
+import { codexSSEErrorFromEvent, parseCodexSSEEvents, parseCodexSSEEventsFromChunks } from "./codex-sse";
 
 const maxAccumulatedTextBytes = 50 * 1024 * 1024;
 
@@ -125,6 +125,41 @@ export function translateCodexSSEToChatCompletionChunks(model: string, text: str
   }
 
   return chunks.join("");
+}
+
+export async function* translateCodexSSEToChatCompletionChunkStream(
+  model: string,
+  chunks: AsyncIterable<Uint8Array>
+): AsyncGenerator<string> {
+  const requestID = `chatcmpl-${crypto.randomUUID().slice(0, 12)}`;
+  let sentRole = false;
+
+  for await (const event of parseCodexSSEEventsFromChunks(chunks)) {
+    const error = codexSSEErrorFromEvent(event);
+    if (error) {
+      yield formatSSELine({ error: { message: error.message, type: "proxy_error" } });
+      yield "data: [DONE]\n\n";
+      return;
+    }
+
+    switch (event.type) {
+      case "response.output_text.delta":
+        if (!sentRole) {
+          yield formatSSELine(makeStreamChunk(requestID, model, { role: "assistant" }));
+          sentRole = true;
+        }
+        if (typeof event.object.delta === "string") {
+          yield formatSSELine(makeStreamChunk(requestID, model, { content: event.object.delta }));
+        }
+        break;
+      case "response.completed":
+        yield formatSSELine(makeStreamChunk(requestID, model, {}, "stop"));
+        yield "data: [DONE]\n\n";
+        return;
+      default:
+        break;
+    }
+  }
 }
 
 function extractMessageContent(message: Record<string, unknown>): string {

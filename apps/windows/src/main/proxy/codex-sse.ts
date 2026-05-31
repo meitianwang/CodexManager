@@ -10,6 +10,11 @@ export interface ParsedCodexSSEError {
   statusCode: number;
 }
 
+export type CodexSSEPreflightLineResult =
+  | { kind: "continue" }
+  | { kind: "ready" }
+  | { error: ParsedCodexSSEError; kind: "error" };
+
 const maxPreflightBytes = 64 * 1024;
 const maxPreflightLines = 128;
 
@@ -63,6 +68,27 @@ export function firstPreflightCodexSSEError(text: string): ParsedCodexSSEError |
     }
   }
   return undefined;
+}
+
+export function inspectCodexSSEPreflightLine(line: string): CodexSSEPreflightLineResult {
+  const event = parseCodexSSEEventLine(line);
+  if (!event) {
+    return { kind: "continue" };
+  }
+  const error = codexSSEErrorFromEvent(event);
+  if (error) {
+    return { kind: "error", error };
+  }
+  return isReadyForClient(event) ? { kind: "ready" } : { kind: "continue" };
+}
+
+export async function* parseCodexSSEEventsFromChunks(chunks: AsyncIterable<Uint8Array>): AsyncGenerator<ParsedCodexSSEEvent> {
+  for await (const line of decodeTextLines(chunks)) {
+    const event = parseCodexSSEEventLine(line);
+    if (event) {
+      yield event;
+    }
+  }
 }
 
 export function codexSSEErrorFromEvent(event: ParsedCodexSSEEvent): ParsedCodexSSEError | undefined {
@@ -174,6 +200,25 @@ function parseCodexSSEEventLine(line: string): ParsedCodexSSEEvent | undefined {
     return undefined;
   }
   return undefined;
+}
+
+export async function* decodeTextLines(chunks: AsyncIterable<Uint8Array>): AsyncGenerator<string> {
+  const decoder = new TextDecoder();
+  let pending = "";
+
+  for await (const chunk of chunks) {
+    pending += decoder.decode(chunk, { stream: true });
+    const lines = pending.split("\n");
+    pending = lines.pop() ?? "";
+    for (const line of lines) {
+      yield line.endsWith("\r") ? line.slice(0, -1) : line;
+    }
+  }
+
+  pending += decoder.decode();
+  if (pending) {
+    yield pending.endsWith("\r") ? pending.slice(0, -1) : pending;
+  }
 }
 
 function isReadyForClient(event: ParsedCodexSSEEvent): boolean {

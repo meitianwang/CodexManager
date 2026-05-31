@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
 import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
@@ -14,19 +15,39 @@ import { tokenObjectFromAuth } from "../repositories/auth-parsing";
 import {
   translateChatRequest,
   translateCodexSSEToChatCompletion,
-  translateCodexSSEToChatCompletionChunks
+  translateCodexSSEToChatCompletionChunks,
+  translateCodexSSEToChatCompletionChunkStream
 } from "./chat-to-codex-translator";
 import {
   anthropicErrorBody,
   translateAnthropicRequest,
   translateCodexSSEToAnthropicMessage,
-  translateCodexSSEToAnthropicStream
+  translateCodexSSEToAnthropicStream,
+  translateCodexSSEToAnthropicStreamChunks
 } from "./anthropic-to-codex-translator";
-import { CodexUpstreamClient, CodexUpstreamError, isForwardableHeader, type CodexUpstreamClientLike, type CodexUpstreamRequest, type CodexUpstreamResult } from "./upstream-client";
+import {
+  CodexUpstreamClient,
+  CodexUpstreamError,
+  isForwardableHeader,
+  isStreamingUpstreamResult,
+  type CodexUpstreamClientLike,
+  type CodexUpstreamRequest,
+  type CodexUpstreamResult,
+  type CodexUpstreamStreamingResult
+} from "./upstream-client";
 import { modelCatalogPlanKey } from "../services/remote-model-catalog-service";
-import { collectCompletedResponseFromSSE, firstPreflightCodexSSEError } from "./codex-sse";
+import {
+  collectCompletedResponseFromSSE,
+  decodeTextLines,
+  firstPreflightCodexSSEError,
+  inspectCodexSSEPreflightLine,
+  type ParsedCodexSSEError
+} from "./codex-sse";
 
 const maxRequestBytes = 50 * 1024 * 1024;
+const maxBufferedUpstreamBytes = 50 * 1024 * 1024;
+const maxPreflightBytes = 64 * 1024;
+const maxPreflightLines = 128;
 const accountCooldownSeconds = 60;
 const authCooldownSeconds = 5 * 60;
 const shortCooldownSeconds = 15;
@@ -253,14 +274,18 @@ export class ProxyCoordinator {
     );
 
     if (clientWantsStream) {
-      sendText(
-        response,
-        200,
-        translateCodexSSEToChatCompletionChunks(model, result.body.toString("utf8")),
-        "text/event-stream; charset=utf-8"
-      );
+      if (isStreamingUpstreamResult(result)) {
+        await sendTextStream(response, 200, translateCodexSSEToChatCompletionChunkStream(model, result.body), "text/event-stream; charset=utf-8");
+      } else {
+        sendText(
+          response,
+          200,
+          translateCodexSSEToChatCompletionChunks(model, result.body.toString("utf8")),
+          "text/event-stream; charset=utf-8"
+        );
+      }
     } else {
-      sendJson(response, 200, translateCodexSSEToChatCompletion(model, result.body.toString("utf8")));
+      sendJson(response, 200, translateCodexSSEToChatCompletion(model, await upstreamResultText(result)));
     }
   }
 
@@ -285,14 +310,18 @@ export class ProxyCoordinator {
       false
     );
     if (translation.isStream) {
-      sendText(
-        response,
-        200,
-        translateCodexSSEToAnthropicStream(translation.model, result.body.toString("utf8")),
-        "text/event-stream; charset=utf-8"
-      );
+      if (isStreamingUpstreamResult(result)) {
+        await sendTextStream(response, 200, translateCodexSSEToAnthropicStreamChunks(translation.model, result.body), "text/event-stream; charset=utf-8");
+      } else {
+        sendText(
+          response,
+          200,
+          translateCodexSSEToAnthropicStream(translation.model, result.body.toString("utf8")),
+          "text/event-stream; charset=utf-8"
+        );
+      }
     } else {
-      const translated = translateCodexSSEToAnthropicMessage(translation.model, result.body.toString("utf8"));
+      const translated = translateCodexSSEToAnthropicMessage(translation.model, await upstreamResultText(result));
       sendJson(response, translated.statusCode, translated.body);
     }
   }
@@ -317,11 +346,11 @@ export class ProxyCoordinator {
       false
     );
     if (forceStream && !clientWantsStream) {
-      const completed = collectCompletedResponseFromSSE(result.body.toString("utf8"));
+      const completed = collectCompletedResponseFromSSE(await upstreamResultText(result));
       sendJson(response, completed.statusCode, completed.body, result.headers);
       return;
     }
-    sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
+    await sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
   }
 
   private async forwardCodexJSONPassthrough(
@@ -342,7 +371,7 @@ export class ProxyCoordinator {
       model,
       false
     );
-    sendUpstream(response, result, "application/json; charset=utf-8");
+    await sendUpstream(response, result, "application/json; charset=utf-8");
   }
 
   private async forwardProxyRequest(
@@ -377,7 +406,7 @@ export class ProxyCoordinator {
           isStream
         }, account, extracted, model);
         if (writeResponse) {
-          sendUpstream(response, result, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
+          await sendUpstream(response, result, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
         }
         return result;
       } catch (error) {
@@ -398,7 +427,7 @@ export class ProxyCoordinator {
     model: string
   ): Promise<CodexUpstreamResult> {
     try {
-      return this.preflightUpstreamResult(
+      return await this.preflightUpstreamResult(
         await this.upstreamClient.execute({
           ...request,
           accessToken: extracted.accessToken,
@@ -410,7 +439,7 @@ export class ProxyCoordinator {
         const refreshed = await this.refreshProxyAccountAuth(account);
         if (refreshed) {
           try {
-            return this.preflightUpstreamResult(
+            return await this.preflightUpstreamResult(
               await this.upstreamClient.execute({
                 ...request,
                 accessToken: refreshed.extracted.accessToken,
@@ -429,7 +458,10 @@ export class ProxyCoordinator {
     }
   }
 
-  private preflightUpstreamResult(result: CodexUpstreamResult): CodexUpstreamResult {
+  private async preflightUpstreamResult(result: CodexUpstreamResult): Promise<CodexUpstreamResult> {
+    if (isStreamingUpstreamResult(result)) {
+      return preflightStreamingUpstreamResult(result);
+    }
     const error = firstPreflightCodexSSEError(result.body.toString("utf8"));
     if (!error) {
       return result;
@@ -740,7 +772,116 @@ function modelsQueryString(request: IncomingMessage, url: URL): string {
   return queryString ? `?${queryString}` : "";
 }
 
-function sendUpstream(response: ServerResponse, result: CodexUpstreamResult, contentType: string): void {
+async function upstreamResultText(result: CodexUpstreamResult): Promise<string> {
+  if (!isStreamingUpstreamResult(result)) {
+    return result.body.toString("utf8");
+  }
+  return (await collectBufferedStream(result.body)).toString("utf8");
+}
+
+async function collectBufferedStream(chunks: AsyncIterable<Uint8Array>): Promise<Buffer> {
+  const buffers: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of chunks) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.byteLength;
+    if (total > maxBufferedUpstreamBytes) {
+      throw new Error("Upstream response exceeded maximum size");
+    }
+    buffers.push(buffer);
+  }
+  return Buffer.concat(buffers);
+}
+
+async function preflightStreamingUpstreamResult(result: CodexUpstreamStreamingResult): Promise<CodexUpstreamStreamingResult> {
+  const iterator = result.body[Symbol.asyncIterator]();
+  const buffered: Buffer[] = [];
+  let lines = 0;
+  let bytes = 0;
+
+  const inspectedChunks = inspectStreamingPreflight(iterator, buffered, (line) => {
+    lines += 1;
+    bytes += Buffer.byteLength(line);
+    const inspected = inspectCodexSSEPreflightLine(line);
+    if (inspected.kind === "error") {
+      return inspected.error;
+    }
+    if (inspected.kind === "ready" || lines >= maxPreflightLines || bytes >= maxPreflightBytes) {
+      return false;
+    }
+    return undefined;
+  });
+
+  for await (const preflightError of inspectedChunks) {
+    if (preflightError) {
+      await iterator.return?.();
+      throw new CodexUpstreamError(preflightError.statusCode, `SSE ${preflightError.statusCode}`, preflightError.body);
+    }
+    break;
+  }
+
+  return {
+    ...result,
+    body: replayBufferedThenRest(buffered, iterator)
+  };
+}
+
+async function* inspectStreamingPreflight(
+  iterator: AsyncIterator<Buffer>,
+  buffered: Buffer[],
+  inspectLine: (line: string) => false | ParsedCodexSSEError | undefined
+): AsyncGenerator<ParsedCodexSSEError | undefined> {
+  const preflightChunks = (async function* () {
+    while (true) {
+      const next = await iterator.next();
+      if (next.done) {
+        return;
+      }
+      const buffer = Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value);
+      buffered.push(buffer);
+      yield buffer;
+    }
+  })();
+
+  for await (const line of decodeTextLines(preflightChunks)) {
+    const result = inspectLine(line);
+    if (result === false) {
+      yield undefined;
+      return;
+    }
+    if (result) {
+      yield result;
+      return;
+    }
+  }
+
+  yield undefined;
+}
+
+async function* replayBufferedThenRest(buffered: readonly Buffer[], iterator: AsyncIterator<Buffer>): AsyncGenerator<Buffer> {
+  for (const buffer of buffered) {
+    yield buffer;
+  }
+
+  try {
+    while (true) {
+      const next = await iterator.next();
+      if (next.done) {
+        return;
+      }
+      yield Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value);
+    }
+  } finally {
+    await iterator.return?.();
+  }
+}
+
+async function sendUpstream(response: ServerResponse, result: CodexUpstreamResult, contentType: string): Promise<void> {
+  if (isStreamingUpstreamResult(result)) {
+    await sendByteStream(response, result.statusCode, result.body, contentType, result.headers);
+    return;
+  }
+
   const headers: Record<string, string> = {
     ...filterResponseHeaders(result.headers),
     "Content-Type": result.headers["content-type"] ?? contentType,
@@ -748,6 +889,50 @@ function sendUpstream(response: ServerResponse, result: CodexUpstreamResult, con
   };
   response.writeHead(result.statusCode, headers);
   response.end(result.body);
+}
+
+async function sendTextStream(
+  response: ServerResponse,
+  statusCode: number,
+  chunks: AsyncIterable<string | Uint8Array>,
+  contentType: string,
+  headers: Record<string, string> = {}
+): Promise<void> {
+  await sendByteStream(response, statusCode, chunks, contentType, headers);
+}
+
+async function sendByteStream(
+  response: ServerResponse,
+  statusCode: number,
+  chunks: AsyncIterable<string | Uint8Array>,
+  contentType: string,
+  headers: Record<string, string> = {}
+): Promise<void> {
+  response.writeHead(statusCode, {
+    ...filterResponseHeaders(headers),
+    "Content-Type": headers["content-type"] ?? contentType,
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive"
+  });
+
+  try {
+    for await (const chunk of chunks) {
+      if (response.destroyed) {
+        break;
+      }
+      const buffer = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : Buffer.from(chunk);
+      if (!response.write(buffer)) {
+        await once(response, "drain");
+      }
+    }
+    if (!response.destroyed) {
+      response.end();
+    }
+  } catch (error) {
+    if (!response.destroyed) {
+      response.destroy(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
 }
 
 function filterResponseHeaders(headers: Record<string, string>): Record<string, string> {

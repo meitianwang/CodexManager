@@ -1,4 +1,4 @@
-import { codexSSEErrorFromEvent, parseCodexSSEEvents } from "./codex-sse";
+import { codexSSEErrorFromEvent, parseCodexSSEEvents, parseCodexSSEEventsFromChunks } from "./codex-sse";
 
 export interface AnthropicTranslation {
   codexBody: Record<string, unknown>;
@@ -402,6 +402,157 @@ export function translateCodexSSEToAnthropicStream(model: string, text: string):
   }));
   chunks.push("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
   return chunks.join("");
+}
+
+export async function* translateCodexSSEToAnthropicStreamChunks(
+  model: string,
+  chunks: AsyncIterable<Uint8Array>
+): AsyncGenerator<string> {
+  const messageID = generateMessageID();
+  yield formatEvent("message_start", {
+    type: "message_start",
+    message: {
+      id: messageID,
+      type: "message",
+      role: "assistant",
+      content: [],
+      model,
+      stop_reason: null,
+      stop_sequence: null,
+      usage: { input_tokens: 0, output_tokens: 0 }
+    }
+  });
+  yield "event: ping\ndata: {\"type\":\"ping\"}\n\n";
+
+  let contentIndex = 0;
+  let blockOpen: "text" | "thinking" | "tool_use" | undefined;
+  let hasToolCall = false;
+  let outputTokens = 0;
+
+  for await (const event of parseCodexSSEEventsFromChunks(chunks)) {
+    const error = codexSSEErrorFromEvent(event);
+    if (error) {
+      if (blockOpen) {
+        yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+      }
+      yield formatEvent("error", { type: "error", error: { type: "api_error", message: error.message } });
+      return;
+    }
+
+    switch (event.type) {
+      case "response.output_text.delta": {
+        const delta = typeof event.object.delta === "string" ? event.object.delta : "";
+        if (!delta) {
+          break;
+        }
+        if (!blockOpen) {
+          yield formatEvent("content_block_start", {
+            type: "content_block_start",
+            index: contentIndex,
+            content_block: { type: "text", text: "" }
+          });
+          blockOpen = "text";
+        }
+        yield formatEvent("content_block_delta", {
+          type: "content_block_delta",
+          index: contentIndex,
+          delta: { type: "text_delta", text: delta }
+        });
+        break;
+      }
+      case "response.output_text.done":
+        if (blockOpen) {
+          yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+          contentIndex += 1;
+          blockOpen = undefined;
+        }
+        break;
+      case "response.reasoning_summary_text.delta": {
+        const delta = typeof event.object.delta === "string" ? event.object.delta : "";
+        if (!delta) {
+          break;
+        }
+        if (!blockOpen) {
+          yield formatEvent("content_block_start", {
+            type: "content_block_start",
+            index: contentIndex,
+            content_block: { type: "thinking", thinking: "" }
+          });
+          blockOpen = "thinking";
+        }
+        yield formatEvent("content_block_delta", {
+          type: "content_block_delta",
+          index: contentIndex,
+          delta: { type: "thinking_delta", thinking: delta }
+        });
+        break;
+      }
+      case "response.reasoning_summary_text.done":
+        if (blockOpen) {
+          yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+          contentIndex += 1;
+          blockOpen = undefined;
+        }
+        break;
+      case "response.output_item.added":
+        if (!isRecord(event.object.item) || event.object.item.type !== "function_call") {
+          break;
+        }
+        if (blockOpen) {
+          yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+          contentIndex += 1;
+        }
+        hasToolCall = true;
+        blockOpen = "tool_use";
+        yield formatEvent("content_block_start", {
+          type: "content_block_start",
+          index: contentIndex,
+          content_block: {
+            type: "tool_use",
+            id: generateToolUseID(),
+            name: typeof event.object.item.name === "string" ? event.object.item.name : "",
+            input: {}
+          }
+        });
+        break;
+      case "response.function_call_arguments.delta": {
+        const delta = typeof event.object.delta === "string" ? event.object.delta : "";
+        if (delta) {
+          yield formatEvent("content_block_delta", {
+            type: "content_block_delta",
+            index: contentIndex,
+            delta: { type: "input_json_delta", partial_json: delta }
+          });
+        }
+        break;
+      }
+      case "response.function_call_arguments.done":
+      case "response.output_item.done":
+        if (blockOpen === "tool_use") {
+          yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+          contentIndex += 1;
+          blockOpen = undefined;
+        }
+        break;
+      case "response.completed":
+        if (isRecord(event.object.response) && isRecord(event.object.response.usage)) {
+          outputTokens = integerValue(event.object.response.usage.output_tokens) ?? 0;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (blockOpen) {
+    yield formatEvent("content_block_stop", { type: "content_block_stop", index: contentIndex });
+  }
+  yield formatEvent("message_delta", {
+    type: "message_delta",
+    delta: { stop_reason: hasToolCall ? "tool_use" : "end_turn", stop_sequence: null },
+    usage: { output_tokens: outputTokens }
+  });
+  yield "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
 }
 
 export function translateCodexSSEToAnthropicMessage(model: string, text: string): AnthropicMessageResult {

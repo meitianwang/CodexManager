@@ -29,11 +29,21 @@ export interface CodexUpstreamRequest {
   isStream: boolean;
 }
 
-export interface CodexUpstreamResult {
+export interface CodexUpstreamCompleteResult {
   statusCode: number;
   headers: Record<string, string>;
   body: Buffer;
+  stream?: false;
 }
+
+export interface CodexUpstreamStreamingResult {
+  statusCode: number;
+  headers: Record<string, string>;
+  body: AsyncIterable<Buffer>;
+  stream: true;
+}
+
+export type CodexUpstreamResult = CodexUpstreamCompleteResult | CodexUpstreamStreamingResult;
 
 export interface CodexUpstreamClientLike {
   execute(request: CodexUpstreamRequest): Promise<CodexUpstreamResult>;
@@ -105,12 +115,25 @@ export class CodexUpstreamClient implements CodexUpstreamClientLike {
       throw new CodexUpstreamError(response.status, `HTTP ${response.status}`, body);
     }
 
+    if (request.isStream && response.body) {
+      return {
+        statusCode: response.status,
+        headers: responseHeaders(response),
+        body: streamResponseBody(response),
+        stream: true
+      };
+    }
+
     return {
       statusCode: response.status,
       headers: responseHeaders(response),
       body: await boundedArrayBuffer(response)
     };
   }
+}
+
+export function isStreamingUpstreamResult(result: CodexUpstreamResult): result is CodexUpstreamStreamingResult {
+  return result.stream === true;
 }
 
 export function isForwardableHeader(name: string): boolean {
@@ -148,4 +171,30 @@ async function boundedArrayBuffer(response: Response): Promise<Buffer> {
     chunks.push(value);
   }
   return Buffer.concat(chunks);
+}
+
+async function* streamResponseBody(response: Response): AsyncGenerator<Buffer> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    yield Buffer.from(await response.arrayBuffer());
+    return;
+  }
+
+  let total = 0;
+  try {
+    while (total <= maxResponseBytes) {
+      const { done, value } = await reader.read();
+      if (done || !value) {
+        return;
+      }
+      total += value.byteLength;
+      if (total > maxResponseBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("Upstream response exceeded maximum size");
+      }
+      yield Buffer.from(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }

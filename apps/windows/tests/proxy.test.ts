@@ -184,6 +184,36 @@ describe("local proxy", () => {
     });
   });
 
+  it("streams Responses passthrough chunks before the upstream request completes", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early" }));
+        await gate.promise;
+        yield Buffer.from(sseDataLine({ type: "response.completed", response: { id: "resp-stream" } }));
+      }())
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    try {
+      expect(response.status).toBe(200);
+      const firstChunk = await readUntilText(reader!, "early");
+      expect(firstChunk).toContain("response.output_text.delta");
+      expect(firstChunk).toContain("early");
+    } finally {
+      gate.resolve();
+      await reader?.cancel().catch(() => undefined);
+    }
+  });
+
   it("adds encrypted reasoning include for Responses requests that use reasoning", async () => {
     const upstream = new FakeUpstreamClient([completedResponseResult({ id: "resp-reasoning" })]);
     const context = await makeProxyContext({ upstream });
@@ -511,6 +541,36 @@ describe("local proxy", () => {
     expect(events[2]).toMatchObject({
       choices: [{ delta: {}, finish_reason: "stop" }]
     });
+  });
+
+  it("translates streaming Chat Completions chunks before the upstream request completes", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early chat" }));
+        await gate.promise;
+        yield Buffer.from(sseDataLine({ type: "response.completed", response: { usage: { output_tokens: 1 } } }));
+      }())
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: true,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    try {
+      expect(response.status).toBe(200);
+      const firstText = await readUntilText(reader!, "early chat");
+      expect(firstText).toContain("chat.completion.chunk");
+      expect(firstText).toContain("early chat");
+    } finally {
+      gate.resolve();
+      await reader?.cancel().catch(() => undefined);
+    }
   });
 
   it("translates Anthropic messages requests to Codex Responses", async () => {
@@ -1297,6 +1357,17 @@ function sseResult(text: string): CodexUpstreamResult {
   };
 }
 
+function streamingSSEResult(body: AsyncIterable<Buffer>): CodexUpstreamResult {
+  return {
+    statusCode: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8"
+    },
+    body,
+    stream: true
+  };
+}
+
 function sseDataLine(value: Record<string, unknown>): string {
   return `data: ${JSON.stringify(value)}\n\n`;
 }
@@ -1332,6 +1403,36 @@ function completedResponseResult(response: Record<string, unknown>, headers: Rec
       ].join("\n")
     )
   };
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve: () => void = () => undefined;
+  const promise = new Promise<void>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
+async function readUntilText(reader: ReadableStreamDefaultReader<Uint8Array>, expected: string): Promise<string> {
+  const decoder = new TextDecoder();
+  let text = "";
+  for (let index = 0; index < 5; index += 1) {
+    const result = await Promise.race([
+      reader.read(),
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500))
+    ]);
+    if (result === "timeout") {
+      throw new Error(`Timed out waiting for streamed text: ${expected}`);
+    }
+    if (result.done) {
+      break;
+    }
+    text += decoder.decode(result.value, { stream: true });
+    if (text.includes(expected)) {
+      return text;
+    }
+  }
+  throw new Error(`Streamed text did not include ${expected}: ${text}`);
 }
 
 function parseDataEvents(text: string): unknown[] {
