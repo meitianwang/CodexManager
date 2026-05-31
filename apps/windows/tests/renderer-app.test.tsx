@@ -486,10 +486,6 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
         }
         return { insertedCount: accountIds.length, updatedCount: 0 };
       }),
-      importPackage: vi.fn(async () => {
-        accounts = [...accounts, makeAccount("package", "Package")];
-        return { insertedCount: 1, updatedCount: 0 };
-      }),
       list: vi.fn(async () => accounts),
       onChanged: vi.fn(() => () => undefined),
       prepareImportPackage: vi.fn(async () => ({
@@ -505,7 +501,6 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
         accounts = accounts.map((account) => (account.id === id ? updated : account));
         return updated;
       }),
-      refreshWorkspaceMetadata: vi.fn(async () => accounts),
       smartSwitch: vi.fn(async () => undefined as SmartSwitchResult | undefined),
       switch: vi.fn(async () => ({ restartedEditorApps: [], usedFallbackCLI: false })),
       updateTeamAlias: vi.fn(async (id, alias) => {

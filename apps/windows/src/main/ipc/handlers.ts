@@ -21,7 +21,6 @@ import {
   ipcChannels,
   parseIpcInput,
   proxyStartSchema,
-  refreshWorkspaceMetadataSchema,
   settingsPatchSchema,
   switchAccountSchema,
   updateTeamAliasSchema
@@ -71,13 +70,6 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     const account = await context.accountsCoordinator.refreshAccountUsage(id);
     await publishLatestAccounts(context, options);
     return account;
-  });
-
-  ipcMain.handle(ipcChannels.accountsRefreshWorkspaceMetadata, async (_event, input: unknown) => {
-    const { forceRemoteCheck } = parseIpcInput(refreshWorkspaceMetadataSchema, input);
-    const accounts = await context.accountsCoordinator.refreshWorkspaceMetadata(forceRemoteCheck ?? false);
-    options.onAccountsChanged?.(accounts);
-    return accounts;
   });
 
   ipcMain.handle(ipcChannels.accountsSwitch, async (_event, input: unknown) => {
@@ -151,24 +143,6 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     } finally {
       accountImportDrafts.delete(draftId);
     }
-  });
-
-  ipcMain.handle(ipcChannels.accountsImportPackage, async () => {
-    const result = await dialog.showOpenDialog({
-      filters: [{ name: "CodexManager account package", extensions: ["json"] }],
-      properties: ["openFile"]
-    });
-    const path = result.filePaths[0];
-    if (result.canceled || !path) {
-      return undefined;
-    }
-    const accountPackage = await context.accountsCoordinator.loadAccountsTransferPackage(path);
-    const importResult = await context.accountsCoordinator.importAccountsTransferPackage(
-      accountPackage,
-      new Set(accountPackage.accounts.map((account) => account.id))
-    );
-    await publishLatestAccounts(context, options);
-    return importResult;
   });
 
   ipcMain.handle(ipcChannels.settingsGet, () => context.settingsCoordinator.currentSettings());

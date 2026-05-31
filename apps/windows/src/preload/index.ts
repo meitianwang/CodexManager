@@ -19,13 +19,11 @@ export interface CodexManagerAPI {
     exportPackage: (accountIds: string[]) => Promise<{ canceled: boolean; path?: string }>;
     importCurrentAuth: () => Promise<AccountSummary>;
     importPreparedPackage: (draftId: string, accountIds: string[]) => Promise<AccountsImportResult>;
-    importPackage: () => Promise<AccountsImportResult | undefined>;
     list: () => Promise<AccountSummary[]>;
     onChanged: (listener: (accounts: AccountSummary[]) => void) => () => void;
     prepareImportPackage: () => Promise<AccountsImportDraftDescriptor | undefined>;
     refreshAllUsage: () => Promise<AccountSummary[]>;
     refreshUsage: (id: string) => Promise<AccountSummary>;
-    refreshWorkspaceMetadata: (forceRemoteCheck?: boolean) => Promise<AccountSummary[]>;
     smartSwitch: () => Promise<SmartSwitchResult | undefined>;
     switch: (id: string, workspacePath?: string) => Promise<SwitchAccountExecutionResult>;
     updateTeamAlias: (id: string, alias?: string) => Promise<AccountSummary>;
@@ -61,7 +59,6 @@ const api: CodexManagerAPI = {
     importCurrentAuth: () => invoke<AccountSummary>(ipcChannels.accountsImportCurrentAuth),
     importPreparedPackage: (draftId, accountIds) =>
       invoke<AccountsImportResult>(ipcChannels.accountsImportPreparedPackage, { draftId, accountIds }),
-    importPackage: () => invoke<AccountsImportResult | undefined>(ipcChannels.accountsImportPackage),
     list: () => invoke<AccountSummary[]>(ipcChannels.accountsList),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, accounts: AccountSummary[]) => {
@@ -73,8 +70,6 @@ const api: CodexManagerAPI = {
     prepareImportPackage: () => invoke<AccountsImportDraftDescriptor | undefined>(ipcChannels.accountsPrepareImportPackage),
     refreshAllUsage: () => invoke<AccountSummary[]>(ipcChannels.accountsRefreshAllUsage),
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
-    refreshWorkspaceMetadata: (forceRemoteCheck) =>
-      invoke<AccountSummary[]>(ipcChannels.accountsRefreshWorkspaceMetadata, { forceRemoteCheck }),
     smartSwitch: () => invoke<SmartSwitchResult | undefined>(ipcChannels.accountsSmartSwitch),
     switch: (id, workspacePath) => invoke<SwitchAccountExecutionResult>(ipcChannels.accountsSwitch, { id, workspacePath }),
     updateTeamAlias: (id, alias) => invoke<AccountSummary>(ipcChannels.accountsUpdateTeamAlias, { id, alias }),
