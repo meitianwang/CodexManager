@@ -80,7 +80,59 @@ describe("local proxy", () => {
     expect(upstream.requests[0]?.headers["x-api-key"]).toBeUndefined();
     expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toMatchObject({
       model: "gpt-5-codex",
-      stream: true
+      stream: true,
+      store: false,
+      instructions: "",
+      tools: [],
+      tool_choice: "auto",
+      parallel_tool_calls: true,
+      include: []
+    });
+  });
+
+  it("adds encrypted reasoning include for Responses requests that use reasoning", async () => {
+    const upstream = new FakeUpstreamClient([completedResponseResult({ id: "resp-reasoning" })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      reasoning: { effort: "high" },
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toMatchObject({
+      stream: true,
+      include: ["reasoning.encrypted_content"]
+    });
+  });
+
+  it("preserves explicit Responses compatibility fields", async () => {
+    const upstream = new FakeUpstreamClient([completedResponseResult({ id: "resp-explicit" })]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      store: true,
+      instructions: "custom",
+      tools: [{ type: "web_search_preview" }],
+      tool_choice: "none",
+      parallel_tool_calls: false,
+      include: ["file_search_call.results"],
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toMatchObject({
+      stream: true,
+      store: true,
+      instructions: "custom",
+      tools: [{ type: "web_search_preview" }],
+      tool_choice: "none",
+      parallel_tool_calls: false,
+      include: ["file_search_call.results"]
     });
   });
 

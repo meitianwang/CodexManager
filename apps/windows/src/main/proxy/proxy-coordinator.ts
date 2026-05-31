@@ -259,7 +259,7 @@ export class ProxyCoordinator {
   ): Promise<void> {
     const model = readOptionalString(json.model) ?? "";
     const clientWantsStream = json.stream !== false;
-    const body = forceStream ? { ...json, stream: true } : json;
+    const body = forceStream ? normalizedResponsesBody(json) : json;
     const result = await this.forwardProxyRequest(
       request,
       response,
@@ -577,6 +577,17 @@ function parseJsonObject(body: Buffer): Record<string, unknown> {
     throw new Error("Request body must be a JSON object");
   }
   return parsed;
+}
+
+function normalizedResponsesBody(json: Record<string, unknown>): Record<string, unknown> {
+  const body: Record<string, unknown> = { ...json, stream: true };
+  body.store ??= false;
+  body.instructions ??= "";
+  body.tools ??= [];
+  body.tool_choice ??= "auto";
+  body.parallel_tool_calls ??= true;
+  body.include ??= body.reasoning === undefined ? [] : ["reasoning.encrypted_content"];
+  return body;
 }
 
 function requestHeaders(request: IncomingMessage): Record<string, string> {
