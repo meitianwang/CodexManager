@@ -591,6 +591,35 @@ describe("local proxy", () => {
     });
   });
 
+  it("uses the mac-compatible Anthropic fallback text extraction", async () => {
+    const upstream = new FakeUpstreamClient([
+      completedResponseResult({
+        output: [
+          {
+            type: "custom_output",
+            content: [{ type: "output_text", text: "Fallback text" }]
+          }
+        ],
+        usage: { input_tokens: 1, output_tokens: 1 }
+      })
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/messages", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json() as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      type: "message",
+      role: "assistant",
+      content: [{ type: "text", text: "Fallback text" }]
+    });
+  });
+
   it("converts Anthropic tool calls and tool results in request history", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Done")]);
     const context = await makeProxyContext({ upstream });

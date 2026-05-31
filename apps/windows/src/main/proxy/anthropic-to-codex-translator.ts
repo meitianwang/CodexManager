@@ -460,6 +460,13 @@ function buildAnthropicMessage(response: Record<string, unknown>, model: string)
     }
   }
 
+  if (content.length === 0) {
+    const text = extractText(response);
+    if (text) {
+      content.push({ type: "text", text });
+    }
+  }
+
   const usage = isRecord(response.usage) ? response.usage : {};
   return {
     id: generateMessageID(),
@@ -474,6 +481,23 @@ function buildAnthropicMessage(response: Record<string, unknown>, model: string)
       output_tokens: integerValue(usage.output_tokens) ?? 0
     }
   };
+}
+
+function extractText(response: Record<string, unknown>): string | undefined {
+  if (!Array.isArray(response.output)) {
+    return undefined;
+  }
+  for (const item of response.output) {
+    if (!isRecord(item) || !Array.isArray(item.content)) {
+      continue;
+    }
+    for (const part of item.content) {
+      if (isRecord(part) && part.type === "output_text" && typeof part.text === "string") {
+        return part.text;
+      }
+    }
+  }
+  return undefined;
 }
 
 export function anthropicErrorBody(message: string): Record<string, unknown> {
