@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ChatGPTOAuthTokens } from "../src/shared/models/auth";
+import { appLocales } from "../src/shared/models/settings";
 import type { FetchLike } from "../src/main/services/endpoint-request-coordinator";
+import { oauthMessage, type OAuthMessageKey } from "../src/main/services/oauth/oauth-messages";
 import { ChatGPTRefreshTokenExchangeCoordinator } from "../src/main/services/oauth/refresh-token-exchange-coordinator";
 import {
   formEncodedBody,
@@ -40,6 +42,31 @@ describe("OAuth helpers", () => {
         ["redirect_uri", "http://localhost:1455/auth/callback"]
       ])
     ).toBe("grant_type=authorization_code&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback");
+  });
+
+  it("keeps OAuth messages localized for every supported non-English locale", () => {
+    const messageKeys = [
+      "addAccountTimeout",
+      "browserOpenFailed",
+      "callbackFailedFormat",
+      "callbackMissingCode",
+      "callbackServerStartFailed",
+      "callbackStateMismatch",
+      "requestCancelled",
+      "tokenExchangeFailedFormat",
+      "workspaceMismatchFormat"
+    ] satisfies OAuthMessageKey[];
+
+    for (const locale of appLocales) {
+      if (locale === "en") {
+        continue;
+      }
+      for (const key of messageKeys) {
+        const message = oauthMessage(locale, key, "workspace");
+        expect(message, `${locale}.${key}`).not.toBe(oauthMessage("en", key, "workspace"));
+        expect(message.trim().length, `${locale}.${key}`).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("completes callback sign-in after validating state", async () => {
