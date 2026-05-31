@@ -16,6 +16,7 @@ import { RemoteModelCatalogService } from "./services/remote-model-catalog-servi
 import { CodexCLIService } from "./platform/codex-cli-service";
 import { EditorAppService } from "./platform/editor-app-service";
 import { LaunchAtStartupService } from "./platform/launch-at-startup-service";
+import type { ChatGPTOAuthTokens } from "../shared/models/auth";
 import type { EditorAppID } from "../shared/models/settings";
 
 export interface SmokePlatformSideEffectLog {
@@ -25,6 +26,11 @@ export interface SmokePlatformSideEffectLog {
   editorRestarts: Array<{
     restarted: EditorAppID[];
     targets: EditorAppID[];
+  }>;
+  oauthSignIns: Array<{
+    accountId: string;
+    allowedWorkspaceId?: string;
+    timeoutSeconds: number;
   }>;
   startupSetEnabledValues: boolean[];
   startupSyncValues: boolean[];
@@ -59,9 +65,11 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
   const usageService = new DefaultUsageService(paths);
   const weeklyQuotaWarmupService = new DefaultWeeklyQuotaWarmupService(paths);
   const workspaceMetadataService = new DefaultWorkspaceMetadataService(paths);
-  const chatGPTOAuthLoginService = new OpenAIChatGPTOAuthLoginService(paths, {
-    localeProvider: async () => (await settingsRepository.loadSettings()).locale
-  });
+  const chatGPTOAuthLoginService =
+    smokePlatformSideEffects?.chatGPTOAuthLoginService ??
+    new OpenAIChatGPTOAuthLoginService(paths, {
+      localeProvider: async () => (await settingsRepository.loadSettings()).locale
+    });
   const editorAppService = new EditorAppService();
   const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({
@@ -145,6 +153,10 @@ function createSmokePlatformSideEffects():
       editorAppService: {
         restartSelectedApps(targets: readonly EditorAppID[]): Promise<{ restarted: EditorAppID[] }>;
       };
+      chatGPTOAuthLoginService: {
+        refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens>;
+        signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens>;
+      };
       launchAtStartupService: {
         setEnabled(enabled: boolean): void;
         syncWithStoreValue(enabled: boolean): void;
@@ -158,6 +170,7 @@ function createSmokePlatformSideEffects():
   const log: SmokePlatformSideEffectLog = {
     codexLaunches: [],
     editorRestarts: [],
+    oauthSignIns: [],
     startupSetEnabledValues: [],
     startupSyncValues: []
   };
@@ -179,6 +192,20 @@ function createSmokePlatformSideEffects():
         return { restarted: normalizedTargets };
       }
     },
+    chatGPTOAuthLoginService: {
+      async refreshChatGPTTokens(refreshToken: string): Promise<ChatGPTOAuthTokens> {
+        return makeSmokeChatGPTOAuthTokens(refreshToken.replace(/^refresh-/, "") || "acct-oauth");
+      },
+      async signInWithChatGPT(timeoutSeconds: number, allowedWorkspaceId?: string): Promise<ChatGPTOAuthTokens> {
+        const accountId = allowedWorkspaceId ?? "acct-oauth";
+        log.oauthSignIns.push(
+          allowedWorkspaceId === undefined
+            ? { accountId, timeoutSeconds }
+            : { accountId, allowedWorkspaceId, timeoutSeconds }
+        );
+        return makeSmokeChatGPTOAuthTokens(accountId);
+      }
+    },
     launchAtStartupService: {
       setEnabled(enabled: boolean): void {
         log.startupSetEnabledValues.push(enabled);
@@ -194,9 +221,32 @@ function createSmokePlatformSideEffects():
           restarted: [...entry.restarted],
           targets: [...entry.targets]
         })),
+        oauthSignIns: log.oauthSignIns.map((entry) => ({ ...entry })),
         startupSetEnabledValues: [...log.startupSetEnabledValues],
         startupSyncValues: [...log.startupSyncValues]
       };
     }
   };
+}
+
+function makeSmokeChatGPTOAuthTokens(accountId: string): ChatGPTOAuthTokens {
+  return {
+    accessToken: `access-${accountId}`,
+    refreshToken: `refresh-${accountId}`,
+    idToken: makeSmokeJwt({
+      email: `${accountId}@example.com`,
+      sub: `${accountId}@example.com`,
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: accountId,
+        chatgpt_plan_type: "plus",
+        chatgpt_team_name: "Smoke OAuth Team"
+      }
+    })
+  };
+}
+
+function makeSmokeJwt(payload: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${header}.${body}.signature`;
 }

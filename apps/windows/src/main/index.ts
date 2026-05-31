@@ -101,6 +101,10 @@ interface SmokeAccountWorkflowState {
   importCurrentAuthLabel: string;
   importPackageInsertedCount: number;
   importPackageUpdatedCount: number;
+  oauthAccountId: string;
+  oauthLabel: string;
+  oauthSignInCount: number;
+  oauthTimeoutSeconds: number;
   restoredAccountCount: number;
   smartSwitchAccountId: string;
 }
@@ -802,6 +806,16 @@ async function verifySmokeAccountWorkflows(
   primaryAccount: StoredAccount,
   now: number
 ): Promise<SmokeAccountWorkflowState> {
+  const oauthAccount = await context.accountsCoordinator.addAccountViaLogin("OAuth smoke account", 7);
+  if (oauthAccount.accountId !== "acct-oauth" || oauthAccount.label !== "OAuth smoke account") {
+    throw new Error(`Smoke OAuth login import failed: ${JSON.stringify(oauthAccount)}`);
+  }
+  const oauthSignIns = context.smokePlatformSideEffects?.snapshot().oauthSignIns ?? [];
+  const oauthSignIn = oauthSignIns.at(-1);
+  if (oauthSignIn?.accountId !== "acct-oauth" || oauthSignIn.timeoutSeconds !== 7) {
+    throw new Error(`Smoke OAuth sign-in side effect failed: ${JSON.stringify(oauthSignIns)}`);
+  }
+
   const importedAccountAuth = makeSmokeAuth("acct-import", "import@example.com");
   await context.authRepository.writeCurrentAuth(importedAccountAuth);
   const importedAccount = await context.accountsCoordinator.importCurrentAuthAccount("Imported smoke account");
@@ -833,12 +847,12 @@ async function verifySmokeAccountWorkflows(
   }
 
   const exportPackage = await context.accountsCoordinator.makeAccountsTransferPackage(
-    new Set([primaryAccount.id, importedAccount.id, packageAccount.id])
+    new Set([primaryAccount.id, oauthAccount.id, importedAccount.id, packageAccount.id])
   );
   if (
     exportPackage.format !== accountsTransferFormatIdentifier ||
     exportPackage.version !== accountsTransferCurrentVersion ||
-    exportPackage.accounts.length !== 3
+    exportPackage.accounts.length !== 4
   ) {
     throw new Error(`Smoke export package failed: ${JSON.stringify(exportPackage)}`);
   }
@@ -868,6 +882,10 @@ async function verifySmokeAccountWorkflows(
     importCurrentAuthLabel: importedAccount.label,
     importPackageInsertedCount: importPackageResult.insertedCount,
     importPackageUpdatedCount: importPackageResult.updatedCount,
+    oauthAccountId: oauthAccount.accountId,
+    oauthLabel: oauthAccount.label,
+    oauthSignInCount: oauthSignIns.length,
+    oauthTimeoutSeconds: oauthSignIn.timeoutSeconds,
     restoredAccountCount: restoredAccounts.length,
     smartSwitchAccountId
   };

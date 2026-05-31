@@ -549,7 +549,11 @@ function Add-SmokeResultChecks {
     (Get-StringValue (Get-PropertyValue $accountWorkflows "importCurrentAuthLabel")) -eq "Imported smoke account" -and
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "importPackageInsertedCount")) -eq 1 -and
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "importPackageUpdatedCount")) -eq 0 -and
-    (Get-NumberValue (Get-PropertyValue $accountWorkflows "exportPackageAccountCount")) -eq 3 -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "oauthAccountId")) -eq "acct-oauth" -and
+    (Get-StringValue (Get-PropertyValue $accountWorkflows "oauthLabel")) -eq "OAuth smoke account" -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "oauthSignInCount")) -ge 1 -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "oauthTimeoutSeconds")) -eq 7 -and
+    (Get-NumberValue (Get-PropertyValue $accountWorkflows "exportPackageAccountCount")) -eq 4 -and
     (Get-StringValue (Get-PropertyValue $accountWorkflows "smartSwitchAccountId")) -eq "acct-package" -and
     (Get-NumberValue (Get-PropertyValue $accountWorkflows "restoredAccountCount")) -eq 1
   ) $accountWorkflows
