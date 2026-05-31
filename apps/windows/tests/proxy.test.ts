@@ -477,6 +477,42 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
 
+  it("prioritizes the highest remaining quota instead of pinning the current account", async () => {
+    const current = makeAccount("current", "acct-current", "access-current", 1);
+    const better = makeAccount("better", "acct-better", "access-better", 2);
+    current.usage = {
+      fetchedAt: 1,
+      fiveHour: { usedPercent: 90, windowSeconds: 5 * 60 * 60 },
+      oneWeek: { usedPercent: 90, windowSeconds: 7 * 24 * 60 * 60 }
+    };
+    better.usage = {
+      fetchedAt: 1,
+      fiveHour: { usedPercent: 10, windowSeconds: 5 * 60 * 60 },
+      oneWeek: { usedPercent: 10, windowSeconds: 7 * 24 * 60 * 60 }
+    };
+    const upstream = new FakeUpstreamClient([successResult({ id: "resp-best" })]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [current, better],
+        currentSelection: {
+          accountId: "acct-current",
+          selectedAt: 1,
+          sourceDeviceID: "test"
+        }
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-better"]);
+  });
+
   it("retries the next eligible account after a preflight SSE error before output", async () => {
     const upstream = new FakeUpstreamClient([
       sseErrorResult({ code: "model_restricted", message: "model is not available", status: 403 }),

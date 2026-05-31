@@ -7,7 +7,7 @@ import { appInfo } from "../../shared/app-info";
 import { accountSummaries } from "../../shared/domain/accounts-store";
 import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId } from "../../shared/domain/account-identity";
 import { effectivePlanType, preferredPlanType } from "../../shared/domain/account-plan-resolver";
-import { sortForDisplay } from "../../shared/domain/account-ranking";
+import { remainingScore } from "../../shared/domain/account-ranking";
 import { resolveChatGPTBaseOrigin, removeSuffix } from "../services/chatgpt-base-origin";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../services/accounts-coordinator";
 import { tokenObjectFromAuth } from "../repositories/auth-parsing";
@@ -407,7 +407,10 @@ export class ProxyCoordinator {
   private async orderedEligibleAccounts(store: AccountsStore, model: string): Promise<StoredAccount[]> {
     const now = this.dateProvider.unixSecondsNow();
     this.expireCooldowns(now);
-    const summaries = sortForDisplay(accountSummaries(store, await this.currentAuthAccountKey()));
+    const summaries = accountSummaries(store).sort((left, right) => {
+      const scoreDelta = remainingScore(right) - remainingScore(left);
+      return scoreDelta !== 0 ? scoreDelta : left.addedAt - right.addedAt;
+    });
     const byId = new Map(store.accounts.map((account) => [account.id, account]));
     return summaries
       .map((summary) => byId.get(summary.id))
