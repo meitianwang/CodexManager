@@ -42,7 +42,10 @@ interface SmokeUISnapshot {
   bodyLength: number;
   page: SmokePageID;
   pageTitle: string;
+  screenshotByteLength?: number;
+  screenshotHeight?: number;
   screenshotPath?: string;
+  screenshotWidth?: number;
 }
 
 interface SmokeWorkflowState {
@@ -416,11 +419,18 @@ async function captureSmokeUISnapshots(browserWindow: BrowserWindow): Promise<Sm
       const screenshotPath = path.join(screenshotDirectory, `${page}.png`);
       const image = await browserWindow.capturePage();
       const png = image.toPNG();
+      const size = image.getSize();
       if (png.byteLength === 0) {
         throw new Error(`Smoke screenshot for ${page} was empty`);
       }
+      if (size.width <= 0 || size.height <= 0) {
+        throw new Error(`Smoke screenshot for ${page} had invalid dimensions: ${size.width}x${size.height}`);
+      }
       writeFileSync(screenshotPath, png);
+      snapshot.screenshotByteLength = png.byteLength;
+      snapshot.screenshotHeight = size.height;
       snapshot.screenshotPath = screenshotPath;
+      snapshot.screenshotWidth = size.width;
     }
     snapshots.push(snapshot);
   }
