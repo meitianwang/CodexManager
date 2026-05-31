@@ -40,6 +40,25 @@ describe("local proxy", () => {
     expect(response.status).toBe(401);
   });
 
+  it("mirrors mac-compatible CORS headers for preflight requests", async () => {
+    const context = await makeProxyContext();
+    const response = await fetch(`http://127.0.0.1:${context.port}/v1/responses`, {
+      method: "OPTIONS"
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost");
+    expect(response.headers.get("access-control-allow-methods")).toBe("GET, POST, OPTIONS");
+    expect(response.headers.get("access-control-max-age")).toBe("86400");
+    expect(response.headers.get("access-control-allow-headers")).toContain("anthropic-version");
+    expect(response.headers.get("access-control-allow-headers")).toContain("x-codex-turn-state");
+    expect(response.headers.get("access-control-allow-headers")).toContain("originator");
+    expect(response.headers.get("access-control-allow-headers")).toContain("version");
+    expect(response.headers.get("access-control-expose-headers")).toContain("x-codex-turn-state");
+    expect(response.headers.get("access-control-expose-headers")).toContain("x-models-etag");
+    expect(response.headers.get("access-control-expose-headers")).toContain("x-codex-ratelimit-limit-tokens");
+  });
+
   it("forwards Responses requests through the selected account and cleans headers", async () => {
     const upstream = new FakeUpstreamClient([
       completedResponseResult({ id: "resp-1" }, { "x-codex-turn-state": "next", "transfer-encoding": "chunked" })

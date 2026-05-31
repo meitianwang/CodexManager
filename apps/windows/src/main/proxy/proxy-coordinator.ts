@@ -29,6 +29,38 @@ const maxRequestBytes = 50 * 1024 * 1024;
 const accountCooldownSeconds = 60;
 const authCooldownSeconds = 5 * 60;
 const shortCooldownSeconds = 30;
+const corsAllowedHeaders = [
+  "Content-Type",
+  "Authorization",
+  "x-api-key",
+  "anthropic-version",
+  "session-id",
+  "thread-id",
+  "x-client-request-id",
+  "x-codex-window-id",
+  "x-codex-turn-metadata",
+  "x-codex-turn-state",
+  "x-codex-beta-features",
+  "x-openai-subagent",
+  "x-codex-parent-thread-id",
+  "x-openai-memgen-request",
+  "openai-beta",
+  "version",
+  "originator"
+].join(", ");
+const corsExposedHeaders = [
+  "x-codex-turn-state",
+  "x-request-id",
+  "openai-model",
+  "x-models-etag",
+  "x-reasoning-included",
+  "x-codex-ratelimit-reset-requests",
+  "x-codex-ratelimit-remaining-requests",
+  "x-codex-ratelimit-limit-requests",
+  "x-codex-ratelimit-reset-tokens",
+  "x-codex-ratelimit-remaining-tokens",
+  "x-codex-ratelimit-limit-tokens"
+].join(", ");
 
 export interface SettingsRepositoryLike {
   loadSettings(): Promise<AppSettings>;
@@ -607,9 +639,11 @@ function sendText(response: ServerResponse, statusCode: number, value: string, c
 }
 
 function setCorsHeaders(response: ServerResponse): void {
-  response.setHeader("Access-Control-Allow-Origin", "*");
-  response.setHeader("Access-Control-Allow-Headers", "authorization,content-type,x-api-key");
-  response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  response.setHeader("Access-Control-Allow-Origin", "http://localhost");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", corsAllowedHeaders);
+  response.setHeader("Access-Control-Expose-Headers", corsExposedHeaders);
+  response.setHeader("Access-Control-Max-Age", "86400");
 }
 
 function readString(value: unknown, label: string): string {
