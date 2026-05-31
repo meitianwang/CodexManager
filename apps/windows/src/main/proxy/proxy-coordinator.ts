@@ -229,7 +229,7 @@ export class ProxyCoordinator {
     json: Record<string, unknown>
   ): Promise<void> {
     const model = readOptionalString(json.model);
-    if (!model) {
+    if (model === undefined) {
       sendProxyError(response, 400, "Missing required field: model");
       return;
     }
@@ -798,7 +798,7 @@ function setCorsHeaders(response: ServerResponse): void {
 }
 
 function readOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  return typeof value === "string" ? value : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

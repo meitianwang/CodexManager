@@ -312,6 +312,31 @@ describe("local proxy", () => {
     expect(upstream.requests[0]?.body.toString("utf8")).toBe(JSON.stringify({ query: "codex" }));
   });
 
+  it("preserves empty string models instead of applying a default", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ results: [] })]);
+    const context = await makeProxyContext({
+      modelCatalogService: new FakeModelCatalogService({
+        "codex-plus": ["plus-model"]
+      }),
+      upstream
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/alpha/search", {
+      model: "",
+      query: "codex"
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests[0]).toMatchObject({
+      isStream: false,
+      url: "https://chatgpt.com/backend-api/codex/alpha/search"
+    });
+    expect(JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}")).toEqual({
+      model: "",
+      query: "codex"
+    });
+  });
+
   it("translates non-streaming Chat Completions requests", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });
@@ -378,6 +403,26 @@ describe("local proxy", () => {
       }
     });
     expect(upstream.requests).toEqual([]);
+  });
+
+  it("accepts empty string Chat Completions models like macOS", async () => {
+    const upstream = new FakeUpstreamClient([sseResult("Hello")]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "",
+      stream: false,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json();
+    const forwarded = JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}") as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      model: "",
+      choices: [{ message: { role: "assistant", content: "Hello" } }]
+    });
+    expect(forwarded.model).toBe("");
   });
 
   it("rejects Chat Completions requests without messages before forwarding", async () => {
