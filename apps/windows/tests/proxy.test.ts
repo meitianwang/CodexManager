@@ -268,6 +268,44 @@ describe("local proxy", () => {
     expect(forwarded.stream).toBe(true);
   });
 
+  it("rejects Chat Completions requests without a model before forwarding", async () => {
+    const upstream = new FakeUpstreamClient([]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({
+      error: {
+        message: "Missing required field: model",
+        type: "proxy_error"
+      }
+    });
+    expect(upstream.requests).toEqual([]);
+  });
+
+  it("rejects Chat Completions requests without messages before forwarding", async () => {
+    const upstream = new FakeUpstreamClient([]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({
+      error: {
+        message: "Chat request missing messages array",
+        type: "proxy_error"
+      }
+    });
+    expect(upstream.requests).toEqual([]);
+  });
+
   it("translates streaming Chat Completions responses to OpenAI chunks", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });

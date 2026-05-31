@@ -192,8 +192,18 @@ export class ProxyCoordinator {
     response: ServerResponse,
     json: Record<string, unknown>
   ): Promise<void> {
-    const model = readString(json.model, "model");
-    const messages = Array.isArray(json.messages) ? json.messages.filter(isRecord) : [];
+    const model = readOptionalString(json.model);
+    if (!model) {
+      sendProxyError(response, 400, "Missing required field: model");
+      return;
+    }
+
+    if (!Array.isArray(json.messages)) {
+      sendProxyError(response, 400, "Chat request missing messages array");
+      return;
+    }
+
+    const messages = json.messages.filter(isRecord);
     const clientWantsStream = json.stream === true;
     const codexBody = translateChatRequest(model, messages, json);
     const result = await this.forwardProxyRequest(
@@ -641,6 +651,15 @@ function sendJson(response: ServerResponse, statusCode: number, value: unknown, 
   response.end(body);
 }
 
+function sendProxyError(response: ServerResponse, statusCode: number, message: string): void {
+  sendJson(response, statusCode, {
+    error: {
+      message,
+      type: "proxy_error"
+    }
+  });
+}
+
 function sendText(response: ServerResponse, statusCode: number, value: string, contentType: string): void {
   const body = Buffer.from(value, "utf8");
   response.writeHead(statusCode, {
@@ -656,13 +675,6 @@ function setCorsHeaders(response: ServerResponse): void {
   response.setHeader("Access-Control-Allow-Headers", corsAllowedHeaders);
   response.setHeader("Access-Control-Expose-Headers", corsExposedHeaders);
   response.setHeader("Access-Control-Max-Age", "86400");
-}
-
-function readString(value: unknown, label: string): string {
-  if (typeof value !== "string" || !value) {
-    throw new Error(`${label} must be a non-empty string`);
-  }
-  return value;
 }
 
 function readOptionalString(value: unknown): string | undefined {
