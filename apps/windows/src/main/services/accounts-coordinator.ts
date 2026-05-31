@@ -194,8 +194,16 @@ export class AccountsCoordinator {
   }
 
   async refreshAllUsage(options: UsageRefreshOptions = {}): Promise<AccountSummary[]> {
+    return this.refreshUsage(undefined, options);
+  }
+
+  async refreshUsage(accountIds?: readonly string[], options: UsageRefreshOptions = {}): Promise<AccountSummary[]> {
     const accounts = await this.listAccounts();
+    const targetIds = accountIds === undefined ? undefined : new Set(accountIds);
     for (const account of accounts) {
+      if (targetIds && !targetIds.has(account.id)) {
+        continue;
+      }
       await this.refreshAccountUsage(account.id, options);
     }
     return this.listAccounts();

@@ -24,6 +24,13 @@ describe("background account maintenance service", () => {
 
   it("refreshes usage, auto switches, refreshes workspace metadata, and publishes the final account list", async () => {
     const accounts = new FakeAccounts();
+    accounts.accounts = [
+      makeAccount("idle"),
+      makeAccount("current", { isCurrent: true }),
+      makeAccount("reset-soon", { oneWeekResetAt: fixedNow + 60 }),
+      makeAccount("failed", { usageError: "refresh failed" }),
+      makeAccount("reset-later", { oneWeekResetAt: fixedNow + 61 })
+    ];
     const settings = new FakeSettings({ autoSmartSwitch: true });
     const updates: AccountSummary[][] = [];
     const service = makeService({
@@ -34,7 +41,12 @@ describe("background account maintenance service", () => {
 
     await service.runNow();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage:false", "autoSmartSwitchIfNeeded", "refreshWorkspaceMetadata:false"]);
+    expect(accounts.calls).toEqual([
+      "listAccounts",
+      "refreshUsage:current,reset-soon,failed:false",
+      "autoSmartSwitchIfNeeded",
+      "refreshWorkspaceMetadata:false"
+    ]);
     expect(updates).toEqual([accounts.metadataResult]);
   });
 
@@ -48,7 +60,21 @@ describe("background account maintenance service", () => {
 
     await service.runNow();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage:false", "refreshWorkspaceMetadata:false"]);
+    expect(accounts.calls).toEqual(["listAccounts", "refreshUsage:current:false", "refreshWorkspaceMetadata:false"]);
+  });
+
+  it("skips usage refresh and auto switch when no account matches the mac background refresh plan", async () => {
+    const accounts = new FakeAccounts();
+    accounts.accounts = [makeAccount("idle")];
+    const settings = new FakeSettings({ autoSmartSwitch: true });
+    const service = makeService({
+      accountsCoordinator: accounts,
+      settingsCoordinator: settings
+    });
+
+    await service.runNow();
+
+    expect(accounts.calls).toEqual(["listAccounts", "refreshWorkspaceMetadata:false"]);
   });
 
   it("reports refresh errors without publishing stale account data", async () => {
@@ -72,7 +98,7 @@ describe("background account maintenance service", () => {
   it("skips overlapping refresh cycles", async () => {
     const accounts = new FakeAccounts();
     let releaseRefresh: ((accounts: AccountSummary[]) => void) | undefined;
-    accounts.refreshAllUsageHandler = () =>
+    accounts.refreshUsageHandler = () =>
       new Promise<AccountSummary[]>((resolve) => {
         releaseRefresh = resolve;
       });
@@ -83,7 +109,7 @@ describe("background account maintenance service", () => {
     await secondRun;
     await Promise.resolve();
 
-    expect(accounts.calls).toEqual(["refreshAllUsage:false"]);
+    expect(accounts.calls).toEqual(["listAccounts", "refreshUsage:current:false"]);
     expect(releaseRefresh).toBeDefined();
 
     releaseRefresh?.([makeAccount("usage")]);
@@ -96,26 +122,35 @@ function makeService(
 ): BackgroundAccountMaintenanceService {
   return new BackgroundAccountMaintenanceService({
     accountsCoordinator: new FakeAccounts(),
+    dateProvider: fixedDateProvider(),
     settingsCoordinator: new FakeSettings(),
     ...options
   });
 }
 
+const fixedNow = 1_780_000_000;
+
 class FakeAccounts implements BackgroundAccountMaintenanceAccountsLike {
   calls: string[] = [];
+  accounts = [makeAccount("current", { isCurrent: true })];
   metadataResult = [makeAccount("metadata")];
   refreshError: Error | undefined;
-  refreshAllUsageHandler: (() => Promise<AccountSummary[]>) | undefined;
+  refreshUsageHandler: (() => Promise<AccountSummary[]>) | undefined;
 
-  async refreshAllUsage(options: { force?: boolean } = {}): Promise<AccountSummary[]> {
-    this.calls.push(`refreshAllUsage:${String(options.force)}`);
+  async listAccounts(): Promise<AccountSummary[]> {
+    this.calls.push("listAccounts");
+    return this.accounts;
+  }
+
+  async refreshUsage(accountIds: readonly string[], options: { force?: boolean } = {}): Promise<AccountSummary[]> {
+    this.calls.push(`refreshUsage:${accountIds.join(",")}:${String(options.force)}`);
     if (this.refreshError) {
       throw this.refreshError;
     }
-    if (this.refreshAllUsageHandler) {
-      return this.refreshAllUsageHandler();
+    if (this.refreshUsageHandler) {
+      return this.refreshUsageHandler();
     }
-    return [makeAccount("usage")];
+    return this.accounts;
   }
 
   async autoSmartSwitchIfNeeded(): Promise<unknown> {
@@ -127,6 +162,12 @@ class FakeAccounts implements BackgroundAccountMaintenanceAccountsLike {
     this.calls.push(`refreshWorkspaceMetadata:${String(forceRemoteCheck)}`);
     return this.metadataResult;
   }
+}
+
+function fixedDateProvider() {
+  return {
+    unixSecondsNow: () => fixedNow
+  };
 }
 
 class FakeSettings {
@@ -159,7 +200,20 @@ class FakeScheduler implements BackgroundMaintenanceScheduler {
   }
 }
 
-function makeAccount(id: string): AccountSummary {
+function makeAccount(
+  id: string,
+  options: {
+    isCurrent?: boolean;
+    oneWeekResetAt?: number;
+    usageError?: string;
+  } = {}
+): AccountSummary {
+  const usage = options.oneWeekResetAt === undefined
+    ? undefined
+    : {
+        fetchedAt: fixedNow - 100,
+        oneWeek: { resetAt: options.oneWeekResetAt, usedPercent: 95, windowSeconds: 7 * 24 * 60 * 60 }
+      };
   return {
     id,
     accountId: `acct-${id}`,
@@ -167,10 +221,12 @@ function makeAccount(id: string): AccountSummary {
     addedAt: 1,
     displayTeamName: "Team",
     effectivePlanType: "pro",
-    isCurrent: false,
+    isCurrent: options.isCurrent ?? false,
     label: id,
     normalizedPlanLabel: "Pro",
     shouldDisplayWorkspaceTag: true,
-    updatedAt: 2
+    updatedAt: 2,
+    usage,
+    usageError: options.usageError
   };
 }

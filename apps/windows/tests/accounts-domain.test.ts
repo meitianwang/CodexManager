@@ -22,6 +22,7 @@ import {
   pickBestAccount,
   sortForDisplay
 } from "../src/shared/domain/account-ranking";
+import { targetUsageRefreshAccountIds } from "../src/shared/domain/accounts-usage-refresh-planning";
 import { applyAccountsTransferMerge } from "../src/shared/domain/accounts-transfer-merge";
 import { pickNearestWindow } from "../src/shared/domain/usage-window-selector";
 import { UnauthorizedError } from "../src/main/services/network-errors";
@@ -69,6 +70,40 @@ describe("usage window selector", () => {
 
     expect(selected?.limitWindowSeconds).toBe(5 * 60 * 60);
     expect(pickNearestWindow([], 100)).toBeUndefined();
+  });
+});
+
+describe("usage refresh planning", () => {
+  it("targets the current account plus non-current accounts with errors or imminent resets", () => {
+    const now = 1_780_000_000;
+    const current = makeSummary({ id: "current", weekUsed: 20, hourUsed: 30, isCurrent: true });
+    const failed = { ...makeSummary({ id: "failed", weekUsed: 20, hourUsed: 30 }), usageError: "refresh failed" };
+    const resetSoon = {
+      ...makeSummary({ id: "reset-soon", weekUsed: 20, hourUsed: 30 }),
+      usage: makeUsageSnapshotWithReset(now + 60)
+    };
+    const resetLater = {
+      ...makeSummary({ id: "reset-later", weekUsed: 20, hourUsed: 30 }),
+      usage: makeUsageSnapshotWithReset(now + 61)
+    };
+    const staleButNotResetting = makeSummary({ id: "idle", weekUsed: 20, hourUsed: 30 });
+
+    expect(targetUsageRefreshAccountIds([staleButNotResetting, resetSoon, current, failed, resetLater], now)).toEqual([
+      "current",
+      "reset-soon",
+      "failed"
+    ]);
+  });
+
+  it("does not target non-current accounts only because their usage is stale", () => {
+    const now = 1_780_000_000;
+    const staleUsage = { ...makeUsageSnapshot("team", 20, 30), fetchedAt: now - 1_000 };
+    const account = {
+      ...makeSummary({ id: "idle", weekUsed: 20, hourUsed: 30 }),
+      usage: staleUsage
+    };
+
+    expect(targetUsageRefreshAccountIds([account], now)).toEqual([]);
   });
 });
 
@@ -749,6 +784,15 @@ function makeUsageSnapshot(planType: string, fiveHourUsed: number, oneWeekUsed: 
     planType,
     fiveHour: { usedPercent: fiveHourUsed, windowSeconds: 5 * 60 * 60 },
     oneWeek: { usedPercent: oneWeekUsed, windowSeconds: 7 * 24 * 60 * 60 }
+  };
+}
+
+function makeUsageSnapshotWithReset(resetAt: number): UsageSnapshot {
+  return {
+    fetchedAt: 1_780_000_000,
+    planType: "team",
+    fiveHour: { usedPercent: 20, windowSeconds: 5 * 60 * 60, resetAt: resetAt + 1_000 },
+    oneWeek: { usedPercent: 30, windowSeconds: 7 * 24 * 60 * 60, resetAt }
   };
 }
 
