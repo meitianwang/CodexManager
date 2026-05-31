@@ -373,7 +373,7 @@ describe("accounts coordinator", () => {
     expect(authRepository.currentAuth).toEqual(account.authJson);
   });
 
-  it("does not smart-switch when the best account is already current", async () => {
+  it("smart-switches through the current account when it is already best", async () => {
     const current = makeStoredAccount({
       id: "current",
       accountId: "acct-current",
@@ -386,15 +386,48 @@ describe("accounts coordinator", () => {
       email: "other@example.com",
       usage: makeUsageSnapshot("team", 60, 70)
     });
+    const storeRepository = new MemoryStoreRepository({ version: 1, accounts: [current, other] });
     const authRepository = new FakeAuthRepository(current.authJson);
+    const settingsRepository = new FakeSettingsRepository({
+      ...defaultAppSettings(),
+      launchCodexAfterSwitch: true,
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: ["cursor"]
+    });
+    let launchedWorkspacePath: string | undefined = "not launched";
+    let restartTargets: EditorAppID[] = [];
     const coordinator = new AccountsCoordinator({
-      storeRepository: new MemoryStoreRepository({ version: 1, accounts: [current, other] }),
+      storeRepository,
       authRepository,
+      settingsRepository,
+      codexCLIService: {
+        async launchApp(workspacePath?: string) {
+          launchedWorkspacePath = workspacePath;
+          return true;
+        }
+      } satisfies CodexCLIServiceLike,
+      editorAppService: {
+        async restartSelectedApps(targets: readonly EditorAppID[]) {
+          restartTargets = [...targets];
+          return { restarted: ["cursor"] };
+        }
+      } satisfies EditorAppServiceLike,
       dateProvider: fixedDateProvider()
     });
 
-    await expect(coordinator.smartSwitch()).resolves.toBeUndefined();
+    const result = await coordinator.smartSwitch();
+
+    expect(result?.account.id).toBe("current");
+    expect(result?.execution).toEqual({ restartedEditorApps: ["cursor"], usedFallbackCLI: true });
+    expect(launchedWorkspacePath).toBeUndefined();
+    expect(restartTargets).toEqual(["cursor"]);
     expect(authRepository.currentAuth).toEqual(current.authJson);
+    expect(storeRepository.store.currentSelection).toEqual({
+      accountId: "acct-current",
+      selectedAt: 1_780_000_000_000,
+      sourceDeviceID: "windows-local",
+      accountKey: accountKeyForStoredAccount(current)
+    });
   });
 
   it("smart-switches to the highest remaining non-current account", async () => {
