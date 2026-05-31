@@ -8,6 +8,7 @@ const windowsParityLocalizedKeys: MessageKey[] = [
   "accounts.notice.exported_format",
   "accounts.notice.imported_accounts_format",
   "proxy.api_key.regenerate",
+  "proxy.section.endpoints",
   "proxy.endpoint.messages",
   "settings.auto_start_proxy"
 ];
