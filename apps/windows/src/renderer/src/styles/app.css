@@ -1347,8 +1347,7 @@ button.danger {
   gap: 16px;
 }
 
-.endpoint-list,
-.model-list {
+.endpoint-list {
   display: grid;
 }
 
@@ -1357,7 +1356,10 @@ button.danger {
 }
 
 .model-list {
-  gap: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
 }
 
 .endpoint-row {
@@ -1414,18 +1416,28 @@ button.danger {
   background: rgba(214, 240, 95, 0.11);
 }
 
+.model-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: #20231c;
+  color: #e7ebe1;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .model-chip.selected {
   border-color: rgba(214, 240, 95, 0.42);
   background: rgba(214, 240, 95, 0.11);
-}
-
-.model-list {
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-}
-
-.model-chip {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #efffb1;
 }
 
 .code-block + .code-block {

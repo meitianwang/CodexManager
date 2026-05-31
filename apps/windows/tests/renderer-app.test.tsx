@@ -288,6 +288,12 @@ describe("Windows renderer app", () => {
     expect(endpointRows[0]?.classList.contains("selected")).toBe(true);
     expect(rendererStyles()).toContain(".endpoint-method-badge");
     expect(rendererStyles()).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    const modelList = document.querySelector(".model-list") as HTMLElement;
+    const modelChips = Array.from(modelList.querySelectorAll(".model-chip"));
+    expect(modelChips).toHaveLength(proxyAvailableModels.length);
+    expect(modelList.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5");
+    expect(rendererStyles()).toContain("flex-wrap: wrap;");
+    expect(rendererStyles()).not.toContain("grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));");
     expect(codeBlockCopyButtons()).toHaveLength(2);
     expect(codeBlockCopyButtons().every((button) => button.textContent === "")).toBe(true);
     expect(codeBlockCopyButtons().every((button) => button.querySelector(".copy-doc-icon"))).toBe(true);
