@@ -6,18 +6,19 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26721416007
-- Commit: `c3edd586736168b2877076b63cda2a2db7fd0602`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26721621988
+- Commit: `2fd85b63e64161d01449bd01c0f6eea8dfbd44e8`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:1504b15f6dbcf3c466c42607becbe9a24b4ea74c41517f907f089ab15063b793`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:ce7ee8c2195e0eb8dd1ca0c1f5d2c6585f46c3ee9322ca11b7415660a9e941a9`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:874e92ac7be77134d83f64019d83204eb6ad9c03e741d3b417d781f66f89c504`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:603050f2529387fafa5d01e30cbc823232167274936db8db2b0e657c7c508d26`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:7868ee121890bada29309a3db0200e84b8dfad90556c2e58649c7196d0c75364`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:cf85861fb0f691e473d6f117b841dbcc005ec7c6b6eb7ea73c6675445bbd02f5`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
 - The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of the large Squirrel artifact has previously failed from this macOS host with a GitHub TLS archive error, so the smaller automated report and screenshot artifacts are the locally downloaded evidence in this verification pass.
 - Windows renderer tests now compare shared English UI labels against the macOS `en.lproj/Localizable.strings` source for Accounts, Proxy, and Settings labels, and verify the team-name placeholder wording for all 11 locales.
 - Windows source parity tests now compare proxy models, proxy endpoint paths, language choices, and editor restart target IDs against the macOS Swift source.
+- Packaged smoke now records and asserts the Accounts team-name input label `Set team name Smoke account` and placeholder `Set team name`.
 - Packaged smoke result: passed.
 - Packaged UI screenshots: Accounts, Proxy, and Settings screenshots were recorded at `944x471` with non-trivial file sizes.
 - Packaged Proxy route smoke: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages` all returned `200` through smoke-safe upstream routing.
