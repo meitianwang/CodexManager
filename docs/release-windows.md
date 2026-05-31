@@ -60,8 +60,14 @@ The workflow uploads one artifact named `CodexManager-Windows-x64-Squirrel` cont
 - `*.nupkg`
 - `RELEASES`
 
+The workflow also uploads `CodexManager-Windows-Smoke-Screenshots` with packaged-app screenshots of:
+
+- Accounts
+- Proxy
+- Settings
+
 Before upload, CI also runs the packaged `CodexManager.exe` with `CODEX_MANAGER_ELECTRON_SMOKE_TEST=1`.
-The smoke test waits for the process to exit, checks its result JSON, and verifies that the real packaged app starts, exposes the preload IPC bridge, renders the default Accounts page, switches to a seeded account, persists settings, starts the local proxy, passes `/health`, rejects an unauthenticated proxy request, and exits cleanly.
+The smoke test waits for the process to exit, checks its result JSON, and verifies that the real packaged app starts, exposes the preload IPC bridge, renders and screenshots the Accounts, Proxy, and Settings pages, switches to a seeded account, persists settings, starts the local proxy, passes `/health`, rejects an unauthenticated proxy request, and exits cleanly.
 
 Treat the CI artifact as the installable Windows verification build. It is not code signed yet.
 

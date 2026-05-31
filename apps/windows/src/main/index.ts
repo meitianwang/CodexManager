@@ -22,16 +22,27 @@ let backgroundAccountMaintenanceService: BackgroundAccountMaintenanceService | u
 let isQuitting = false;
 const isSmokeTest = process.env.CODEX_MANAGER_ELECTRON_SMOKE_TEST === "1";
 const smokeTestTimeoutMs = parsePositiveInteger(process.env.CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS, 30_000);
+const smokePages = ["accounts", "proxy", "settings"] as const;
 
 interface CreateMainWindowOptions {
   beforeLoad?: (browserWindow: BrowserWindow) => void;
 }
+
+type SmokePageID = (typeof smokePages)[number];
 
 interface SmokeRendererState {
   activePage: string | null;
   bodyLength: number;
   hasBridge: boolean;
   pageTitle: string | null;
+}
+
+interface SmokeUISnapshot {
+  activePage: string;
+  bodyLength: number;
+  page: SmokePageID;
+  pageTitle: string;
+  screenshotPath?: string;
 }
 
 interface SmokeWorkflowState {
@@ -295,8 +306,9 @@ function createSmokeTestController(context: WindowsAppContext): { attach: (brows
         throw new Error(`Renderer did not finish painting the workspace: ${JSON.stringify(state)}`);
       }
       const workflows = await verifySmokeWorkflows(context);
-      writeSmokeResult({ state, workflows, status: "passed" });
-      console.log(`CodexManager Windows smoke test passed: ${JSON.stringify({ state, workflows })}`);
+      const uiSnapshots = await captureSmokeUISnapshots(browserWindow);
+      writeSmokeResult({ state, uiSnapshots, workflows, status: "passed" });
+      console.log(`CodexManager Windows smoke test passed: ${JSON.stringify({ state, uiSnapshots, workflows })}`);
       complete(0);
     } catch (error) {
       failSmokeTest(error);
@@ -364,6 +376,94 @@ function isSmokeRendererState(value: unknown): value is SmokeRendererState {
   );
 }
 
+async function waitForSmokePage(browserWindow: BrowserWindow, page: SmokePageID): Promise<SmokeRendererState> {
+  const deadline = Date.now() + smokeTestTimeoutMs;
+  let lastState: SmokeRendererState | undefined;
+  while (Date.now() < deadline) {
+    const state = await readRendererState(browserWindow);
+    lastState = state;
+    if (state.activePage === page && state.pageTitle === smokePageLabel(page) && state.bodyLength > 100) {
+      return state;
+    }
+    await delay(100);
+  }
+  throw new Error(`Renderer did not activate ${page}: ${JSON.stringify(lastState)}`);
+}
+
+async function captureSmokeUISnapshots(browserWindow: BrowserWindow): Promise<SmokeUISnapshot[]> {
+  const screenshotDirectory = smokeScreenshotDirectory();
+  if (screenshotDirectory !== undefined) {
+    mkdirSync(screenshotDirectory, { recursive: true });
+  }
+  if (!browserWindow.isVisible()) {
+    browserWindow.show();
+  }
+  browserWindow.focus();
+
+  const snapshots: SmokeUISnapshot[] = [];
+  for (const page of smokePages) {
+    await activateSmokePage(browserWindow, page);
+    const state = await waitForSmokePage(browserWindow, page);
+    await delay(150);
+
+    const snapshot: SmokeUISnapshot = {
+      activePage: page,
+      bodyLength: state.bodyLength,
+      page,
+      pageTitle: smokePageLabel(page)
+    };
+    if (screenshotDirectory !== undefined) {
+      const screenshotPath = path.join(screenshotDirectory, `${page}.png`);
+      const image = await browserWindow.capturePage();
+      const png = image.toPNG();
+      if (png.byteLength === 0) {
+        throw new Error(`Smoke screenshot for ${page} was empty`);
+      }
+      writeFileSync(screenshotPath, png);
+      snapshot.screenshotPath = screenshotPath;
+    }
+    snapshots.push(snapshot);
+  }
+  return snapshots;
+}
+
+async function activateSmokePage(browserWindow: BrowserWindow, page: SmokePageID): Promise<void> {
+  const label = smokePageLabel(page);
+  const didClick = await browserWindow.webContents.executeJavaScript(
+    `(() => {
+      const buttons = Array.from(document.querySelectorAll(".nav-list button"));
+      const button = buttons.find((candidate) => candidate.textContent?.trim() === ${JSON.stringify(label)});
+      if (!(button instanceof HTMLButtonElement)) {
+        return false;
+      }
+      button.click();
+      return true;
+    })()`,
+    true
+  );
+  if (didClick !== true) {
+    throw new Error(`Smoke navigation button was not found for ${page}`);
+  }
+}
+
+function smokePageLabel(page: SmokePageID): string {
+  if (page === "accounts") {
+    return "Accounts";
+  }
+  if (page === "proxy") {
+    return "Proxy";
+  }
+  return "Settings";
+}
+
+function smokeScreenshotDirectory(): string | undefined {
+  const value = process.env.CODEX_MANAGER_ELECTRON_SMOKE_SCREENSHOT_DIR;
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+  return value;
+}
+
 async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWorkflowState> {
   const smokeAccountId = "smoke-account";
   const smokeChatGPTAccountId = "acct-smoke";
@@ -388,6 +488,7 @@ async function verifySmokeWorkflows(context: WindowsAppContext): Promise<SmokeWo
     accounts: [account]
   });
   await context.accountsCoordinator.switchAccount(smokeAccountId);
+  publishAccounts(await context.accountsCoordinator.listAccounts());
 
   const currentAuth = context.authRepository.extractAuth(await context.authRepository.readCurrentAuth());
   if (currentAuth.accountId !== smokeChatGPTAccountId) {
@@ -481,6 +582,7 @@ function writeSmokeResult(result: {
   error?: string;
   state?: SmokeRendererState;
   status: "failed" | "passed";
+  uiSnapshots?: SmokeUISnapshot[];
   workflows?: SmokeWorkflowState;
 }): void {
   const resultPath = process.env.CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH;

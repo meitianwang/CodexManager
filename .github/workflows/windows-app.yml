@@ -206,11 +206,13 @@ jobs:
           $env:USERPROFILE = Join-Path $SmokeRoot "UserProfile"
           New-Item -ItemType Directory -Force -Path $env:APPDATA, $env:USERPROFILE | Out-Null
           $ResultPath = Join-Path $SmokeRoot "smoke-result.json"
+          $ScreenshotRoot = Join-Path $SmokeRoot "screenshots"
 
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TEST = "1"
           $env:CODEX_MANAGER_ELECTRON_SMOKE_ROOT = $SmokeRoot
           $env:CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS = "45000"
           $env:CODEX_MANAGER_ELECTRON_SMOKE_RESULT_PATH = $ResultPath
+          $env:CODEX_MANAGER_ELECTRON_SMOKE_SCREENSHOT_DIR = $ScreenshotRoot
           $env:ELECTRON_ENABLE_LOGGING = "1"
           $Process = Start-Process -FilePath $ExePath -ArgumentList "--user-data-dir=$SmokeRoot\UserData" -Wait -PassThru
           if ($Process.ExitCode -ne 0) {
@@ -230,11 +232,27 @@ jobs:
             $Result.workflows.proxyUnauthorizedStatus -ne 401
             $Result.workflows.settingsLocale -ne "en"
             $Result.workflows.switchedAccountId -ne "acct-smoke"
+            @($Result.uiSnapshots).Count -ne 3
           ) -contains $true
           if ($InvalidSmokeResult) {
             throw "Packaged app smoke test returned an invalid result: $(Get-Content -Raw $ResultPath)"
           }
+          foreach ($Page in @("accounts", "proxy", "settings")) {
+            $Snapshot = @($Result.uiSnapshots | Where-Object { $_.page -eq $Page })[0]
+            $ScreenshotPath = if ($null -eq $Snapshot) { "" } else { [string] $Snapshot.screenshotPath }
+            if ([string]::IsNullOrWhiteSpace($ScreenshotPath) -or -not (Test-Path $ScreenshotPath)) {
+              throw "Packaged app smoke test did not write the $Page screenshot."
+            }
+          }
           Write-Host "CodexManager Windows smoke test passed: $(Get-Content -Raw $ResultPath)"
+
+      - name: Upload Windows smoke screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexManager-Windows-Smoke-Screenshots
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/codexmanager-smoke/screenshots/*.png
 
       - name: Upload Squirrel.Windows artifacts
         uses: actions/upload-artifact@v4
