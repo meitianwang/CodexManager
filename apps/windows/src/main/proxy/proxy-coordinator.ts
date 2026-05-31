@@ -92,7 +92,7 @@ const supportedPostPaths = new Set([
   "/v1/alpha/search"
 ]);
 const unsupportedRouteMessage =
-  "Proxy only supports GET /health, GET /v1/models, POST /v1/chat/completions, POST /v1/responses, POST /v1/responses/compact, POST /v1/memories/trace_summarize, POST /v1/alpha/search";
+  "Proxy only supports GET /health, GET /v1/models, POST /v1/chat/completions, POST /v1/responses, POST /v1/responses/compact, POST /v1/memories/trace_summarize, POST /v1/alpha/search, POST /v1/messages";
 const invalidApiKeyMessage = "Invalid or missing API key. Use Authorization: Bearer <key> or x-api-key header.";
 const noAccountsAvailableMessage = "No accounts available for proxy. Add and authorize at least one account first.";
 

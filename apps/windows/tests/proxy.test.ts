@@ -89,6 +89,7 @@ describe("local proxy", () => {
       type: "proxy_error"
     });
     expect(body.error?.message).toContain("POST /v1/responses");
+    expect(body.error?.message).toContain("POST /v1/messages");
     expect(upstream.requests).toEqual([]);
   });
 
