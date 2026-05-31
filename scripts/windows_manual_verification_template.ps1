@@ -78,35 +78,35 @@ if (-not [string]::IsNullOrWhiteSpace($OutputDirectory)) {
   New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 }
 
-$CollectorArguments = @(
-  "-OutputPath", $OutputPath,
-  "-ArtifactRunUrl", $ArtifactRunUrl,
-  "-ArtifactDigest", $ArtifactDigest,
-  "-SmokeResultPath", $SmokeResultPath,
-  "-UIParityEvidencePath", $UIParityEvidencePath,
-  "-ProxyPort", $ProxyPort,
-  "-ProxyApiKey", $ProxyApiKey,
-  "-ProbeProxyRoutes",
-  "-AppLaunchVerified",
-  "-UIParityVerified",
-  "-OAuthVerified",
-  "-ImportCurrentAuthVerified",
-  "-ImportAuthFileVerified",
-  "-ImportExportPackageVerified",
-  "-SwitchVerified",
-  "-SmartSwitchVerified",
-  "-UsageRefreshVerified",
-  "-ProxyStartStopVerified",
-  "-CodexLaunchVerified",
-  "-SettingsPersistenceVerified",
-  "-StartupVerified",
-  "-EditorRestartVerified",
-  "-TrayMenuVerified",
-  "-RequireComplete"
-)
+$CollectorArguments = @{
+  OutputPath = $OutputPath
+  ArtifactRunUrl = $ArtifactRunUrl
+  ArtifactDigest = $ArtifactDigest
+  SmokeResultPath = $SmokeResultPath
+  UIParityEvidencePath = $UIParityEvidencePath
+  ProxyPort = $ProxyPort
+  ProxyApiKey = $ProxyApiKey
+  ProbeProxyRoutes = $true
+  AppLaunchVerified = $true
+  UIParityVerified = $true
+  OAuthVerified = $true
+  ImportCurrentAuthVerified = $true
+  ImportAuthFileVerified = $true
+  ImportExportPackageVerified = $true
+  SwitchVerified = $true
+  SmartSwitchVerified = $true
+  UsageRefreshVerified = $true
+  ProxyStartStopVerified = $true
+  CodexLaunchVerified = $true
+  SettingsPersistenceVerified = $true
+  StartupVerified = $true
+  EditorRestartVerified = $true
+  TrayMenuVerified = $true
+  RequireComplete = $true
+}
 
 if (-not [string]::IsNullOrWhiteSpace($ExpectedCurrentAccountId)) {
-  $CollectorArguments += @("-ExpectedCurrentAccountId", $ExpectedCurrentAccountId)
+  $CollectorArguments.ExpectedCurrentAccountId = $ExpectedCurrentAccountId
 }
 
 & $CollectorPath @CollectorArguments
