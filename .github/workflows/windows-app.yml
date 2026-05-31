@@ -91,7 +91,8 @@ jobs:
             $Deadline = (Get-Date).AddSeconds(15)
             do {
               Start-Sleep -Milliseconds 200
-              $Port = if (Test-Path $PortPath) { (Get-Content -Raw $PortPath).Trim() } else { "" }
+              $PortRaw = if (Test-Path $PortPath) { Get-Content -Raw $PortPath -ErrorAction SilentlyContinue } else { "" }
+              $Port = if ([string]::IsNullOrWhiteSpace($PortRaw)) { "" } else { $PortRaw.Trim() }
             } while ([string]::IsNullOrWhiteSpace($Port) -and (Get-Date) -lt $Deadline -and -not $MockProxy.HasExited)
 
             if ([string]::IsNullOrWhiteSpace($Port)) {
