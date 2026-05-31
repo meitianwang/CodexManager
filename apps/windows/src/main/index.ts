@@ -40,12 +40,43 @@ interface SmokeRendererState {
 interface SmokeUISnapshot {
   activePage: string;
   bodyLength: number;
+  fingerprint: SmokeUIFingerprint;
   page: SmokePageID;
   pageTitle: string;
   screenshotByteLength?: number;
   screenshotHeight?: number;
   screenshotPath?: string;
   screenshotWidth?: number;
+}
+
+interface SmokeUIFingerprint {
+  accounts?: {
+    accountCount: number;
+    actionButtons: string[];
+    currentBadgeCount: number;
+    hasSmokeAccount: boolean;
+    hasSmokeEmail: boolean;
+    toolbarButtons: string[];
+  };
+  navItemCount: number;
+  proxy?: {
+    actionButtons: string[];
+    codeCopyButtonCount: number;
+    endpointPaths: string[];
+    formLabels: string[];
+    modelChipCount: number;
+    sectionHeadings: string[];
+    statusText: string;
+  };
+  settings?: {
+    footerButtons: string[];
+    languageOptionCount: number;
+    sectionHeadings: string[];
+    selectLabels: string[];
+    toggleLabels: string[];
+  };
+  sidebarBrand: string;
+  sidebarStatus: string;
 }
 
 interface SmokeWorkflowState {
@@ -419,11 +450,13 @@ async function captureSmokeUISnapshots(browserWindow: BrowserWindow): Promise<Sm
   for (const page of smokePages) {
     await activateSmokePage(browserWindow, page);
     const state = await waitForSmokePage(browserWindow, page);
+    const fingerprint = await waitForSmokeUIFingerprint(browserWindow, page);
     await delay(150);
 
     const snapshot: SmokeUISnapshot = {
       activePage: page,
       bodyLength: state.bodyLength,
+      fingerprint,
       page,
       pageTitle: smokePageLabel(page)
     };
@@ -447,6 +480,147 @@ async function captureSmokeUISnapshots(browserWindow: BrowserWindow): Promise<Sm
     snapshots.push(snapshot);
   }
   return snapshots;
+}
+
+async function waitForSmokeUIFingerprint(browserWindow: BrowserWindow, page: SmokePageID): Promise<SmokeUIFingerprint> {
+  const deadline = Date.now() + smokeTestTimeoutMs;
+  let lastFingerprint: SmokeUIFingerprint | undefined;
+  while (Date.now() < deadline) {
+    const fingerprint = await readSmokeUIFingerprint(browserWindow);
+    lastFingerprint = fingerprint;
+    if (smokeUIFingerprintReady(fingerprint, page)) {
+      return fingerprint;
+    }
+    await delay(100);
+  }
+  throw new Error(`Renderer did not expose the expected ${page} UI fingerprint: ${JSON.stringify(lastFingerprint)}`);
+}
+
+async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<SmokeUIFingerprint> {
+  const value = await browserWindow.webContents.executeJavaScript(
+    `(() => {
+      const text = (selector) => Array.from(document.querySelectorAll(selector))
+        .map((element) => element.textContent?.trim() ?? "")
+        .filter((value) => value.length > 0);
+      const labels = (selector) => Array.from(document.querySelectorAll(selector))
+        .map((element) => element.getAttribute("aria-label") ?? element.textContent?.trim() ?? "")
+        .filter((value) => value.length > 0);
+      const endpointPaths = Array.from(document.querySelectorAll(".endpoint-row code"))
+        .map((element) => element.textContent?.trim() ?? "")
+        .filter((value) => value.length > 0);
+      const bodyText = document.body?.innerText ?? "";
+      const fingerprint = {
+        navItemCount: document.querySelectorAll(".nav-list .nav-item").length,
+        sidebarBrand: document.querySelector(".brand-block h1")?.textContent?.trim() ?? "",
+        sidebarStatus: document.querySelector(".sidebar-status-row")?.textContent?.trim() ?? ""
+      };
+
+      if (document.querySelector(".accounts-layout")) {
+        fingerprint.accounts = {
+          accountCount: document.querySelectorAll(".account-row").length,
+          actionButtons: labels(".account-actions button"),
+          currentBadgeCount: Array.from(document.querySelectorAll(".badge")).filter((element) => element.textContent?.trim() === "CURRENT").length,
+          hasSmokeAccount: bodyText.includes("Smoke account") || bodyText.includes("Smoke Team"),
+          hasSmokeEmail: bodyText.includes("smoke@example.com"),
+          toolbarButtons: labels(".toolbar button")
+        };
+      }
+
+      if (document.querySelector(".proxy-layout")) {
+        fingerprint.proxy = {
+          actionButtons: labels(".proxy-actions button"),
+          codeCopyButtonCount: document.querySelectorAll(".code-copy-button").length,
+          endpointPaths,
+          formLabels: labels(".proxy-form-row label, .api-key-field label"),
+          modelChipCount: document.querySelectorAll(".model-chip").length,
+          sectionHeadings: text(".proxy-layout h2, .proxy-layout h3"),
+          statusText: document.querySelector(".status-pill")?.textContent?.trim() ?? ""
+        };
+      }
+
+      if (document.querySelector(".settings-layout")) {
+        fingerprint.settings = {
+          footerButtons: labels(".settings-footer button"),
+          languageOptionCount: document.querySelectorAll("select[aria-label='Language'] option").length,
+          sectionHeadings: text(".settings-layout h2, .settings-layout h3"),
+          selectLabels: labels(".select-row label"),
+          toggleLabels: labels(".toggle-row label")
+        };
+      }
+
+      return fingerprint;
+    })()`,
+    true
+  );
+  if (!isSmokeUIFingerprint(value)) {
+    throw new Error(`Unexpected renderer smoke UI fingerprint: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePageID): boolean {
+  if (fingerprint.navItemCount !== 3 || fingerprint.sidebarBrand !== appInfo.displayName || !fingerprint.sidebarStatus.includes("Proxy:")) {
+    return false;
+  }
+  if (page === "accounts") {
+    return (
+      fingerprint.accounts !== undefined &&
+      fingerprint.accounts.accountCount === 1 &&
+      fingerprint.accounts.currentBadgeCount === 1 &&
+      fingerprint.accounts.hasSmokeAccount &&
+      fingerprint.accounts.hasSmokeEmail &&
+      includesAll(fingerprint.accounts.toolbarButtons, [
+        "Export accounts",
+        "Import file",
+        "Import current auth",
+        "Add account",
+        "Smart switch",
+        "Warm up weekly quota"
+      ]) &&
+      includesAll(fingerprint.accounts.actionButtons, ["Switch", "Refresh", "Delete"])
+    );
+  }
+  if (page === "proxy") {
+    return (
+      fingerprint.proxy !== undefined &&
+      includesAll(fingerprint.proxy.sectionHeadings, ["Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage"]) &&
+      includesAll(fingerprint.proxy.endpointPaths, ["/v1/chat/completions", "/v1/responses", "/v1/messages"]) &&
+      includesAll(fingerprint.proxy.formLabels, ["Port", "API key"]) &&
+      includesAll(fingerprint.proxy.actionButtons, ["Start"]) &&
+      fingerprint.proxy.codeCopyButtonCount === 2 &&
+      fingerprint.proxy.modelChipCount >= 3 &&
+      fingerprint.proxy.statusText === "Stopped"
+    );
+  }
+  return (
+    fingerprint.settings !== undefined &&
+    includesAll(fingerprint.settings.sectionHeadings, ["Settings", "General", "Switch Behavior", "Language"]) &&
+    includesAll(fingerprint.settings.toggleLabels, [
+      "Launch at startup",
+      "Auto-start API proxy on launch",
+      "Launch Codex after switch",
+      "Auto smart switch",
+      "Restart editors on switch"
+    ]) &&
+    includesAll(fingerprint.settings.selectLabels, ["Editor restart target", "Language"]) &&
+    includesAll(fingerprint.settings.footerButtons, ["GitHub Star", "Quit"]) &&
+    fingerprint.settings.languageOptionCount === 11
+  );
+}
+
+function includesAll(values: readonly string[], expectedValues: readonly string[]): boolean {
+  return expectedValues.every((expected) => values.includes(expected));
+}
+
+function isSmokeUIFingerprint(value: unknown): value is SmokeUIFingerprint {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.navItemCount === "number" &&
+    typeof value.sidebarBrand === "string" &&
+    typeof value.sidebarStatus === "string"
+  );
 }
 
 async function activateSmokePage(browserWindow: BrowserWindow, page: SmokePageID): Promise<void> {

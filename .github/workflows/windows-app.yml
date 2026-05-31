@@ -264,6 +264,67 @@ jobs:
             if ($Snapshot.screenshotByteLength -lt 10000 -or (Get-Item $ScreenshotPath).Length -lt 10000) {
               throw "Packaged app smoke test wrote a suspiciously small $Page screenshot."
             }
+
+            $Fingerprint = $Snapshot.fingerprint
+            if ($null -eq $Fingerprint -or $Fingerprint.navItemCount -ne 3 -or $Fingerprint.sidebarBrand -ne "CodexManager") {
+              throw "Packaged app smoke test did not record the expected $Page navigation fingerprint: $(ConvertTo-Json $Fingerprint -Compress -Depth 8)"
+            }
+
+            if ($Page -eq "accounts") {
+              $AccountFingerprint = $Fingerprint.accounts
+              $RequiredToolbarButtons = @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota")
+              $MissingToolbarButtons = @($RequiredToolbarButtons | Where-Object { @($AccountFingerprint.toolbarButtons) -notcontains $_ })
+              $RequiredAccountActions = @("Switch", "Refresh", "Delete")
+              $MissingAccountActions = @($RequiredAccountActions | Where-Object { @($AccountFingerprint.actionButtons) -notcontains $_ })
+              if (
+                $null -eq $AccountFingerprint -or
+                $AccountFingerprint.accountCount -ne 1 -or
+                $AccountFingerprint.currentBadgeCount -ne 1 -or
+                -not ([bool] $AccountFingerprint.hasSmokeAccount) -or
+                -not ([bool] $AccountFingerprint.hasSmokeEmail) -or
+                $MissingToolbarButtons.Count -gt 0 -or
+                $MissingAccountActions.Count -gt 0
+              ) {
+                throw "Packaged app smoke test accounts fingerprint failed: $(ConvertTo-Json $AccountFingerprint -Compress -Depth 8)"
+              }
+            } elseif ($Page -eq "proxy") {
+              $ProxyFingerprint = $Fingerprint.proxy
+              $RequiredHeadings = @("Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage")
+              $MissingHeadings = @($RequiredHeadings | Where-Object { @($ProxyFingerprint.sectionHeadings) -notcontains $_ })
+              $RequiredEndpoints = @("/v1/chat/completions", "/v1/responses", "/v1/messages")
+              $MissingEndpoints = @($RequiredEndpoints | Where-Object { @($ProxyFingerprint.endpointPaths) -notcontains $_ })
+              if (
+                $null -eq $ProxyFingerprint -or
+                $MissingHeadings.Count -gt 0 -or
+                $MissingEndpoints.Count -gt 0 -or
+                @($ProxyFingerprint.formLabels) -notcontains "Port" -or
+                @($ProxyFingerprint.formLabels) -notcontains "API key" -or
+                @($ProxyFingerprint.actionButtons) -notcontains "Start" -or
+                $ProxyFingerprint.codeCopyButtonCount -ne 2 -or
+                $ProxyFingerprint.modelChipCount -lt 3 -or
+                $ProxyFingerprint.statusText -ne "Stopped"
+              ) {
+                throw "Packaged app smoke test proxy fingerprint failed: $(ConvertTo-Json $ProxyFingerprint -Compress -Depth 8)"
+              }
+            } else {
+              $SettingsFingerprint = $Fingerprint.settings
+              $RequiredHeadings = @("Settings", "General", "Switch Behavior", "Language")
+              $MissingHeadings = @($RequiredHeadings | Where-Object { @($SettingsFingerprint.sectionHeadings) -notcontains $_ })
+              $RequiredToggles = @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")
+              $MissingToggles = @($RequiredToggles | Where-Object { @($SettingsFingerprint.toggleLabels) -notcontains $_ })
+              if (
+                $null -eq $SettingsFingerprint -or
+                $MissingHeadings.Count -gt 0 -or
+                $MissingToggles.Count -gt 0 -or
+                @($SettingsFingerprint.selectLabels) -notcontains "Editor restart target" -or
+                @($SettingsFingerprint.selectLabels) -notcontains "Language" -or
+                @($SettingsFingerprint.footerButtons) -notcontains "GitHub Star" -or
+                @($SettingsFingerprint.footerButtons) -notcontains "Quit" -or
+                $SettingsFingerprint.languageOptionCount -ne 11
+              ) {
+                throw "Packaged app smoke test settings fingerprint failed: $(ConvertTo-Json $SettingsFingerprint -Compress -Depth 8)"
+              }
+            }
           }
           Write-Host "CodexManager Windows smoke test passed: $(Get-Content -Raw $ResultPath)"
 

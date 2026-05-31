@@ -68,6 +68,7 @@ The workflow also uploads `CodexManager-Windows-Smoke-Screenshots` with packaged
 
 Before upload, CI also runs the packaged `CodexManager.exe` with `CODEX_MANAGER_ELECTRON_SMOKE_TEST=1`.
 The smoke test waits for the process to exit, checks its result JSON, and verifies that the real packaged app starts, exposes the preload IPC bridge, renders and screenshots the Accounts, Proxy, and Settings pages, records screenshot dimensions and byte sizes, switches to a seeded account, writes `accounts.json`, `settings.json`, and `.codex\auth.json` to disk, persists settings, starts the local proxy, passes `/health`, rejects an unauthenticated proxy request, and exits cleanly.
+The smoke result also records page-specific UI fingerprints so CI confirms the packaged Accounts page shows the seeded current account and primary account actions, the Proxy page exposes the expected endpoints/models/port/API key controls, and the Settings page exposes the expected toggles, selects, language list, and footer actions.
 
 Treat the CI artifact as the installable Windows verification build. It is not code signed yet.
 
