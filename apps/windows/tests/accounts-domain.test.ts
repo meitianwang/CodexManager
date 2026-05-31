@@ -622,6 +622,42 @@ describe("accounts coordinator", () => {
     expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({ accessToken: "access-refreshed" });
     expect(authRepository.currentAuth).toMatchObject({ accessToken: "access-refreshed" });
   });
+
+  it("falls back to bounded interactive OAuth repair during manual single-account usage refresh", async () => {
+    const account = makeStoredAccount({ id: "target", accountId: "acct-target" });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(account.authJson);
+    const usageService = new QueuedUsageService([
+      new UnauthorizedError("unauthorized"),
+      makeUsageSnapshot("team", 6, 7)
+    ]);
+    const loginService = new FakeChatGPTLoginService(
+      {
+        accessToken: "access-reauthorized",
+        refreshToken: "refresh-reauthorized",
+        idToken: "id-reauthorized"
+      },
+      new Error("refresh failed")
+    );
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      usageService,
+      chatGPTOAuthLoginService: loginService,
+      dateProvider: fixedDateProvider()
+    });
+
+    await coordinator.refreshAccountUsage("target", { allowInteractiveAuthRepair: true });
+
+    expect(loginService.refreshes).toEqual(["refresh-acct-target"]);
+    expect(loginService.signIns).toEqual([{ timeoutSeconds: 600, allowedWorkspaceId: "acct-target" }]);
+    expect(usageService.calls.map((call) => call.accessToken)).toEqual(["access-acct-target", "access-reauthorized"]);
+    expect(storeRepository.store.accounts[0]?.authJson).toMatchObject({ accessToken: "access-reauthorized" });
+    expect(authRepository.currentAuth).toMatchObject({ accessToken: "access-reauthorized" });
+  });
 });
 
 class MemoryStoreRepository implements AccountsStoreRepositoryLike {

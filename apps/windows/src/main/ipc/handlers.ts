@@ -71,7 +71,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
 
   ipcMain.handle(ipcChannels.accountsRefreshUsage, async (_event, input: unknown) => {
     const { id } = parseIpcInput(accountIdSchema, input);
-    const account = await context.accountsCoordinator.refreshAccountUsage(id);
+    const account = await context.accountsCoordinator.refreshAccountUsage(id, { allowInteractiveAuthRepair: true });
     await publishLatestAccounts(context, options);
     return account;
   });

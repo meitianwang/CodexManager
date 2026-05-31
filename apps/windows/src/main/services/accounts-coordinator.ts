@@ -44,6 +44,7 @@ export interface UsageServiceLike {
 }
 
 export interface UsageRefreshOptions {
+  allowInteractiveAuthRepair?: boolean;
   force?: boolean;
 }
 
@@ -187,7 +188,11 @@ export class AccountsCoordinator {
       throw new Error("Account was not found for usage refresh");
     }
 
-    const refreshed = await this.refreshStoredAccountUsage(account, options.force ?? true);
+    const refreshed = await this.refreshStoredAccountUsage(
+      account,
+      options.force ?? true,
+      options.allowInteractiveAuthRepair ?? false
+    );
     store.accounts[index] = refreshed;
     await this.storeRepository.saveStore(store);
     return toAccountSummary(refreshed, await this.currentAuthAccountKey());
@@ -258,7 +263,7 @@ export class AccountsCoordinator {
     }
 
     for (const id of succeededIds) {
-      await this.refreshAccountUsage(id);
+      await this.refreshAccountUsage(id, { allowInteractiveAuthRepair: true, force: true });
     }
 
     return {
@@ -550,7 +555,11 @@ export class AccountsCoordinator {
     return result;
   }
 
-  private async refreshStoredAccountUsage(account: StoredAccount, forceRefresh: boolean): Promise<StoredAccount> {
+  private async refreshStoredAccountUsage(
+    account: StoredAccount,
+    forceRefresh: boolean,
+    allowInteractiveAuthRepair: boolean
+  ): Promise<StoredAccount> {
     const now = this.dateProvider.unixSecondsNow();
     if (!forceRefresh && !shouldRefreshUsage(account.usage, now)) {
       return account;
@@ -571,7 +580,7 @@ export class AccountsCoordinator {
       }
     } catch (error) {
       if (error instanceof UnauthorizedError) {
-        return this.refreshAccountAuthAndRetryUsage(updated, error, false);
+        return this.refreshAccountAuthAndRetryUsage(updated, error, allowInteractiveAuthRepair);
       }
       updated.usageError = errorMessage(error);
     }

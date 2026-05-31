@@ -71,6 +71,23 @@ describe("ipc handlers", () => {
     expect(published).toEqual([refreshedAccounts]);
   });
 
+  it("allows interactive OAuth repair for single-account manual usage refreshes", async () => {
+    const refreshedAccount = accountSummary({ id: "a", isCurrent: true });
+    const latest = [refreshedAccount];
+    const context = appContext({
+      listAccounts: vi.fn(async () => latest),
+      refreshAccountUsage: vi.fn(async () => refreshedAccount)
+    });
+    const ipcMain = new FakeIpcMain();
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context);
+
+    await expect(ipcMain.invoke(ipcChannels.accountsRefreshUsage, { id: "a" })).resolves.toEqual(refreshedAccount);
+    expect(context.accountsCoordinator.refreshAccountUsage).toHaveBeenCalledWith("a", {
+      allowInteractiveAuthRepair: true
+    });
+  });
+
   it("imports selected auth JSON files directly from the shared import file dialog", async () => {
     const root = await makeTempRoot();
     const authPath = join(root, "auth.json");
