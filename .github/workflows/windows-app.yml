@@ -228,6 +228,8 @@ jobs:
                       currentBadgeCount = 1
                       hasSmokeAccount = $true
                       hasSmokeEmail = $true
+                      teamAliasLabels = @("Set team name Smoke account")
+                      teamAliasPlaceholders = @("Set team name")
                       toolbarButtons = @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota", "Refresh usage")
                     }
                   }
@@ -249,7 +251,7 @@ jobs:
                       actionButtons = @("Start")
                       codeCopyButtonCount = 2
                       endpointPaths = @("/v1/chat/completions", "/v1/responses", "/v1/messages")
-                      formLabels = @("Port", "API key")
+                      formLabels = @("Port", "API Key")
                       modelChipCount = 3
                       sectionHeadings = @("Proxy", "Proxy Control", "Endpoints", "Available Models", "Usage")
                       statusText = "Stopped"
@@ -343,7 +345,7 @@ jobs:
                 settingsLocale = "en"
                 switchedAccountId = "acct-ci"
                 tray = @{
-                  actionLabels = @("Show Window", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")
+                  actionLabels = @("Open Main Panel", "Refresh Accounts", "Smart Switch", "Start Proxy", "Quit")
                   completedActions = @("showWindow", "showWindow", "refreshAccounts", "smartSwitch", "startProxy", "stopProxy", "quit")
                   menuActionIDs = @("showWindow", "refreshAccounts", "smartSwitch", "startProxy", "quit")
                   primaryClickShowWindowCount = 2
@@ -476,7 +478,7 @@ jobs:
             (-not ([string]::IsNullOrWhiteSpace([string] $Result.workflows.platform.editorRestartError)))
             @($Result.workflows.platform.startupSetEnabledValues) -notcontains $true
             @($Result.workflows.platform.startupSetEnabledValues) -notcontains $false
-            @($Result.workflows.tray.actionLabels) -notcontains "Show Window"
+            @($Result.workflows.tray.actionLabels) -notcontains "Open Main Panel"
             @($Result.workflows.tray.actionLabels) -notcontains "Refresh Accounts"
             @($Result.workflows.tray.actionLabels) -notcontains "Smart Switch"
             @($Result.workflows.tray.actionLabels) -notcontains "Start Proxy"
@@ -533,6 +535,8 @@ jobs:
                 $AccountFingerprint.currentBadgeCount -ne 1 -or
                 -not ([bool] $AccountFingerprint.hasSmokeAccount) -or
                 -not ([bool] $AccountFingerprint.hasSmokeEmail) -or
+                @($AccountFingerprint.teamAliasLabels) -notcontains "Set team name Smoke account" -or
+                @($AccountFingerprint.teamAliasPlaceholders) -notcontains "Set team name" -or
                 $MissingToolbarButtons.Count -gt 0 -or
                 $MissingAccountActions.Count -gt 0
               ) {
@@ -549,7 +553,7 @@ jobs:
                 $MissingHeadings.Count -gt 0 -or
                 $MissingEndpoints.Count -gt 0 -or
                 @($ProxyFingerprint.formLabels) -notcontains "Port" -or
-                @($ProxyFingerprint.formLabels) -notcontains "API key" -or
+                @($ProxyFingerprint.formLabels) -notcontains "API Key" -or
                 @($ProxyFingerprint.actionButtons) -notcontains "Start" -or
                 $ProxyFingerprint.codeCopyButtonCount -ne 2 -or
                 $ProxyFingerprint.modelChipCount -lt 3 -or
