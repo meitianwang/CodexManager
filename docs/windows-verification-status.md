@@ -6,16 +6,17 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26720844135
-- Commit: `6dbbd42b41c8acb56fe3fdf68213e9703b93998b`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26721144860
+- Commit: `c0fd43288edf80e443aaa0520b2551a4eb4b70ef`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:d395f9f4e8d70bd0c0a91f863aa4a9c388b136091ed837080892b3c50e4cd855`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:525c981fd4031cde03bdeec799b4d6c04a95b7e61a22a2ec669625bc34d60895`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:d45ec7e4ce3bc5e48845ae0d2d06f5a45951bf27399aa35b1a820fe7bc6d58f7`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:1ed7bc155903c01c8b363e59d9e8299baf9d289d9beb4b8853d03cf1752987f1`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:78522e4fb3cd9667efa93d66bba1f8df134ab95bcbcdf13cda1fe57da02fd572`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:1eadd0d8d9027729ee346db6a1ad0aaf7e1193ac1e704e3180e560cb856a4af6`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
-- The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of that large artifact from this macOS host failed twice with a GitHub TLS archive error, so it was not unpacked locally in this verification pass.
+- The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of the large Squirrel artifact has previously failed from this macOS host with a GitHub TLS archive error, so the smaller automated report and screenshot artifacts are the locally downloaded evidence in this verification pass.
+- Windows renderer tests now compare shared English UI labels against the macOS `en.lproj/Localizable.strings` source for Accounts, Proxy, and Settings labels, and verify the team-name placeholder wording for all 11 locales.
 - Packaged smoke result: passed.
 - Packaged UI screenshots: Accounts, Proxy, and Settings screenshots were recorded at `944x471` with non-trivial file sizes.
 - Packaged Proxy route smoke: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages` all returned `200` through smoke-safe upstream routing.
