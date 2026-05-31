@@ -79,7 +79,8 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
       localeProvider: async () => (await settingsRepository.loadSettings()).locale
     });
   const editorAppService = new EditorAppService();
-  const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
+  const remoteModelCatalogService =
+    smokePlatformSideEffects?.modelCatalogService ?? new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({
     storeRepository,
     settingsRepository,
@@ -171,6 +172,11 @@ function createSmokePlatformSideEffects():
         syncWithStoreValue(enabled: boolean): void;
       };
       proxyUpstreamClient: CodexUpstreamClientLike;
+      modelCatalogService: {
+        cachedAvailableModels(): string[] | undefined;
+        cachedModelIDsByPlanKey(): ReadonlyMap<string, ReadonlySet<string>> | undefined;
+        refreshModels(): Promise<string[] | undefined>;
+      };
     })
   | undefined {
   if (!process.env.CODEX_MANAGER_ELECTRON_SMOKE_ROOT) {
@@ -185,6 +191,10 @@ function createSmokePlatformSideEffects():
     startupSetEnabledValues: [],
     startupSyncValues: []
   };
+  const smokeModels = ["gpt-5-codex", "gpt-5"];
+  const smokeModelsByPlanKey = new Map(
+    ["codex-free", "codex-plus", "codex-pro", "codex-team"].map((planKey) => [planKey, new Set(smokeModels)])
+  );
 
   return {
     codexCLIService: {
@@ -223,6 +233,17 @@ function createSmokePlatformSideEffects():
       },
       syncWithStoreValue(enabled: boolean): void {
         log.startupSyncValues.push(enabled);
+      }
+    },
+    modelCatalogService: {
+      cachedAvailableModels(): string[] {
+        return [...smokeModels];
+      },
+      cachedModelIDsByPlanKey(): ReadonlyMap<string, ReadonlySet<string>> {
+        return smokeModelsByPlanKey;
+      },
+      async refreshModels(): Promise<string[]> {
+        return [...smokeModels];
       }
     },
     proxyUpstreamClient: {
