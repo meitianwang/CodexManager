@@ -452,6 +452,31 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
 
+  it("retries the next eligible account after a 403 auth failure without a refresh token", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(403, "HTTP 403", "invalid_api_key"),
+      successResult({ id: "resp-2" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
+  });
+
   it("retries the next eligible account after a preflight SSE error before output", async () => {
     const upstream = new FakeUpstreamClient([
       sseErrorResult({ code: "model_restricted", message: "model is not available", status: 403 }),

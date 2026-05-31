@@ -54,7 +54,14 @@ export class CodexUpstreamError extends Error {
       return true;
     }
     if (this.statusCode === 403) {
-      return this.body.includes("model_restricted") || this.body.includes("model_not_found") || this.body.includes("authentication");
+      const body = this.body.toLowerCase();
+      return (
+        body.includes("model_restricted") ||
+        body.includes("model_not_found") ||
+        body.includes("authentication") ||
+        body.includes("unauthorized") ||
+        body.includes("invalid_api_key")
+      );
     }
     return false;
   }
