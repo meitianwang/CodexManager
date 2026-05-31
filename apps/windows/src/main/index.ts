@@ -331,6 +331,9 @@ function createSmokeTestController(context: WindowsAppContext): { attach: (brows
   }
 
   function failSmokeTest(error: unknown): void {
+    if (completed) {
+      return;
+    }
     console.error("CodexManager Windows smoke test failed", error);
     writeSmokeResult({
       error: error instanceof Error ? error.message : String(error),
@@ -531,7 +534,7 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
           actionButtons: labels(".proxy-actions button"),
           codeCopyButtonCount: document.querySelectorAll(".code-copy-button").length,
           endpointPaths,
-          formLabels: labels(".proxy-form-row label, .api-key-field label"),
+          formLabels: text(".proxy-port-row > span, .api-key-field > label"),
           modelChipCount: document.querySelectorAll(".model-chip").length,
           sectionHeadings: text(".proxy-layout h2, .proxy-layout h3"),
           statusText: document.querySelector(".status-pill")?.textContent?.trim() ?? ""
@@ -543,8 +546,8 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
           footerButtons: labels(".settings-footer button"),
           languageOptionCount: document.querySelectorAll("select[aria-label='Language'] option").length,
           sectionHeadings: text(".settings-layout h2, .settings-layout h3"),
-          selectLabels: labels(".select-row label"),
-          toggleLabels: labels(".toggle-row label")
+          selectLabels: text(".select-row > span"),
+          toggleLabels: text(".toggle-row > span")
         };
       }
 
