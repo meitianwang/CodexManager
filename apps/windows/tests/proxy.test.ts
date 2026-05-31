@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { AccountsStore } from "../src/shared/models/accounts";
+import type { AccountsStore, StoredAccount } from "../src/shared/models/accounts";
 import type { AppSettings } from "../src/shared/models/settings";
 import { appInfo } from "../src/shared/app-info";
 import { defaultAppSettings } from "../src/shared/models/settings";
@@ -77,6 +77,50 @@ describe("local proxy", () => {
     const response = await rawAuthorizedFetch(context.port, "/v1/unknown", "{");
 
     expect(response.status).toBe(404);
+    expect(upstream.requests).toEqual([]);
+  });
+
+  it("returns the mac-compatible no-account status before forwarding", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
+    const context = await makeProxyContext({
+      upstream,
+      store: { version: 1, accounts: [] }
+    });
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const body = await response.json() as { error?: { message?: string } };
+
+    expect(response.status).toBe(503);
+    expect(body.error?.message).toBe("No accounts available for proxy. Add and authorize at least one account first.");
+    expect(upstream.requests).toEqual([]);
+  });
+
+  it("returns unavailable-account reasons when all stored accounts are filtered out", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
+    const exhausted = makeAccount("exhausted", "acct-exhausted", "access-exhausted", 1);
+    exhausted.usage = {
+      fetchedAt: 1,
+      fiveHour: { usedPercent: 100, windowSeconds: 5 * 60 * 60, resetAt: 1_780_001_000 },
+      oneWeek: { usedPercent: 10, windowSeconds: 7 * 24 * 60 * 60 }
+    };
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [exhausted]
+      }
+    });
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const body = await response.json() as { error?: { message?: string } };
+
+    expect(response.status).toBe(429);
+    expect(body.error?.message).toContain("All accounts are unavailable");
+    expect(body.error?.message).toContain("exhausted: quota resets");
     expect(upstream.requests).toEqual([]);
   });
 
@@ -935,7 +979,14 @@ class FakeModelCatalogService {
   }
 }
 
-function makeAccount(id: string, accountId: string, accessToken: string, addedAt: number, refreshToken = `refresh-${id}`, planType = "plus") {
+function makeAccount(
+  id: string,
+  accountId: string,
+  accessToken: string,
+  addedAt: number,
+  refreshToken = `refresh-${id}`,
+  planType = "plus"
+): StoredAccount {
   return {
     id,
     label: id,

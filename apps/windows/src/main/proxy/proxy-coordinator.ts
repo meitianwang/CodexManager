@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
-import type { AccountsStore, StoredAccount } from "../../shared/models/accounts";
+import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import { appInfo } from "../../shared/app-info";
 import { accountSummaries } from "../../shared/domain/accounts-store";
@@ -69,6 +69,13 @@ const supportedPostPaths = new Set([
   "/v1/memories/trace_summarize",
   "/v1/alpha/search"
 ]);
+const noAccountsAvailableMessage = "No accounts available for proxy. Add and authorize at least one account first.";
+
+interface ProxyAccountSelection {
+  accounts: Array<{ account: StoredAccount; extracted: ExtractedAuth }>;
+  hasStoredAccounts: boolean;
+  unavailableReasons: string[];
+}
 
 export interface SettingsRepositoryLike {
   loadSettings(): Promise<AppSettings>;
@@ -191,6 +198,10 @@ export class ProxyCoordinator {
     } catch (error) {
       if (error instanceof ProxyBadRequestError) {
         sendProxyError(response, 400, error.message);
+        return;
+      }
+      if (error instanceof ProxyResponseError) {
+        sendProxyError(response, error.statusCode, error.message);
         return;
       }
       sendJson(response, error instanceof CodexUpstreamError ? error.statusCode : 500, {
@@ -335,16 +346,18 @@ export class ProxyCoordinator {
     queryString = ""
   ): Promise<CodexUpstreamResult> {
     const store = await this.options.storeRepository.loadStore();
-    const orderedAccounts = await this.orderedEligibleAccounts(store, model);
-    const url = await this.upstreamURL(normalizedPath, queryString);
-    let lastError: unknown;
-
-    for (const account of orderedAccounts) {
-      const extracted = this.extractAccount(account);
-      if (!extracted) {
-        continue;
+    const selection = await this.selectEligibleAccounts(store, model);
+    if (selection.accounts.length === 0) {
+      if (selection.hasStoredAccounts) {
+        throw new ProxyResponseError(429, allAccountsUnavailableMessage(selection.unavailableReasons));
       }
+      throw new ProxyResponseError(503, noAccountsAvailableMessage);
+    }
 
+    const url = await this.upstreamURL(normalizedPath, queryString);
+    const failures: string[] = [];
+
+    for (const { account, extracted } of selection.accounts) {
       try {
         const result = await this.executeUpstreamRequest({
           method: request.method ?? "POST",
@@ -358,14 +371,14 @@ export class ProxyCoordinator {
         }
         return result;
       } catch (error) {
-        lastError = error;
+        failures.push(`${account.label}: ${error instanceof Error ? error.message : String(error)}`);
         if (!(error instanceof CodexUpstreamError) || !error.isRetryable) {
           throw error;
         }
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error("No eligible account could satisfy the proxy request");
+    throw new ProxyResponseError(502, upstreamFailedMessage([...failures, ...selection.unavailableReasons]));
   }
 
   private async executeUpstreamRequest(
@@ -419,7 +432,7 @@ export class ProxyCoordinator {
     throw new CodexUpstreamError(error.statusCode, `SSE ${error.statusCode}`, error.body);
   }
 
-  private async orderedEligibleAccounts(store: AccountsStore, model: string): Promise<StoredAccount[]> {
+  private async selectEligibleAccounts(store: AccountsStore, model: string): Promise<ProxyAccountSelection> {
     const now = this.dateProvider.unixSecondsNow();
     this.expireCooldowns(now);
     const summaries = accountSummaries(store).sort((left, right) => {
@@ -427,31 +440,65 @@ export class ProxyCoordinator {
       return scoreDelta !== 0 ? scoreDelta : left.addedAt - right.addedAt;
     });
     const byId = new Map(store.accounts.map((account) => [account.id, account]));
-    return summaries
-      .map((summary) => byId.get(summary.id))
-      .filter((account): account is StoredAccount => account !== undefined)
-      .filter((account) => this.isAccountEligible(account, model, now));
+    const accounts: ProxyAccountSelection["accounts"] = [];
+    const unavailableReasons: string[] = [];
+
+    for (const summary of summaries) {
+      const account = byId.get(summary.id);
+      if (!account) {
+        continue;
+      }
+
+      const unavailableReason = this.accountUnavailableReason(account, summary, model, now);
+      if (unavailableReason) {
+        unavailableReasons.push(unavailableReason);
+        continue;
+      }
+
+      const extracted = this.extractAccount(account);
+      if (!extracted) {
+        unavailableReasons.push(`${account.label}: auth unavailable`);
+        continue;
+      }
+
+      accounts.push({ account, extracted });
+    }
+
+    return {
+      accounts,
+      hasStoredAccounts: store.accounts.length > 0,
+      unavailableReasons
+    };
   }
 
-  private isAccountEligible(account: StoredAccount, model: string, now: number): boolean {
+  private accountUnavailableReason(
+    account: StoredAccount,
+    summary: AccountSummary,
+    model: string,
+    now: number
+  ): string | undefined {
     const accountKey = accountKeyForStoredAccount(account);
     const quotaResetTime = exhaustedQuotaResetTime(account.usage, now);
     if (quotaResetTime !== undefined) {
       this.accountCooldowns.set(accountKey, quotaResetTime);
-      return false;
+      return `${account.label}: quota resets ${formatResetTime(quotaResetTime)}`;
     }
 
     const cooldownUntil = this.accountCooldowns.get(accountKey);
     if (cooldownUntil !== undefined && cooldownUntil > now) {
-      return false;
+      return `${account.label}: cooling down until ${formatResetTime(cooldownUntil)}`;
     }
 
     const modelCooldownUntil = this.accountModelCooldowns.get(modelCooldownKey(accountKey, model));
     if (modelCooldownUntil !== undefined && modelCooldownUntil > now) {
-      return false;
+      return `${account.label}: model ${model} cooling down until ${formatResetTime(modelCooldownUntil)}`;
     }
 
-    return this.modelIsSupported(model, account);
+    if (!this.modelIsSupported(model, account)) {
+      return `${account.label}: model ${model} unavailable for ${summary.effectivePlanType}`;
+    }
+
+    return undefined;
   }
 
   private modelIsSupported(model: string, account: StoredAccount): boolean {
@@ -620,6 +667,26 @@ class ProxyBadRequestError extends Error {
   }
 }
 
+class ProxyResponseError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "ProxyResponseError";
+  }
+}
+
+function allAccountsUnavailableMessage(unavailableReasons: readonly string[]): string {
+  const summary = unavailableReasons.length > 0 ? unavailableReasons.join("; ") : noAccountsAvailableMessage;
+  return `All accounts are unavailable: ${summary}`;
+}
+
+function upstreamFailedMessage(details: readonly string[]): string {
+  const summary = details.length > 0 ? details.join("; ") : "No eligible account could satisfy the proxy request";
+  return `Codex upstream request failed: ${summary}`;
+}
+
 function normalizedResponsesBody(json: Record<string, unknown>): Record<string, unknown> {
   const body: Record<string, unknown> = { ...json, stream: true };
   body.store ??= false;
@@ -783,6 +850,10 @@ function exhaustedQuotaResetTime(usage: StoredAccount["usage"], now: number): nu
 
 function quotaRetryCooldown(usage: StoredAccount["usage"], now: number): number {
   return exhaustedQuotaResetTime(usage, now) ?? now + accountCooldownSeconds;
+}
+
+function formatResetTime(timestamp: number): string {
+  return new Date(timestamp * 1000).toISOString();
 }
 
 function modelCooldownKey(accountKey: string, model: string): string {
