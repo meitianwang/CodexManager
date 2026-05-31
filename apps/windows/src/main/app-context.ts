@@ -26,6 +26,8 @@ export interface SmokePlatformSideEffectLog {
     restarted: EditorAppID[];
     targets: EditorAppID[];
   }>;
+  startupSetEnabledValues: boolean[];
+  startupSyncValues: boolean[];
 }
 
 export interface SmokePlatformSideEffects {
@@ -48,9 +50,11 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
   const storeRepository = new AccountsStoreRepository(paths);
   const settingsRepository = new SettingsFileRepository(paths);
   const authRepository = new AuthFileRepository(paths);
+  const smokePlatformSideEffects = createSmokePlatformSideEffects();
   const settingsCoordinator = new SettingsCoordinator(
     settingsRepository,
-    new LaunchAtStartupService(electronApp, { isPackaged: electronApp.isPackaged })
+    smokePlatformSideEffects?.launchAtStartupService ??
+      new LaunchAtStartupService(electronApp, { isPackaged: electronApp.isPackaged })
   );
   const usageService = new DefaultUsageService(paths);
   const weeklyQuotaWarmupService = new DefaultWeeklyQuotaWarmupService(paths);
@@ -59,7 +63,6 @@ export async function createWindowsAppContext(electronApp: App): Promise<Windows
     localeProvider: async () => (await settingsRepository.loadSettings()).locale
   });
   const editorAppService = new EditorAppService();
-  const smokePlatformSideEffects = createSmokePlatformSideEffects();
   const remoteModelCatalogService = new RemoteModelCatalogService({ storeRepository });
   const accountsCoordinator = new AccountsCoordinator({
     storeRepository,
@@ -142,6 +145,10 @@ function createSmokePlatformSideEffects():
       editorAppService: {
         restartSelectedApps(targets: readonly EditorAppID[]): Promise<{ restarted: EditorAppID[] }>;
       };
+      launchAtStartupService: {
+        setEnabled(enabled: boolean): void;
+        syncWithStoreValue(enabled: boolean): void;
+      };
     })
   | undefined {
   if (!process.env.CODEX_MANAGER_ELECTRON_SMOKE_ROOT) {
@@ -150,7 +157,9 @@ function createSmokePlatformSideEffects():
 
   const log: SmokePlatformSideEffectLog = {
     codexLaunches: [],
-    editorRestarts: []
+    editorRestarts: [],
+    startupSetEnabledValues: [],
+    startupSyncValues: []
   };
 
   return {
@@ -170,13 +179,23 @@ function createSmokePlatformSideEffects():
         return { restarted: normalizedTargets };
       }
     },
+    launchAtStartupService: {
+      setEnabled(enabled: boolean): void {
+        log.startupSetEnabledValues.push(enabled);
+      },
+      syncWithStoreValue(enabled: boolean): void {
+        log.startupSyncValues.push(enabled);
+      }
+    },
     snapshot(): SmokePlatformSideEffectLog {
       return {
         codexLaunches: log.codexLaunches.map((entry) => ({ ...entry })),
         editorRestarts: log.editorRestarts.map((entry) => ({
           restarted: [...entry.restarted],
           targets: [...entry.targets]
-        }))
+        })),
+        startupSetEnabledValues: [...log.startupSetEnabledValues],
+        startupSyncValues: [...log.startupSyncValues]
       };
     }
   };

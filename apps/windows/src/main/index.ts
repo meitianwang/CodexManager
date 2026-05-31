@@ -110,6 +110,8 @@ interface SmokePlatformWorkflowState {
   editorRestartCount: number;
   editorRestartError?: string;
   restartedEditorApps: string[];
+  startupSetEnabledValues: boolean[];
+  startupSyncValues: boolean[];
   usedFallbackCLI: boolean;
 }
 
@@ -865,17 +867,27 @@ async function verifySmokePlatformSideEffects(
   }
 
   const workspacePath = "C:\\smoke-workspace";
+  let restoredSettings = false;
   try {
     await context.settingsCoordinator.updateSettings({
+      launchAtStartup: true,
       launchCodexAfterSwitch: true,
       restartEditorsOnSwitch: true,
       restartEditorTargets: ["cursor"]
     });
 
     const execution = await context.accountsCoordinator.switchAccountAndApplySettings(primaryAccount.id, workspacePath);
+    await context.settingsCoordinator.updateSettings({
+      launchAtStartup: false,
+      launchCodexAfterSwitch: false,
+      restartEditorsOnSwitch: false,
+      restartEditorTargets: []
+    });
+    restoredSettings = true;
+
     const sideEffects = context.smokePlatformSideEffects.snapshot();
-    const latestCodexLaunch = sideEffects.codexLaunches[sideEffects.codexLaunches.length - 1];
-    const latestEditorRestart = sideEffects.editorRestarts[sideEffects.editorRestarts.length - 1];
+    const latestCodexLaunch = sideEffects.codexLaunches.at(-1);
+    const latestEditorRestart = sideEffects.editorRestarts.at(-1);
     const restartedEditorApps = latestEditorRestart?.restarted ?? [];
 
     if (!execution.usedFallbackCLI) {
@@ -892,6 +904,9 @@ async function verifySmokePlatformSideEffects(
         `Smoke editor restart did not include Cursor: ${JSON.stringify({ execution, editorRestarts: sideEffects.editorRestarts })}`
       );
     }
+    if (!includesBooleanSequence(sideEffects.startupSetEnabledValues, [true, false])) {
+      throw new Error(`Smoke launch-at-startup changes were not recorded: ${JSON.stringify(sideEffects.startupSetEnabledValues)}`);
+    }
 
     return {
       codexLaunchCount: sideEffects.codexLaunches.length,
@@ -899,15 +914,38 @@ async function verifySmokePlatformSideEffects(
       editorRestartCount: sideEffects.editorRestarts.length,
       editorRestartError: execution.editorRestartError,
       restartedEditorApps,
+      startupSetEnabledValues: sideEffects.startupSetEnabledValues,
+      startupSyncValues: sideEffects.startupSyncValues,
       usedFallbackCLI: execution.usedFallbackCLI
     };
   } finally {
-    await context.settingsCoordinator.updateSettings({
-      launchCodexAfterSwitch: false,
-      restartEditorsOnSwitch: false,
-      restartEditorTargets: []
-    });
+    if (!restoredSettings) {
+      await context.settingsCoordinator.updateSettings({
+        launchAtStartup: false,
+        launchCodexAfterSwitch: false,
+        restartEditorsOnSwitch: false,
+        restartEditorTargets: []
+      });
+    }
   }
+}
+
+function includesBooleanSequence(values: readonly boolean[], expectedSequence: readonly boolean[]): boolean {
+  if (expectedSequence.length === 0) {
+    return true;
+  }
+
+  let expectedIndex = 0;
+  for (const value of values) {
+    if (value !== expectedSequence[expectedIndex]) {
+      continue;
+    }
+    expectedIndex += 1;
+    if (expectedIndex === expectedSequence.length) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function readSmokePersistenceState(context: WindowsAppContext, expectedAccountId: string): SmokePersistenceState {

@@ -161,6 +161,26 @@ function Test-ContainsAll {
   return $true
 }
 
+function Test-ContainsAllBooleans {
+  param(
+    [object] $Values,
+    [bool[]] $ExpectedValues
+  )
+
+  if ($null -eq $Values) {
+    return $false
+  }
+
+  $items = @($Values | ForEach-Object { $_ -eq $true })
+  foreach ($expectedValue in $ExpectedValues) {
+    if ($items -notcontains $expectedValue) {
+      return $false
+    }
+  }
+
+  return $true
+}
+
 function Decode-JwtPayload {
   param(
     [string] $Token
@@ -541,6 +561,7 @@ function Add-SmokeResultChecks {
     (Get-StringValue (Get-PropertyValue $platform "codexWorkspacePath")) -eq "C:\smoke-workspace" -and
     (Get-NumberValue (Get-PropertyValue $platform "editorRestartCount")) -ge 1 -and
     (Test-ContainsAll (Get-PropertyValue $platform "restartedEditorApps") @("cursor")) -and
+    (Test-ContainsAllBooleans (Get-PropertyValue $platform "startupSetEnabledValues") @($true, $false)) -and
     ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $platform "editorRestartError"))))
   ) $platform
 

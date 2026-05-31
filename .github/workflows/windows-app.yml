@@ -256,6 +256,8 @@ jobs:
             $Result.workflows.platform.editorRestartCount -lt 1
             @($Result.workflows.platform.restartedEditorApps) -notcontains "cursor"
             (-not ([string]::IsNullOrWhiteSpace([string] $Result.workflows.platform.editorRestartError)))
+            @($Result.workflows.platform.startupSetEnabledValues) -notcontains $true
+            @($Result.workflows.platform.startupSetEnabledValues) -notcontains $false
             -not ([bool]$Result.workflows.persistence.accountsJsonExists)
             -not ([bool]$Result.workflows.persistence.settingsJsonExists)
             -not ([bool]$Result.workflows.persistence.codexAuthExists)
