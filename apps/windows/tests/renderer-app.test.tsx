@@ -280,6 +280,14 @@ describe("Windows renderer app", () => {
     expect(proxyControl.querySelector(".proxy-actions")).toBeTruthy();
     expect(rendererStyles()).toContain(".proxy-form-row");
     expect(rendererStyles()).toContain("flex: 0 0 68px;");
+    const endpointRows = Array.from(document.querySelectorAll(".endpoint-row"));
+    expect(endpointRows).toHaveLength(3);
+    expect(endpointRows[0]?.querySelector(".endpoint-method-badge")?.textContent).toBe("POST");
+    expect(endpointRows[0]?.querySelector("code")?.textContent).toBe("/v1/chat/completions");
+    expect(endpointRows[0]?.querySelector("em")?.textContent).toBe("Chat completions");
+    expect(endpointRows[0]?.classList.contains("selected")).toBe(true);
+    expect(rendererStyles()).toContain(".endpoint-method-badge");
+    expect(rendererStyles()).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
     expect(codeBlockCopyButtons()).toHaveLength(2);
     expect(codeBlockCopyButtons().every((button) => button.textContent === "")).toBe(true);
     expect(codeBlockCopyButtons().every((button) => button.querySelector(".copy-doc-icon"))).toBe(true);

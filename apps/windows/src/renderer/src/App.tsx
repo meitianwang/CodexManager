@@ -1113,7 +1113,7 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
                 type="button"
                 onClick={() => props.setSelectedEndpoint(item.id)}
               >
-                <span>{item.method}</span>
+                <span className="endpoint-method-badge">{item.method}</span>
                 <code>{item.path}</code>
                 <em>{proxyEndpointDescription(item.id, props.t)}</em>
               </button>

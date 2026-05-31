@@ -1350,23 +1350,42 @@ button.danger {
 .endpoint-list,
 .model-list {
   display: grid;
+}
+
+.endpoint-list {
+  gap: 4px;
+}
+
+.model-list {
   gap: 7px;
 }
 
 .endpoint-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 5px 10px;
-  min-height: 48px;
-  padding: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: transparent;
   text-align: left;
 }
 
-.endpoint-row span {
-  align-self: center;
-  color: #d6f05f;
+.endpoint-row:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgba(214, 240, 95, 0.06);
+}
+
+.endpoint-method-badge {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(214, 240, 95, 0.16);
+  color: #efffb1;
+  font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .endpoint-row code {
@@ -1374,17 +1393,27 @@ button.danger {
   color: #f0f3ea;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 12px;
+  font-weight: 600;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .endpoint-row em {
-  grid-column: 2;
+  justify-self: end;
+  overflow: hidden;
+  max-width: 180px;
   color: #9ea697;
   font-size: 12px;
   font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.endpoint-row.selected,
+.endpoint-row.selected {
+  border-color: transparent;
+  background: rgba(214, 240, 95, 0.11);
+}
+
 .model-chip.selected {
   border-color: rgba(214, 240, 95, 0.42);
   background: rgba(214, 240, 95, 0.11);
@@ -1632,5 +1661,15 @@ button.danger {
 
   .api-key-control {
     width: 100%;
+  }
+
+  .endpoint-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .endpoint-row em {
+    grid-column: 2;
+    justify-self: start;
+    max-width: 100%;
   }
 }
