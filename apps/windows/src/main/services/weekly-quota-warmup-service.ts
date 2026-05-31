@@ -2,10 +2,11 @@ import type { FileSystemPaths } from "../repositories/file-system-paths";
 import { EndpointPreferenceStore } from "./endpoint-request-coordinator";
 import { NetworkRequestError } from "./network-errors";
 import { removeSuffix, resolveChatGPTBaseOrigin } from "./chatgpt-base-origin";
-import { CodexUpstreamClient, type CodexUpstreamClientLike, type CodexUpstreamResult } from "../proxy/upstream-client";
+import { CodexUpstreamClient, CodexUpstreamError, type CodexUpstreamClientLike, type CodexUpstreamResult } from "../proxy/upstream-client";
 
 const scope = "weekly-quota-warmup";
 const warmupModel = "gpt-5.4-mini";
+const failureBodyPreviewBytes = 512;
 
 export interface WeeklyQuotaWarmupServiceOptions {
   endpointPreferenceStore?: EndpointPreferenceStore;
@@ -47,7 +48,7 @@ export class DefaultWeeklyQuotaWarmupService {
         this.endpointPreferenceStore.recordSuccess(scope, endpoint);
         return;
       } catch (error) {
-        failures.push(`${endpoint} -> ${error instanceof Error ? error.message : String(error)}`);
+        failures.push(`${endpoint} -> ${failureDescription(error)}`);
       }
     }
 
@@ -104,6 +105,24 @@ function inspectWarmupResponse(result: CodexUpstreamResult): void {
       throw new NetworkRequestError(`SSE ${error.statusCode}: ${error.message}`);
     }
   }
+}
+
+function failureDescription(error: unknown): string {
+  if (!(error instanceof CodexUpstreamError)) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  const bodyText = trimToByteLimit(error.body, failureBodyPreviewBytes);
+  return bodyText ? `${error.message}: ${bodyText}` : error.message;
+}
+
+function trimToByteLimit(value: string, limitBytes: number): string {
+  const trimmed = value.trim();
+  const encoded = new TextEncoder().encode(trimmed);
+  if (encoded.byteLength <= limitBytes) {
+    return trimmed;
+  }
+  return new TextDecoder().decode(encoded.slice(0, limitBytes)).trim();
 }
 
 function sseError(line: string): { statusCode: number; message: string } | undefined {

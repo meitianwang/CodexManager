@@ -10,10 +10,11 @@ import {
 import { mapUsagePayload } from "../src/main/services/usage-service";
 import { mapWorkspaceMetadataPayload } from "../src/main/services/workspace-metadata-service";
 import { DefaultWeeklyQuotaWarmupService, makeWarmupBodyBuffer } from "../src/main/services/weekly-quota-warmup-service";
-import type {
-  CodexUpstreamClientLike,
-  CodexUpstreamRequest,
-  CodexUpstreamResult
+import {
+  CodexUpstreamError,
+  type CodexUpstreamClientLike,
+  type CodexUpstreamRequest,
+  type CodexUpstreamResult
 } from "../src/main/proxy/upstream-client";
 
 describe("OAuth helpers", () => {
@@ -225,6 +226,20 @@ describe("weekly quota warmup service", () => {
     await expect(service.warmUp("access-token", "acct-1")).rejects.toThrow(/SSE 429: quota exceeded/);
   });
 
+  it("includes a bounded upstream body preview in HTTP warmup failures", async () => {
+    const upstream = new FakeWarmupUpstream(
+      new CodexUpstreamError(400, "HTTP 400", `${"x".repeat(600)}-hidden`)
+    );
+    const service = new DefaultWeeklyQuotaWarmupService(
+      { codexConfigPath: "/missing-config.toml" },
+      { upstreamClient: upstream }
+    );
+
+    await expect(service.warmUp("access-token", "acct-1")).rejects.toThrow(
+      new RegExp(`HTTP 400: ${"x".repeat(512)}(?!x|-hidden)`)
+    );
+  });
+
   it("keeps the warmup body stable", () => {
     const body = JSON.parse(makeWarmupBodyBuffer().toString("utf8")) as Record<string, unknown>;
     expect(body).toMatchObject({
@@ -270,10 +285,13 @@ function jsonResponse(value: unknown, status = 200): Response {
 class FakeWarmupUpstream implements CodexUpstreamClientLike {
   public readonly requests: CodexUpstreamRequest[] = [];
 
-  constructor(private readonly result: CodexUpstreamResult) {}
+  constructor(private readonly result: CodexUpstreamResult | Error) {}
 
   async execute(request: CodexUpstreamRequest): Promise<CodexUpstreamResult> {
     this.requests.push(request);
+    if (this.result instanceof Error) {
+      throw this.result;
+    }
     return this.result;
   }
 }
