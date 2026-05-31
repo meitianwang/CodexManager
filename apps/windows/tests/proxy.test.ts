@@ -248,6 +248,26 @@ describe("local proxy", () => {
     expect(forwarded.stream).toBe(true);
   });
 
+  it("defaults Chat Completions requests to non-streaming responses", async () => {
+    const upstream = new FakeUpstreamClient([sseResult("Hello")]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const body = await response.json();
+    const forwarded = JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}") as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(body).toMatchObject({
+      object: "chat.completion",
+      choices: [{ message: { role: "assistant", content: "Hello" } }]
+    });
+    expect(forwarded.stream).toBe(true);
+  });
+
   it("translates streaming Chat Completions responses to OpenAI chunks", async () => {
     const upstream = new FakeUpstreamClient([sseResult("Hello")]);
     const context = await makeProxyContext({ upstream });

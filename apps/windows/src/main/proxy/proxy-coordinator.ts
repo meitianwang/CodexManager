@@ -194,6 +194,7 @@ export class ProxyCoordinator {
   ): Promise<void> {
     const model = readString(json.model, "model");
     const messages = Array.isArray(json.messages) ? json.messages.filter(isRecord) : [];
+    const clientWantsStream = json.stream === true;
     const codexBody = translateChatRequest(model, messages, json);
     const result = await this.forwardProxyRequest(
       request,
@@ -205,15 +206,15 @@ export class ProxyCoordinator {
       false
     );
 
-    if (json.stream === false) {
-      sendJson(response, 200, translateCodexSSEToChatCompletion(model, result.body.toString("utf8")));
-    } else {
+    if (clientWantsStream) {
       sendText(
         response,
         200,
         translateCodexSSEToChatCompletionChunks(model, result.body.toString("utf8")),
         "text/event-stream; charset=utf-8"
       );
+    } else {
+      sendJson(response, 200, translateCodexSSEToChatCompletion(model, result.body.toString("utf8")));
     }
   }
 
