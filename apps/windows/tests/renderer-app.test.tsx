@@ -234,8 +234,10 @@ describe("Windows renderer app", () => {
     expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
     expect(container.querySelector(".account-list")?.classList.contains("grid")).toBe(true);
     expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
-    expect(rendererStyles()).toContain("grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));");
-    expect(rendererStyles()).toContain("max-width: 280px;");
+    expect(rendererStyles()).toContain("grid-template-columns: repeat(auto-fit, minmax(320px, 340px));");
+    expect(rendererStyles()).toContain("max-width: 340px;");
+    expect(rendererStyles()).toContain("flex-wrap: wrap;");
+    expect(rendererStyles()).toContain("min-width: max-content;");
     expect(rendererStyles()).toContain(".account-list.list");
     expect(rendererStyles()).toContain("grid-template-columns: 58px 58px minmax(0, 1fr);");
     expect(rendererStyles()).toContain("min-height: 178px;");

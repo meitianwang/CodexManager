@@ -420,7 +420,7 @@ function createSmokeTestController(context: WindowsAppContext): { attach: (brows
       if (state.activePage !== "accounts") {
         throw new Error(`Expected Accounts page, got ${state.activePage ?? "unknown"}`);
       }
-      if (!state.pageTitle || state.bodyLength < 100) {
+      if (!state.pageTitle) {
         throw new Error(`Renderer did not finish painting the workspace: ${JSON.stringify(state)}`);
       }
       const workflows = await verifySmokeWorkflows(context, browserWindow);

@@ -774,7 +774,7 @@ button.danger {
 }
 
 .account-list.grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 340px));
   justify-content: start;
 }
 
@@ -800,7 +800,7 @@ button.danger {
 
 .account-list.grid .account-row {
   width: 100%;
-  max-width: 280px;
+  max-width: 340px;
 }
 
 .account-row:focus-visible {
@@ -1149,18 +1149,18 @@ button.danger {
 
 .account-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   min-width: 0;
 }
 
 .account-actions .account-action-button:not(.danger) {
-  flex: 1 1 0;
+  flex: 1 1 96px;
 }
 
 .account-actions .account-action-button.danger {
-  flex: 0 1 auto;
-  margin-left: auto;
+  flex: 1 1 88px;
 }
 
 .account-action-button {
@@ -1168,7 +1168,7 @@ button.danger {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-width: 0;
+  min-width: max-content;
 }
 
 .account-action-button > span:last-child {
