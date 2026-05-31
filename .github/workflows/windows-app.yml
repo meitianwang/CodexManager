@@ -153,12 +153,14 @@ jobs:
               -ProxyPort ([int] $Port) `
               -ProxyApiKey "sk-local-ci" `
               -ProbeProxyRoutes `
+              -AppLaunchVerified `
               -OAuthVerified `
               -ImportCurrentAuthVerified `
               -ImportExportPackageVerified `
               -SwitchVerified `
               -SmartSwitchVerified `
               -UsageRefreshVerified `
+              -ProxyStartStopVerified `
               -CodexLaunchVerified `
               -SettingsPersistenceVerified `
               -StartupVerified `

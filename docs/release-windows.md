@@ -79,12 +79,14 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -ProxyPort <port-from-proxy-page> `
   -ProxyApiKey "<api-key-from-proxy-page>" `
   -ProbeProxyRoutes `
+  -AppLaunchVerified `
   -OAuthVerified `
   -ImportCurrentAuthVerified `
   -ImportExportPackageVerified `
   -SwitchVerified `
   -SmartSwitchVerified `
   -UsageRefreshVerified `
+  -ProxyStartStopVerified `
   -CodexLaunchVerified `
   -SettingsPersistenceVerified `
   -StartupVerified `

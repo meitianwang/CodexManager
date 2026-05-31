@@ -13,6 +13,8 @@ param(
 
   [switch] $ProbeProxyRoutes,
 
+  [switch] $AppLaunchVerified,
+
   [switch] $OAuthVerified,
 
   [switch] $ImportCurrentAuthVerified,
@@ -24,6 +26,8 @@ param(
   [switch] $SmartSwitchVerified,
 
   [switch] $UsageRefreshVerified,
+
+  [switch] $ProxyStartStopVerified,
 
   [switch] $CodexLaunchVerified,
 
@@ -381,12 +385,14 @@ Add-Check "artifact.runUrl" ($ArtifactRunUrl -match "^https://github\.com/.+/act
 Add-Check "artifact.digest" ($ArtifactDigest -match "^sha256:[0-9a-fA-F]{64}$") "Expected format: sha256:<64 hex chars>."
 Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) "Manual verification must run on Windows."
 
+Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
 Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."
 Add-Check "manual.importCurrentAuth" $ImportCurrentAuthVerified.IsPresent "Pass -ImportCurrentAuthVerified only after importing the current Codex auth file."
 Add-Check "manual.importExportPackage" $ImportExportPackageVerified.IsPresent "Pass -ImportExportPackageVerified only after exporting and importing an account transfer package."
 Add-Check "manual.switch" $SwitchVerified.IsPresent "Pass -SwitchVerified only after switching accounts and checking the active auth."
 Add-Check "manual.smartSwitch" $SmartSwitchVerified.IsPresent "Pass -SmartSwitchVerified only after confirming Smart Switch chooses the best available account."
 Add-Check "manual.usageRefresh" $UsageRefreshVerified.IsPresent "Pass -UsageRefreshVerified only after refreshing usage or confirming a user-visible usage error."
+Add-Check "manual.proxyStartStop" $ProxyStartStopVerified.IsPresent "Pass -ProxyStartStopVerified only after starting and stopping the proxy from the Proxy page."
 Add-Check "manual.codexLaunch" $CodexLaunchVerified.IsPresent "Pass -CodexLaunchVerified only after confirming Codex launches after account switch."
 Add-Check "manual.settingsPersistence" $SettingsPersistenceVerified.IsPresent "Pass -SettingsPersistenceVerified only after restarting the app and confirming settings persist."
 Add-Check "manual.startupRegistration" $StartupVerified.IsPresent "Pass -StartupVerified only after confirming Windows login item registration."
@@ -418,6 +424,7 @@ if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
 if ($ProxyPort -le 0) {
   Add-Check "proxy.health" $false "Pass -ProxyPort after starting the proxy in the Windows app."
   Add-Check "proxy.rejectsMissingApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows app."
+  Add-Check "proxy.rejectsWrongApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows app."
   Add-Check "proxy.routes" $false "Pass -ProbeProxyRoutes, -ProxyPort, and -ProxyApiKey after selecting an account."
 } else {
   $client = New-HttpClient
@@ -433,6 +440,17 @@ if ($ProxyPort -le 0) {
       -Headers @{ "Content-Type" = "application/json" } `
       -Body '{"model":"gpt-5","input":"auth probe"}'
     Add-Check "proxy.rejectsMissingApiKey" ($unauthorized.statusCode -eq 401) $unauthorized
+
+    $wrongApiKey = Invoke-BoundedHttpRequest `
+      -Client $client `
+      -Method "POST" `
+      -Url "$baseUrl/v1/responses" `
+      -Headers @{
+        "Authorization" = "Bearer sk-local-wrong"
+        "Content-Type" = "application/json"
+      } `
+      -Body '{"model":"gpt-5","input":"wrong api key probe"}'
+    Add-Check "proxy.rejectsWrongApiKey" ($wrongApiKey.statusCode -eq 401) $wrongApiKey
 
     if ($ProbeProxyRoutes.IsPresent) {
       if ([string]::IsNullOrWhiteSpace($ProxyApiKey)) {
