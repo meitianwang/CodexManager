@@ -224,6 +224,9 @@ jobs:
           $env:ELECTRON_ENABLE_LOGGING = "1"
           $Process = Start-Process -FilePath $ExePath -ArgumentList "--user-data-dir=$SmokeRoot\UserData" -Wait -PassThru
           if ($Process.ExitCode -ne 0) {
+            if (Test-Path $ResultPath) {
+              Write-Host "Packaged app smoke result: $(Get-Content -Raw $ResultPath)"
+            }
             throw "Packaged app smoke test exited with code $($Process.ExitCode)"
           }
           if (-not (Test-Path $ResultPath)) {

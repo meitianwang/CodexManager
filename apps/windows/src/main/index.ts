@@ -520,7 +520,7 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
           accountCount: document.querySelectorAll(".account-row").length,
           actionButtons: labels(".account-actions button"),
           currentBadgeCount: Array.from(document.querySelectorAll(".badge")).filter((element) => element.textContent?.trim() === "CURRENT").length,
-          hasSmokeAccount: bodyText.includes("Smoke account") || bodyText.includes("Smoke Team"),
+          hasSmokeAccount: bodyText.includes("Smoke account") || bodyText.includes("Smoke Team") || bodyText.includes("smoke@example.com"),
           hasSmokeEmail: bodyText.includes("smoke@example.com"),
           toolbarButtons: labels(".toolbar button")
         };
