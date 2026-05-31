@@ -6,6 +6,7 @@ on:
       - ".github/workflows/windows-app.yml"
       - "apps/windows/**"
       - "docs/release-windows.md"
+      - "scripts/collect_windows_verification.ps1"
       - "scripts/package_windows.ps1"
   push:
     branches:
@@ -14,6 +15,7 @@ on:
       - ".github/workflows/windows-app.yml"
       - "apps/windows/**"
       - "docs/release-windows.md"
+      - "scripts/collect_windows_verification.ps1"
       - "scripts/package_windows.ps1"
   workflow_dispatch:
 
@@ -29,6 +31,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Validate Windows verification script syntax
+        shell: pwsh
+        run: |
+          $Errors = $null
+          [System.Management.Automation.PSParser]::Tokenize((Get-Content -Raw .\scripts\collect_windows_verification.ps1), [ref] $Errors) | Out-Null
+          if ($Errors) {
+            $Errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

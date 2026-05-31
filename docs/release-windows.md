@@ -67,6 +67,27 @@ Treat the CI artifact as the installable Windows verification build. It is not c
 
 ## Manual Verification Checklist
 
+Use the CI artifact as the build under test, then keep one machine-readable verification report with the release notes or issue.
+
+After installing `CodexManagerSetup.exe` on Windows, complete the manual actions in the checklist below. Then run this from the repository root on the same Windows machine:
+
+```powershell
+.\scripts\collect_windows_verification.ps1 `
+  -ArtifactRunUrl "https://github.com/meitianwang/CodexManager/actions/runs/<run-id>" `
+  -ArtifactDigest "sha256:<artifact-digest>" `
+  -ProxyPort <port-from-proxy-page> `
+  -ProxyApiKey "<api-key-from-proxy-page>" `
+  -ProbeProxyRoutes `
+  -OAuthVerified `
+  -SwitchVerified `
+  -CodexLaunchVerified `
+  -StartupVerified `
+  -EditorRestartVerified `
+  -RequireComplete
+```
+
+`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. The script keeps only an 8 KB response preview per request and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
+
 - App launches and opens the Accounts page.
 - Accounts page can import the current `%USERPROFILE%\.codex\auth.json`.
 - ChatGPT OAuth opens the default browser, completes callback, imports the account, and surfaces errors on failure.
