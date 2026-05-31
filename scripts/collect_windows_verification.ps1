@@ -15,13 +15,25 @@ param(
 
   [switch] $OAuthVerified,
 
+  [switch] $ImportCurrentAuthVerified,
+
+  [switch] $ImportExportPackageVerified,
+
   [switch] $SwitchVerified,
 
+  [switch] $SmartSwitchVerified,
+
+  [switch] $UsageRefreshVerified,
+
   [switch] $CodexLaunchVerified,
+
+  [switch] $SettingsPersistenceVerified,
 
   [switch] $StartupVerified,
 
   [switch] $EditorRestartVerified,
+
+  [switch] $TrayMenuVerified,
 
   [switch] $RequireComplete
 )
@@ -370,10 +382,16 @@ Add-Check "artifact.digest" ($ArtifactDigest -match "^sha256:[0-9a-fA-F]{64}$") 
 Add-Check "environment.windows" ([Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) "Manual verification must run on Windows."
 
 Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."
+Add-Check "manual.importCurrentAuth" $ImportCurrentAuthVerified.IsPresent "Pass -ImportCurrentAuthVerified only after importing the current Codex auth file."
+Add-Check "manual.importExportPackage" $ImportExportPackageVerified.IsPresent "Pass -ImportExportPackageVerified only after exporting and importing an account transfer package."
 Add-Check "manual.switch" $SwitchVerified.IsPresent "Pass -SwitchVerified only after switching accounts and checking the active auth."
+Add-Check "manual.smartSwitch" $SmartSwitchVerified.IsPresent "Pass -SmartSwitchVerified only after confirming Smart Switch chooses the best available account."
+Add-Check "manual.usageRefresh" $UsageRefreshVerified.IsPresent "Pass -UsageRefreshVerified only after refreshing usage or confirming a user-visible usage error."
 Add-Check "manual.codexLaunch" $CodexLaunchVerified.IsPresent "Pass -CodexLaunchVerified only after confirming Codex launches after account switch."
+Add-Check "manual.settingsPersistence" $SettingsPersistenceVerified.IsPresent "Pass -SettingsPersistenceVerified only after restarting the app and confirming settings persist."
 Add-Check "manual.startupRegistration" $StartupVerified.IsPresent "Pass -StartupVerified only after confirming Windows login item registration."
 Add-Check "manual.editorRestart" $EditorRestartVerified.IsPresent "Pass -EditorRestartVerified only after confirming selected editors relaunch after account switch."
+Add-Check "manual.trayMenu" $TrayMenuVerified.IsPresent "Pass -TrayMenuVerified only after exercising show, refresh, smart switch, proxy toggle, and quit from the tray menu."
 
 if ([string]::IsNullOrWhiteSpace($env:APPDATA)) {
   Add-Check "paths.appDataEnv" $false "APPDATA is not set."

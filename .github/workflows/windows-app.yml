@@ -153,10 +153,16 @@ jobs:
               -ProxyApiKey "sk-local-ci" `
               -ProbeProxyRoutes `
               -OAuthVerified `
+              -ImportCurrentAuthVerified `
+              -ImportExportPackageVerified `
               -SwitchVerified `
+              -SmartSwitchVerified `
+              -UsageRefreshVerified `
               -CodexLaunchVerified `
+              -SettingsPersistenceVerified `
               -StartupVerified `
               -EditorRestartVerified `
+              -TrayMenuVerified `
               -RequireComplete
 
             $Report = Get-Content -Raw $ReportPath | ConvertFrom-Json

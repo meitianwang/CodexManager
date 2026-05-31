@@ -80,14 +80,20 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -ProxyApiKey "<api-key-from-proxy-page>" `
   -ProbeProxyRoutes `
   -OAuthVerified `
+  -ImportCurrentAuthVerified `
+  -ImportExportPackageVerified `
   -SwitchVerified `
+  -SmartSwitchVerified `
+  -UsageRefreshVerified `
   -CodexLaunchVerified `
+  -SettingsPersistenceVerified `
   -StartupVerified `
   -EditorRestartVerified `
+  -TrayMenuVerified `
   -RequireComplete
 ```
 
-`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
+`-ProbeProxyRoutes` sends three small real requests through the selected account: `/v1/chat/completions`, `/v1/responses`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
 
 - App launches and opens the Accounts page.
 - Accounts page can import the current `%USERPROFILE%\.codex\auth.json`.
