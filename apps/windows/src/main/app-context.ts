@@ -191,7 +191,7 @@ function createSmokePlatformSideEffects():
     startupSetEnabledValues: [],
     startupSyncValues: []
   };
-  const smokeModels = ["gpt-5-codex", "gpt-5"];
+  const smokeModels = ["gpt-5-codex", "gpt-5", "gpt-5-mini"];
   const smokeModelsByPlanKey = new Map(
     ["codex-free", "codex-plus", "codex-pro", "codex-team"].map((planKey) => [planKey, new Set(smokeModels)])
   );
@@ -260,10 +260,7 @@ function createSmokePlatformSideEffects():
         switch (normalizedPath) {
           case "models":
             return smokeJSONUpstreamResult({
-              data: [
-                { id: "gpt-5", object: "model" },
-                { id: "gpt-5-codex", object: "model" }
-              ]
+              data: smokeModels.map((id) => ({ id, object: "model" }))
             });
           case "responses":
             return smokeSSEUpstreamResult("ok", {
