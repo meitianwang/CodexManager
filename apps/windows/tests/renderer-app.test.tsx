@@ -72,7 +72,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("a@example.com")).toBeTruthy();
     expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("PRO");
     expect(accountRow("Work").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
@@ -166,8 +166,8 @@ describe("Windows renderer app", () => {
     fireEvent.click(accountSwitchButton as HTMLElement);
     await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
 
-    fireEvent.change(screen.getByLabelText("Team alias Work"), { target: { value: "Platform" } });
-    fireEvent.blur(screen.getByLabelText("Team alias Work"));
+    fireEvent.change(screen.getByLabelText("Set team name Work"), { target: { value: "Platform" } });
+    fireEvent.blur(screen.getByLabelText("Set team name Work"));
     await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
     expect(await screen.findByText("Team name updated")).toBeTruthy();
 
@@ -183,7 +183,7 @@ describe("Windows renderer app", () => {
     api.accounts.importFile = vi.fn(async () => undefined);
     render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
 
@@ -197,7 +197,7 @@ describe("Windows renderer app", () => {
     api.accounts.importFile = vi.fn(async () => ({ kind: "auth" as const, account: imported }));
     render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
 
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
@@ -230,7 +230,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
     expect(container.querySelector(".account-list")?.classList.contains("grid")).toBe(true);
     expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
@@ -273,7 +273,7 @@ describe("Windows renderer app", () => {
     }));
     render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
 
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledTimes(1));
@@ -295,7 +295,7 @@ describe("Windows renderer app", () => {
     }));
     render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     expect(
       await screen.findByText("Smart switched to: Personal · Switched account (via codex app command) · Editors restarted: cursor")
@@ -451,7 +451,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
     render(<App />);
 
-    expect(await screen.findByLabelText("Team alias Work")).toBeTruthy();
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
@@ -608,7 +608,7 @@ function makeAccount(id: string, label: string): AccountSummary {
 }
 
 function accountRow(label: string): HTMLElement {
-  const row = screen.getByLabelText(`Team alias ${label}`).closest("article");
+  const row = screen.getByLabelText(`Set team name ${label}`).closest("article");
   if (!row) {
     throw new Error(`Account row ${label} was not found`);
   }
