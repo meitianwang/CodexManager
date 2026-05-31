@@ -17,7 +17,6 @@ export interface CodexManagerAPI {
     addViaLogin: () => Promise<AccountSummary>;
     delete: (id: string) => Promise<void>;
     exportPackage: (accountIds: string[]) => Promise<{ canceled: boolean; path?: string }>;
-    importAuthFile: () => Promise<AccountSummary | undefined>;
     importCurrentAuth: () => Promise<AccountSummary>;
     importPreparedPackage: (draftId: string, accountIds: string[]) => Promise<AccountsImportResult>;
     importPackage: () => Promise<AccountsImportResult | undefined>;
@@ -59,7 +58,6 @@ const api: CodexManagerAPI = {
     delete: (id) => invoke<void>(ipcChannels.accountsDelete, { id }),
     exportPackage: (accountIds) =>
       invoke<{ canceled: boolean; path?: string }>(ipcChannels.accountsExportPackage, { accountIds }),
-    importAuthFile: () => invoke<AccountSummary | undefined>(ipcChannels.accountsImportAuthFile),
     importCurrentAuth: () => invoke<AccountSummary>(ipcChannels.accountsImportCurrentAuth),
     importPreparedPackage: (draftId, accountIds) =>
       invoke<AccountsImportResult>(ipcChannels.accountsImportPreparedPackage, { draftId, accountIds }),

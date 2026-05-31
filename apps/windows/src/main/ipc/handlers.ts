@@ -106,20 +106,6 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     return account;
   });
 
-  ipcMain.handle(ipcChannels.accountsImportAuthFile, async () => {
-    const result = await dialog.showOpenDialog({
-      filters: [{ name: "Codex auth JSON", extensions: ["json"] }],
-      properties: ["openFile"]
-    });
-    const path = result.filePaths[0];
-    if (result.canceled || !path) {
-      return undefined;
-    }
-    const account = await context.accountsCoordinator.importAccountFile(path, undefined, false);
-    await publishLatestAccounts(context, options);
-    return account;
-  });
-
   ipcMain.handle(ipcChannels.accountsExportPackage, async (_event, input: unknown) => {
     const { accountIds } = parseIpcInput(exportAccountsPackageSchema, input);
     const result = await dialog.showSaveDialog({

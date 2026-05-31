@@ -134,14 +134,6 @@ export class AccountsCoordinator {
     return this.importAccount(await this.authRepository.readCurrentAuth(), customLabel);
   }
 
-  async importAccountFile(path: string, customLabel: string | undefined, setAsCurrent: boolean): Promise<AccountSummary> {
-    const authJson = await this.authRepository.readAuth(path);
-    if (setAsCurrent) {
-      await this.authRepository.writeCurrentAuth(authJson);
-    }
-    return this.importAccount(authJson, customLabel);
-  }
-
   async addAccountViaLogin(customLabel?: string, timeoutSeconds = 10 * 60): Promise<AccountSummary> {
     if (!this.chatGPTOAuthLoginService) {
       throw new Error("ChatGPT OAuth login service is unavailable");

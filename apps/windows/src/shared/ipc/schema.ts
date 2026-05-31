@@ -9,7 +9,6 @@ export const ipcChannels = {
   accountsChanged: "accounts:changed",
   accountsDelete: "accounts:delete",
   accountsExportPackage: "accounts:exportPackage",
-  accountsImportAuthFile: "accounts:importAuthFile",
   accountsImportCurrentAuth: "accounts:importCurrentAuth",
   accountsImportPreparedPackage: "accounts:importPreparedPackage",
   accountsImportPackage: "accounts:importPackage",

@@ -479,7 +479,6 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
         accounts = accounts.filter((account) => account.id !== id);
       }),
       exportPackage: vi.fn(async () => ({ canceled: false, path: String.raw`C:\exports\accounts.codexmanager.json` })),
-      importAuthFile: vi.fn(async () => appendAccount(accounts, "file", "Imported file")),
       importCurrentAuth: vi.fn(async () => appendAccount(accounts, "current", "Current auth")),
       importPreparedPackage: vi.fn(async (_draftId, accountIds) => {
         for (const id of accountIds) {
