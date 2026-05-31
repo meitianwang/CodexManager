@@ -6,13 +6,16 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26720506001
-- Commit: `eded37ebd00ab1fce7525d945085c50a028acfd7`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26720844135
+- Commit: `6dbbd42b41c8acb56fe3fdf68213e9703b93998b`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:976da7d225ee6986f0fbb2b5e035a68d0e85ad5830c16c8ab18aa0ce3968e34e`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:445feab1a78b8df58bc3aa7498209156e449161546ed0fa92235b8493b30e0b6`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:6d942047f6d4752eebdac12a6b402e4fe8b3762878635d0128630d179ba829f9`.
-- Automated verification artifact contents: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:d395f9f4e8d70bd0c0a91f863aa4a9c388b136091ed837080892b3c50e4cd855`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:525c981fd4031cde03bdeec799b4d6c04a95b7e61a22a2ec669625bc34d60895`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:d45ec7e4ce3bc5e48845ae0d2d06f5a45951bf27399aa35b1a820fe7bc6d58f7`.
+- Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
+- Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
+- The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
+- The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of that large artifact from this macOS host failed twice with a GitHub TLS archive error, so it was not unpacked locally in this verification pass.
 - Packaged smoke result: passed.
 - Packaged UI screenshots: Accounts, Proxy, and Settings screenshots were recorded at `944x471` with non-trivial file sizes.
 - Packaged Proxy route smoke: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages` all returned `200` through smoke-safe upstream routing.
