@@ -5,18 +5,7 @@ import { fileURLToPath } from "node:url";
 import { appLocales } from "../src/shared/models/settings";
 import { createTranslator, messageKeys, type MessageKey } from "../src/renderer/src/i18n";
 
-const windowsParityLocalizedKeys: MessageKey[] = [
-  "accounts.action.import_package",
-  "accounts.action.export",
-  "accounts.notice.exported_format",
-  "accounts.notice.imported_accounts_format",
-  "proxy.api_key.regenerate",
-  "proxy.section.endpoints",
-  "proxy.endpoint.messages",
-  "settings.auto_start_proxy"
-];
-
-const sharedEnglishLabelParityKeys: Array<[MessageKey, string]> = [
+const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["tab.accounts", "tab.accounts"],
   ["tab.proxy", "tab.proxy"],
   ["tab.settings", "tab.settings"],
@@ -122,23 +111,16 @@ describe("renderer i18n", () => {
     expect(t("proxy.section.models")).toBe("可用模型");
   });
 
-  it("does not leave Windows parity labels in English for non-English locales", () => {
-    const english = createTranslator("en");
-
-    for (const locale of appLocales.filter((candidate) => candidate !== "en")) {
+  it("keeps shared UI labels aligned with macOS localizations for every locale", () => {
+    for (const locale of appLocales) {
+      const macMessages = readMacLocalization(locale);
       const t = createTranslator(locale);
-      for (const key of windowsParityLocalizedKeys) {
-        expect(t(key), `${locale}:${key}`).not.toBe(english(key));
+
+      for (const [windowsKey, macKey] of sharedLabelParityKeys) {
+        expect(normalizePlaceholders(t(windowsKey)), `${locale}:${windowsKey}`).toBe(
+          normalizePlaceholders(macMessages.get(macKey) ?? "")
+        );
       }
-    }
-  });
-
-  it("keeps shared English UI labels aligned with macOS localization", () => {
-    const macEnglishMessages = readMacLocalization("en");
-    const t = createTranslator("en");
-
-    for (const [windowsKey, macKey] of sharedEnglishLabelParityKeys) {
-      expect(normalizePlaceholders(t(windowsKey)), windowsKey).toBe(normalizePlaceholders(macEnglishMessages.get(macKey) ?? ""));
     }
   });
 
