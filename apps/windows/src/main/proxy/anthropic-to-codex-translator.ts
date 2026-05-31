@@ -154,7 +154,7 @@ function appendAssistantMessage(message: Record<string, unknown>, input: Record<
 
 function convertContent(content: unknown, role: "user" | "assistant"): Record<string, unknown>[] {
   if (typeof content === "string") {
-    return [{ type: role === "assistant" ? "output_text" : "input_text", text: content }];
+    return content.length > 0 ? [{ type: role === "assistant" ? "output_text" : "input_text", text: content }] : [];
   }
   if (!Array.isArray(content)) {
     return [];
@@ -174,7 +174,7 @@ function convertContent(content: unknown, role: "user" | "assistant"): Record<st
 }
 
 function convertSinglePart(part: Record<string, unknown>, role: "user" | "assistant"): Record<string, unknown> {
-  if (part.type === "text" && typeof part.text === "string") {
+  if (part.type === "text" && typeof part.text === "string" && part.text.length > 0) {
     return { type: role === "assistant" ? "output_text" : "input_text", text: part.text };
   }
   if (part.type !== "image" || !isRecord(part.source)) {

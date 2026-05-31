@@ -578,6 +578,32 @@ describe("local proxy", () => {
     ]));
   });
 
+  it("omits empty Anthropic text content before forwarding", async () => {
+    const upstream = new FakeUpstreamClient([sseResult("Done")]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/messages", {
+      model: "gpt-5-codex",
+      stream: true,
+      messages: [
+        { role: "user", content: "" },
+        { role: "user", content: [{ type: "text", text: "" }, { type: "text", text: "Hi" }] },
+        { role: "assistant", content: "" },
+        { role: "assistant", content: [{ type: "text", text: "" }] }
+      ]
+    });
+    const forwarded = JSON.parse(upstream.requests[0]?.body.toString("utf8") ?? "{}") as { input?: unknown[] };
+
+    expect(response.status).toBe(200);
+    expect(forwarded.input).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "Hi" }]
+      }
+    ]);
+  });
+
   it("retries the next eligible account after a retryable upstream error", async () => {
     const upstream = new FakeUpstreamClient([
       new CodexUpstreamError(429, "HTTP 429", "quota"),
