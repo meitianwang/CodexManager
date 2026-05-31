@@ -396,8 +396,7 @@ export class ProxyCoordinator {
           ...request,
           accessToken: extracted.accessToken,
           accountId: extracted.accountId
-        }),
-        request.isStream
+        })
       );
     } catch (error) {
       if (error instanceof CodexUpstreamError && isAuthenticationFailure(error)) {
@@ -409,8 +408,7 @@ export class ProxyCoordinator {
                 ...request,
                 accessToken: refreshed.extracted.accessToken,
                 accountId: refreshed.extracted.accountId
-              }),
-              request.isStream
+              })
             );
           } catch (refreshedError) {
             this.recordCooldown(refreshed.account, model, refreshedError);
@@ -424,10 +422,7 @@ export class ProxyCoordinator {
     }
   }
 
-  private preflightUpstreamResult(result: CodexUpstreamResult, isStream: boolean): CodexUpstreamResult {
-    if (!isStream) {
-      return result;
-    }
+  private preflightUpstreamResult(result: CodexUpstreamResult): CodexUpstreamResult {
     const error = firstPreflightCodexSSEError(result.body.toString("utf8"));
     if (!error) {
       return result;

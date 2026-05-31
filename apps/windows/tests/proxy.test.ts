@@ -663,6 +663,37 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
   });
 
+  it("retries passthrough routes after a complete-body SSE error before output", async () => {
+    const upstream = new FakeUpstreamClient([
+      sseErrorResult({ code: "model_restricted", message: "model is not available", status: 403 }),
+      successResult({ id: "compact-recovered" }),
+      successResult({ id: "compact-again" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses/compact", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses/compact", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    await expect(first.json()).resolves.toEqual({ id: "compact-recovered" });
+    await expect(second.json()).resolves.toEqual({ id: "compact-again" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+  });
+
   it("refreshes an expired access token and retries the same account before moving on", async () => {
     const upstream = new FakeUpstreamClient([
       new CodexUpstreamError(401, "HTTP 401", "authentication failed"),
