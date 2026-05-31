@@ -59,6 +59,7 @@ describe("command runner", () => {
 describe("Codex CLI service", () => {
   it("launches the desktop app when a Windows Codex executable is installed", async () => {
     const codexApp = String.raw`C:\Users\me\AppData\Local\Programs\Codex\Codex.exe`;
+    const commands: CommandCall[] = [];
     const launched: DetachedLaunchCall[] = [];
     const service = new CodexCLIService({
       environment: {
@@ -67,7 +68,7 @@ describe("Codex CLI service", () => {
       },
       executableExists: existingPathSet([codexApp]),
       launchDetached: recordingLauncher(launched),
-      runCommand: successfulRunner(),
+      runCommand: codexProcessRunner(commands, true),
       sleep: async () => undefined
     });
 
@@ -77,6 +78,39 @@ describe("Codex CLI service", () => {
         launchPath: codexApp,
         argumentsList: [String.raw`C:\workspaces\demo`],
         environmentPath: undefined
+      }
+    ]);
+    expect(commands.some((command) => command.launchPath === "tasklist")).toBe(true);
+  });
+
+  it("falls back to codex app when the desktop process does not appear after launch", async () => {
+    const codexApp = String.raw`C:\Users\me\AppData\Local\Programs\Codex\Codex.exe`;
+    const codexCLI = String.raw`C:\Users\me\AppData\Roaming\npm\codex.cmd`;
+    const commands: CommandCall[] = [];
+    const launched: DetachedLaunchCall[] = [];
+    const service = new CodexCLIService({
+      environment: {
+        APPDATA: String.raw`C:\Users\me\AppData\Roaming`,
+        LOCALAPPDATA: String.raw`C:\Users\me\AppData\Local`,
+        Path: String.raw`C:\Windows\System32`
+      },
+      executableExists: existingPathSet([codexApp, codexCLI]),
+      launchDetached: recordingLauncher(launched),
+      runCommand: codexProcessRunner(commands, false),
+      sleep: async () => undefined
+    });
+
+    await expect(service.launchApp(String.raw`C:\workspaces\demo`)).resolves.toBe(true);
+    expect(launched).toEqual([
+      {
+        launchPath: codexApp,
+        argumentsList: [String.raw`C:\workspaces\demo`],
+        environmentPath: undefined
+      },
+      {
+        launchPath: codexCLI,
+        argumentsList: ["app", String.raw`C:\workspaces\demo`],
+        environmentPath: String.raw`C:\Users\me\AppData\Roaming\npm;C:\Windows\System32`
       }
     ]);
   });
@@ -344,6 +378,16 @@ function existingPathSet(paths: readonly string[]): (path: string) => boolean {
 
 function successfulRunner() {
   return async (): Promise<CommandResult> => ({ status: 0, stdout: "", stderr: "" });
+}
+
+function codexProcessRunner(commands: CommandCall[], processRunning: boolean) {
+  return async (launchPath: string, argumentsList: readonly string[] = []): Promise<CommandResult> => {
+    commands.push({ launchPath, argumentsList: [...argumentsList] });
+    if (launchPath === "tasklist" && processRunning) {
+      return { status: 0, stdout: "Codex.exe                    1234 Console                    1     80,000 K", stderr: "" };
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  };
 }
 
 function recordingRunner(commands: CommandCall[]) {

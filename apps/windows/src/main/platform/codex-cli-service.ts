@@ -18,6 +18,10 @@ import {
   userProfileDirectory
 } from "./windows-environment";
 
+const codexProcessNames = ["Codex.exe", "Codex Desktop.exe"] as const;
+const codexProcessPollIntervalMs = 100;
+const codexProcessLaunchTimeoutMs = 2_000;
+
 type RunCommand = (
   launchPath: string,
   argumentsList?: readonly string[],
@@ -61,7 +65,10 @@ export class CodexCLIService {
     if (appPath) {
       try {
         await this.launchDetached(appPath, workspaceArguments(workspacePath));
-        return false;
+        if (await this.waitForCodexProcess(codexProcessLaunchTimeoutMs)) {
+          return false;
+        }
+        appLaunchError = "Codex desktop process did not start";
       } catch (error) {
         appLaunchError = errorMessage(error);
       }
@@ -115,7 +122,7 @@ export class CodexCLIService {
 
   private async forceStopRunningCodex(): Promise<void> {
     await Promise.all(
-      ["Codex.exe", "Codex Desktop.exe"].map(async (processName) => {
+      codexProcessNames.map(async (processName) => {
         try {
           await this.runCommand("taskkill", ["/IM", processName, "/F", "/T"], { timeoutMs: 1_500 });
         } catch {
@@ -124,6 +131,34 @@ export class CodexCLIService {
       })
     );
     await this.sleep(220);
+  }
+
+  private async waitForCodexProcess(timeoutMs: number): Promise<boolean> {
+    const maxAttempts = Math.max(1, Math.ceil(timeoutMs / codexProcessPollIntervalMs));
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (await this.isCodexProcessRunning()) {
+        return true;
+      }
+      await this.sleep(codexProcessPollIntervalMs);
+    }
+    return false;
+  }
+
+  private async isCodexProcessRunning(): Promise<boolean> {
+    for (const processName of codexProcessNames) {
+      try {
+        const result = await this.runCommand("tasklist", ["/FI", `IMAGENAME eq ${processName}`, "/NH"], {
+          maxOutputBytes: 2_048,
+          timeoutMs: 1_500
+        });
+        if (result.status === 0 && taskListIncludesProcess(result.stdout, processName)) {
+          return true;
+        }
+      } catch {
+        // Absence or tasklist failure should let the launcher fall back to the CLI path.
+      }
+    }
+    return false;
   }
 
   private async launchViaCodexCLI(workspacePath?: string): Promise<void> {
@@ -180,6 +215,13 @@ function defaultExecutableExists(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+function taskListIncludesProcess(stdout: string, processName: string): boolean {
+  const expected = processName.toLowerCase();
+  return stdout
+    .split(/\r?\n/)
+    .some((line) => line.trim().toLowerCase().startsWith(expected));
 }
 
 function errorMessage(error: unknown): string {
