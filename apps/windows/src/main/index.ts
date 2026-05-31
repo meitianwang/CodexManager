@@ -60,7 +60,7 @@ function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow 
     height: 760,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: "#111318",
+    backgroundColor: "#fafafc",
     icon: appIconPath(),
     show: false,
     title: appInfo.displayName,
@@ -191,8 +191,8 @@ function toElectronMenuItem(item: TrayMenuItem): MenuItemConstructorOptions {
 function trayIconImage() {
   const svg = [
     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 32 32\">",
-    "<rect width=\"32\" height=\"32\" rx=\"7\" fill=\"#d6f05f\"/>",
-    "<path d=\"M10 16c0-4 2.7-6.8 6.7-6.8 2 0 3.7.7 5 2l-2.1 2.3c-.8-.8-1.7-1.2-2.9-1.2-2.1 0-3.5 1.5-3.5 3.7s1.4 3.7 3.5 3.7c1.3 0 2.3-.5 3.1-1.4l2.1 2.2c-1.3 1.5-3.1 2.3-5.3 2.3-3.9 0-6.6-2.8-6.6-6.8z\" fill=\"#111318\"/>",
+    "<rect width=\"32\" height=\"32\" rx=\"7\" fill=\"#5933d6\"/>",
+    "<path d=\"M10 16c0-4 2.7-6.8 6.7-6.8 2 0 3.7.7 5 2l-2.1 2.3c-.8-.8-1.7-1.2-2.9-1.2-2.1 0-3.5 1.5-3.5 3.7s1.4 3.7 3.5 3.7c1.3 0 2.3-.5 3.1-1.4l2.1 2.2c-1.3 1.5-3.1 2.3-5.3 2.3-3.9 0-6.6-2.8-6.6-6.8z\" fill=\"#ffffff\"/>",
     "</svg>"
   ].join("");
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
@@ -339,7 +339,7 @@ async function readRendererState(browserWindow: BrowserWindow): Promise<SmokeRen
         activePage: shell?.getAttribute("data-active-page") ?? null,
         bodyLength: document.body?.innerText?.length ?? 0,
         hasBridge: Boolean(window.codexManager),
-        pageTitle: document.querySelector("#page-title")?.textContent?.trim() ?? null
+        pageTitle: document.querySelector(".workspace .page-title")?.textContent?.trim() ?? null
       };
     })()`,
     true
