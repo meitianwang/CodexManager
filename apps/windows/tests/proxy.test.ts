@@ -6,6 +6,7 @@ import { defaultAppSettings } from "../src/shared/models/settings";
 import type { JSONValue } from "../src/shared/models/json-value";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../src/shared/models/auth";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../src/main/services/accounts-coordinator";
+import { decodeTextLines } from "../src/main/proxy/codex-sse";
 import { ProxyCoordinator, type SettingsRepositoryLike } from "../src/main/proxy/proxy-coordinator";
 import { translateCodexSSEToChatCompletion } from "../src/main/proxy/chat-to-codex-translator";
 import {
@@ -1067,6 +1068,21 @@ describe("local proxy", () => {
   });
 });
 
+describe("Codex SSE parsing", () => {
+  it("decodes lines split across chunks", async () => {
+    await expect(collectTextLines(chunkStrings("data: fir", "st\r\n", "data: second\n"))).resolves.toEqual([
+      "data: first",
+      "data: second"
+    ]);
+  });
+
+  it("rejects unterminated lines that exceed the bounded stream limit", async () => {
+    await expect(collectTextLines(chunkStrings("data: ", "x".repeat(32)), 24)).rejects.toThrow(
+      "SSE line exceeded maximum size of 24 bytes"
+    );
+  });
+});
+
 describe("Codex upstream client", () => {
   it("adds the app version header when callers do not provide one", async () => {
     let sentHeaders: Headers | undefined;
@@ -1434,6 +1450,20 @@ async function readUntilText(reader: ReadableStreamDefaultReader<Uint8Array>, ex
     }
   }
   throw new Error(`Streamed text did not include ${expected}: ${text}`);
+}
+
+async function collectTextLines(chunks: AsyncIterable<Uint8Array>, maxLineBytes?: number): Promise<string[]> {
+  const lines: string[] = [];
+  for await (const line of decodeTextLines(chunks, maxLineBytes)) {
+    lines.push(line);
+  }
+  return lines;
+}
+
+async function* chunkStrings(...values: string[]): AsyncGenerator<Uint8Array> {
+  for (const value of values) {
+    yield Buffer.from(value, "utf8");
+  }
 }
 
 function parseDataEvents(text: string): unknown[] {

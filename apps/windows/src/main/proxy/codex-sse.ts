@@ -17,6 +17,7 @@ export type CodexSSEPreflightLineResult =
 
 const maxPreflightBytes = 64 * 1024;
 const maxPreflightLines = 128;
+const maxDecodedLineBytes = 64 * 1024;
 
 export function parseCodexSSEEvents(text: string): ParsedCodexSSEEvent[] {
   const events: ParsedCodexSSEEvent[] = [];
@@ -202,7 +203,10 @@ function parseCodexSSEEventLine(line: string): ParsedCodexSSEEvent | undefined {
   return undefined;
 }
 
-export async function* decodeTextLines(chunks: AsyncIterable<Uint8Array>): AsyncGenerator<string> {
+export async function* decodeTextLines(
+  chunks: AsyncIterable<Uint8Array>,
+  maxLineBytes = maxDecodedLineBytes
+): AsyncGenerator<string> {
   const decoder = new TextDecoder();
   let pending = "";
 
@@ -211,13 +215,24 @@ export async function* decodeTextLines(chunks: AsyncIterable<Uint8Array>): Async
     const lines = pending.split("\n");
     pending = lines.pop() ?? "";
     for (const line of lines) {
-      yield line.endsWith("\r") ? line.slice(0, -1) : line;
+      const normalizedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
+      assertDecodedLineWithinLimit(normalizedLine, maxLineBytes);
+      yield normalizedLine;
     }
+    assertDecodedLineWithinLimit(pending, maxLineBytes);
   }
 
   pending += decoder.decode();
   if (pending) {
-    yield pending.endsWith("\r") ? pending.slice(0, -1) : pending;
+    const normalizedLine = pending.endsWith("\r") ? pending.slice(0, -1) : pending;
+    assertDecodedLineWithinLimit(normalizedLine, maxLineBytes);
+    yield normalizedLine;
+  }
+}
+
+function assertDecodedLineWithinLimit(line: string, maxLineBytes: number): void {
+  if (Buffer.byteLength(line) > maxLineBytes) {
+    throw new Error(`SSE line exceeded maximum size of ${maxLineBytes} bytes`);
   }
 }
 
