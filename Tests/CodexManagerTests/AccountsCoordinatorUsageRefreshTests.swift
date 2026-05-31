@@ -203,14 +203,21 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
         XCTAssertEqual(callCountAfterCachedRefresh, 1)
     }
 
-    func testWarmUpResetWeeklyQuotaAccountsWarmsExpiredExhaustedWeeklyAccountsAndRefreshesUsage() async throws {
+    func testWarmUpResetWeeklyQuotaAccountsWarmsFreshResetWeeklyAccountsAndRefreshesUsage() async throws {
         let now: Int64 = 1_000
-        let targetAuth = makeAuth(
-            accessToken: "target-token",
-            refreshToken: "target-refresh",
-            accountID: "target-workspace",
-            email: "target@example.com",
-            principalID: "target-user"
+        let freshAuth = makeAuth(
+            accessToken: "fresh-token",
+            refreshToken: "fresh-refresh",
+            accountID: "fresh-workspace",
+            email: "fresh@example.com",
+            principalID: "fresh-user"
+        )
+        let expiredAuth = makeAuth(
+            accessToken: "expired-token",
+            refreshToken: "expired-refresh",
+            accountID: "expired-workspace",
+            email: "expired@example.com",
+            principalID: "expired-user"
         )
         let futureResetAuth = makeAuth(
             accessToken: "future-token",
@@ -236,10 +243,17 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
         let storeRepository = InMemoryAccountsStoreRepository(
             store: AccountsStore(accounts: [
                 makeStoredAccount(
-                    id: "target-account",
-                    label: "Target",
-                    accountID: "target-workspace",
-                    authJSON: targetAuth,
+                    id: "fresh-account",
+                    label: "Fresh",
+                    accountID: "fresh-workspace",
+                    authJSON: freshAuth,
+                    usage: freshResetWeeklyUsage(resetAt: now + 604_800)
+                ),
+                makeStoredAccount(
+                    id: "expired-account",
+                    label: "Expired",
+                    accountID: "expired-workspace",
+                    authJSON: expiredAuth,
                     usage: exhaustedWeeklyUsage(resetAt: now - 1)
                 ),
                 makeStoredAccount(
@@ -264,9 +278,10 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
                 )
             ])
         )
-        let authRepository = try makeAuthRepository(currentAuth: targetAuth)
+        let authRepository = try makeAuthRepository(currentAuth: freshAuth)
         let usageService = StaticUsageServiceStub(usageByAccountID: [
-            "target-workspace": refreshedUsage
+            "fresh-workspace": refreshedUsage,
+            "expired-workspace": refreshedUsage
         ])
         let warmupService = RecordingWeeklyQuotaWarmupService()
         let coordinator = makeCoordinator(
@@ -279,43 +294,70 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
 
         let result = try await coordinator.warmUpResetWeeklyQuotaAccounts()
 
-        XCTAssertEqual(result.targetCount, 1)
-        XCTAssertEqual(result.succeededCount, 1)
+        XCTAssertEqual(result.targetCount, 2)
+        XCTAssertEqual(result.succeededCount, 2)
         XCTAssertTrue(result.failures.isEmpty)
         let warmupRequests = await warmupService.requests()
         XCTAssertEqual(
             warmupRequests,
-            [WarmupRequest(accessToken: "target-token", accountID: "target-workspace")]
+            [
+                WarmupRequest(accessToken: "fresh-token", accountID: "fresh-workspace"),
+                WarmupRequest(accessToken: "expired-token", accountID: "expired-workspace")
+            ]
         )
         let requestedAccountIDs = await usageService.requestedAccountIDs()
-        XCTAssertEqual(requestedAccountIDs, ["target-workspace"])
+        XCTAssertEqual(requestedAccountIDs, ["fresh-workspace", "expired-workspace"])
         XCTAssertEqual(
-            result.accounts.first(where: { $0.id == "target-account" })?.usage,
+            result.accounts.first(where: { $0.id == "fresh-account" })?.usage,
+            refreshedUsage
+        )
+        XCTAssertEqual(
+            result.accounts.first(where: { $0.id == "expired-account" })?.usage,
             refreshedUsage
         )
     }
 
-    func testWarmUpResetWeeklyQuotaAccountsSkipsWhenNoExpiredExhaustedWeeklyAccounts() async throws {
+    func testWarmUpResetWeeklyQuotaAccountsSkipsWhenNoWarmupEligibleWeeklyAccounts() async throws {
         let now: Int64 = 1_000
-        let auth = makeAuth(
-            accessToken: "token",
-            refreshToken: "refresh",
-            accountID: "workspace",
-            email: "account@example.com",
-            principalID: "user"
+        let futureExhaustedAuth = makeAuth(
+            accessToken: "future-exhausted-token",
+            refreshToken: "future-exhausted-refresh",
+            accountID: "future-exhausted-workspace",
+            email: "future-exhausted@example.com",
+            principalID: "future-exhausted-user"
+        )
+        let partialAuth = makeAuth(
+            accessToken: "partial-token",
+            refreshToken: "partial-refresh",
+            accountID: "partial-workspace",
+            email: "partial@example.com",
+            principalID: "partial-user"
         )
         let storeRepository = InMemoryAccountsStoreRepository(
             store: AccountsStore(accounts: [
                 makeStoredAccount(
-                    id: "account",
-                    label: "Account",
-                    accountID: "workspace",
-                    authJSON: auth,
+                    id: "future-exhausted-account",
+                    label: "Future Exhausted",
+                    accountID: "future-exhausted-workspace",
+                    authJSON: futureExhaustedAuth,
                     usage: exhaustedWeeklyUsage(resetAt: now + 60)
+                ),
+                makeStoredAccount(
+                    id: "partial-account",
+                    label: "Partial",
+                    accountID: "partial-workspace",
+                    authJSON: partialAuth,
+                    usage: UsageSnapshot(
+                        fetchedAt: now - 100,
+                        planType: "pro",
+                        fiveHour: nil,
+                        oneWeek: UsageWindow(usedPercent: 3, windowSeconds: 604_800, resetAt: now + 604_800),
+                        credits: nil
+                    )
                 )
             ])
         )
-        let authRepository = try makeAuthRepository(currentAuth: auth)
+        let authRepository = try makeAuthRepository(currentAuth: futureExhaustedAuth)
         let usageService = StaticUsageServiceStub(usageByAccountID: [:])
         let warmupService = RecordingWeeklyQuotaWarmupService()
         let coordinator = makeCoordinator(
@@ -353,7 +395,7 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
                     label: "Account",
                     accountID: "workspace",
                     authJSON: auth,
-                    usage: exhaustedWeeklyUsage(resetAt: now - 1)
+                    usage: freshResetWeeklyUsage(resetAt: now + 604_800)
                 )
             ])
         )
@@ -528,6 +570,16 @@ final class AccountsCoordinatorUsageRefreshTests: XCTestCase {
             planType: "pro",
             fiveHour: UsageWindow(usedPercent: 0, windowSeconds: 18_000, resetAt: resetAt + 18_000),
             oneWeek: UsageWindow(usedPercent: 100, windowSeconds: 604_800, resetAt: resetAt),
+            credits: nil
+        )
+    }
+
+    private func freshResetWeeklyUsage(resetAt: Int64) -> UsageSnapshot {
+        UsageSnapshot(
+            fetchedAt: resetAt - 604_800,
+            planType: "pro",
+            fiveHour: UsageWindow(usedPercent: 0, windowSeconds: 18_000, resetAt: resetAt - 604_800 + 18_000),
+            oneWeek: UsageWindow(usedPercent: 0, windowSeconds: 604_800, resetAt: resetAt),
             credits: nil
         )
     }

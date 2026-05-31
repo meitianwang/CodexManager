@@ -526,11 +526,13 @@ extension AccountsCoordinator {
 
     private static func shouldWarmUpResetWeeklyQuota(_ account: StoredAccount, now: Int64) -> Bool {
         guard let window = account.usage?.oneWeek,
-              window.usedPercent >= 100,
               let resetAt = window.resetAt else {
             return false
         }
-        return resetAt <= now
+        let usedPercent = max(0, min(100, window.usedPercent)).rounded()
+        let hasFreshResetQuota = usedPercent <= 0 && resetAt > now
+        let hasExpiredExhaustedQuota = usedPercent >= 100 && resetAt <= now
+        return hasFreshResetQuota || hasExpiredExhaustedQuota
     }
 
     private static func updateWarmupFailure(
