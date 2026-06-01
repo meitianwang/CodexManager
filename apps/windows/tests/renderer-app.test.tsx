@@ -171,6 +171,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(within(toolbar).getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
     expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
+    expect(document.querySelector(".notice.info")?.textContent).toContain("Accounts refreshed");
     expect(within(accountRow("Work")).getByText("88%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("66%")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
@@ -191,7 +192,7 @@ describe("Windows renderer app", () => {
     expect((accountRefreshButton as HTMLElement).textContent).toBe("Refresh");
     fireEvent.click(accountRefreshButton as HTMLElement);
     await waitFor(() => expect(api.accounts.refreshUsage).toHaveBeenCalledWith("a"));
-    expect(await screen.findByText("Usage refreshed")).toBeTruthy();
+    expect(screen.queryByText("Usage refreshed")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledOnce());
@@ -212,6 +213,7 @@ describe("Windows renderer app", () => {
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
     expect(await screen.findByText("Account deleted")).toBeTruthy();
+    expect(document.querySelector(".notice.info")?.textContent).toContain("Account deleted");
   });
 
   it("mirrors macOS account toolbar busy labels and refresh spinner", async () => {

@@ -293,7 +293,7 @@ function App(): ReactElement {
                   }
                   await api.accounts.delete(id);
                   await reloadAccounts();
-                  setNotice({ tone: "success", text: t("accounts.notice.account_deleted") });
+                  setNotice({ tone: "info", text: t("accounts.notice.account_deleted") });
                 },
                 { silentSuccess: true }
               )
@@ -348,7 +348,7 @@ function App(): ReactElement {
                     throw new Error(t("error.ipc_bridge_unavailable"));
                   }
                   setAccounts(await api.accounts.refreshAllUsage());
-                  setNotice({ tone: "success", text: t("accounts.notice.accounts_refreshed") });
+                  setNotice({ tone: "info", text: t("accounts.notice.accounts_refreshed") });
                 },
                 { accountToolbarBusyAction: "refreshAll", silentSuccess: true }
               )
@@ -376,7 +376,6 @@ function App(): ReactElement {
                   }
                   const refreshed = await api.accounts.refreshUsage(id);
                   setAccounts((current) => current.map((account) => (account.id === id ? refreshed : account)));
-                  setNotice({ tone: "success", text: t("accounts.notice.usage_refreshed") });
                 },
                 { silentSuccess: true }
               )
