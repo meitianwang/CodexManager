@@ -6,20 +6,21 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26734818479
-- Commit: `e6b3c9a0d0281da33caa0274cbb3695a4cb46c55`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26735359113
+- Commit: `fdc31db0072e6dba96171860950dd6073d41b518`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:92916c3897f0f143df825347b3f53041ea6fa5ff97ecfab3c27df9d7eba0dbba`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:2a7b357b6e2e9dfa6368304562ab9112415914a239a02c91dc54a7c83127e893`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:e9e1d84b0b1cb57a616aa310185490d5d00fbc300a28c85b7374547be62a9926`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:d49f961ea107d3bcea73c21e5befa8ff034611401a81d222b90d8e96c697442b`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:761a19d31635320c4d095caf9fc9551d2053ca0572ac58a392120a08faabfc1f`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:7f680a3278913cd074af70afc2fc06180ad09dbcde3a18e3760553273cf92414`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
 - The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of the large Squirrel artifact has previously failed from this macOS host with a GitHub TLS archive error, so the smaller automated report and screenshot artifacts are the locally downloaded evidence in this verification pass.
-- Windows renderer tests now compare shared UI labels against the macOS `Localizable.strings` source for Accounts, Proxy, and Settings labels across all 11 locales, and verify the team-name placeholder wording for all 11 locales.
+- Windows renderer tests now compare shared UI labels against the macOS `Localizable.strings` source for Accounts, Proxy, and Settings labels across all 11 locales.
 - Windows renderer tests now mirror the macOS Accounts content-state model for loading, load failure, empty, and content states, with loading/error labels verified against macOS localizations across all 11 locales.
 - Windows renderer tests now mirror the macOS Accounts action descriptor busy labels for export, import package, import current auth, add account/login, weekly quota warmup, and refresh usage spinner states.
 - Windows renderer tests now mirror the macOS Accounts refresh/delete notice behavior: full refresh and account delete use info notices, while single-account usage refresh updates the account card without showing a success toast.
+- Windows renderer tests now mirror the macOS missing usage window fallback in account cards: missing usage displays `Used 100%` and `0%` remaining instead of the removed Windows-only `No data` label.
 - Windows renderer tests now mirror the macOS weekly quota warmup notice behavior: no warmup targets use an info notice, complete warmups use success, and partial failures use error; the three warmup notice strings are also parity-checked against the macOS localization source across all 11 locales.
 - Windows renderer, domain, source smoke, packaged smoke, and verification collector now mirror the macOS Smart Switch already-best behavior: the current best account is reported as already best and no switch side effects run.
 - Windows renderer tests now verify account card action labels stay `Switch`, `Refresh`, and `Delete` under localized UI, matching the macOS Swift account card implementation.
@@ -28,9 +29,9 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer tests now verify the Proxy API key label stays `API Key` for all locales, matching the macOS hard-coded `ProxyFormRow(title: "API Key")`.
 - Windows renderer tests now mirror the macOS Proxy invalid-port behavior before proxy startup: blank, zero, and out-of-range ports show the localized invalid-port error and do not call the start IPC; the invalid-port string is parity-checked against macOS localizations across all 11 locales.
 - Windows renderer tests now mirror the macOS Proxy stop behavior by resetting the selected model to the first default proxy model after stopping the proxy.
-- Windows renderer, source smoke, packaged smoke, and the verification collector now mirror the macOS desktop Accounts view controls: only `Grid view` and `List view` are exposed, and the macOS/iOS-only collapse controls are absent from the Windows desktop UI.
+- Windows renderer, source smoke, packaged smoke, and the verification collector now mirror the macOS desktop Accounts view controls: only `Grid view` and `List view` are exposed, and the previous Windows-only collapse controls are absent from the Windows desktop UI.
 - Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
-- Packaged smoke now records and asserts the Accounts team-name input label `Set team name Smoke account` and placeholder `Set team name`.
+- Windows renderer, source smoke, packaged smoke, and the verification collector no longer expose or require the previous Windows-only editable Accounts team-name input; the packaged account fingerprint contains no `teamAliasLabels` or `teamAliasPlaceholders` fields.
 - Packaged smoke now records and asserts the Accounts card action labels `Switch`, `Refresh`, and `Delete`; the downloaded Windows screenshot confirms these labels render fully at `944x471`.
 - Packaged smoke now records and asserts the Proxy form labels `Port` and `API Key`.
 - Packaged smoke and the Windows verification collector now assert the shared tray action labels include `Open Main Panel`, `Refresh Accounts`, `Smart Switch`, `Start Proxy`, and `Quit`.
