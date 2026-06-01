@@ -672,18 +672,22 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
   }
   return (
     fingerprint.settings !== undefined &&
-    includesAll(fingerprint.settings.sectionHeadings, ["Settings", "General", "Switch Behavior", "Language"]) &&
-    includesAll(fingerprint.settings.toggleLabels, [
+    equalsStringArray(fingerprint.settings.sectionHeadings, ["Settings", "General", "Switch Behavior", "Language"]) &&
+    equalsStringArray(fingerprint.settings.toggleLabels, [
       "Launch at startup",
-      "Auto-start API proxy on launch",
       "Launch Codex after switch",
+      "Auto-start API proxy on launch",
       "Auto smart switch",
       "Restart editors on switch"
     ]) &&
-    includesAll(fingerprint.settings.selectLabels, ["Editor restart target", "Language"]) &&
-    includesAll(fingerprint.settings.footerButtons, ["GitHub Star", "Quit"]) &&
+    equalsStringArray(fingerprint.settings.selectLabels, ["Editor restart target", "Language"]) &&
+    equalsStringArray(fingerprint.settings.footerButtons, ["GitHub Star", "Quit"]) &&
     fingerprint.settings.languageOptionCount === 11
   );
+}
+
+function equalsStringArray(values: readonly string[], expectedValues: readonly string[]): boolean {
+  return values.length === expectedValues.length && expectedValues.every((expected, index) => values[index] === expected);
 }
 
 function includesAll(values: readonly string[], expectedValues: readonly string[]): boolean {

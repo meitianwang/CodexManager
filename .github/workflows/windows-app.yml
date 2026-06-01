@@ -276,7 +276,7 @@ jobs:
                       languageOptionCount = 11
                       sectionHeadings = @("Settings", "General", "Switch Behavior", "Language")
                       selectLabels = @("Editor restart target", "Language")
-                      toggleLabels = @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")
+                      toggleLabels = @("Launch at startup", "Launch Codex after switch", "Auto-start API proxy on launch", "Auto smart switch", "Restart editors on switch")
                     }
                   }
                   page = "settings"
@@ -506,6 +506,26 @@ jobs:
           if ($InvalidSmokeResult) {
             throw "Packaged app smoke test returned an invalid result: $(Get-Content -Raw $ResultPath)"
           }
+          function Test-SequenceEquals {
+            param(
+              [object] $Values,
+              [string[]] $ExpectedValues
+            )
+
+            $Items = @($Values | ForEach-Object { [string] $_ })
+            if ($Items.Count -ne $ExpectedValues.Count) {
+              return $false
+            }
+
+            for ($Index = 0; $Index -lt $ExpectedValues.Count; $Index++) {
+              if ($Items[$Index] -ne $ExpectedValues[$Index]) {
+                return $false
+              }
+            }
+
+            return $true
+          }
+
           foreach ($Page in @("accounts", "proxy", "settings")) {
             $Snapshot = @($Result.uiSnapshots | Where-Object { $_.page -eq $Page })[0]
             $ScreenshotPath = if ($null -eq $Snapshot) { "" } else { [string] $Snapshot.screenshotPath }
@@ -570,17 +590,13 @@ jobs:
             } else {
               $SettingsFingerprint = $Fingerprint.settings
               $RequiredHeadings = @("Settings", "General", "Switch Behavior", "Language")
-              $MissingHeadings = @($RequiredHeadings | Where-Object { @($SettingsFingerprint.sectionHeadings) -notcontains $_ })
-              $RequiredToggles = @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")
-              $MissingToggles = @($RequiredToggles | Where-Object { @($SettingsFingerprint.toggleLabels) -notcontains $_ })
+              $RequiredToggles = @("Launch at startup", "Launch Codex after switch", "Auto-start API proxy on launch", "Auto smart switch", "Restart editors on switch")
               if (
                 $null -eq $SettingsFingerprint -or
-                $MissingHeadings.Count -gt 0 -or
-                $MissingToggles.Count -gt 0 -or
-                @($SettingsFingerprint.selectLabels) -notcontains "Editor restart target" -or
-                @($SettingsFingerprint.selectLabels) -notcontains "Language" -or
-                @($SettingsFingerprint.footerButtons) -notcontains "GitHub Star" -or
-                @($SettingsFingerprint.footerButtons) -notcontains "Quit" -or
+                -not (Test-SequenceEquals $SettingsFingerprint.sectionHeadings $RequiredHeadings) -or
+                -not (Test-SequenceEquals $SettingsFingerprint.toggleLabels $RequiredToggles) -or
+                -not (Test-SequenceEquals $SettingsFingerprint.selectLabels @("Editor restart target", "Language")) -or
+                -not (Test-SequenceEquals $SettingsFingerprint.footerButtons @("GitHub Star", "Quit")) -or
                 $SettingsFingerprint.languageOptionCount -ne 11
               ) {
                 throw "Packaged app smoke test settings fingerprint failed: $(ConvertTo-Json $SettingsFingerprint -Compress -Depth 8)"

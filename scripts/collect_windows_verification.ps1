@@ -161,6 +161,26 @@ function Test-ContainsAll {
   return $true
 }
 
+function Test-SequenceEquals {
+  param(
+    [object] $Values,
+    [string[]] $ExpectedValues
+  )
+
+  $items = @($Values | ForEach-Object { [string] $_ })
+  if ($items.Count -ne $ExpectedValues.Count) {
+    return $false
+  }
+
+  for ($i = 0; $i -lt $ExpectedValues.Count; $i++) {
+    if ($items[$i] -ne $ExpectedValues[$i]) {
+      return $false
+    }
+  }
+
+  return $true
+}
+
 function Test-ContainsAllBooleans {
   param(
     [object] $Values,
@@ -514,10 +534,10 @@ function Add-SmokeResultChecks {
     } else {
       $settings = Get-PropertyValue $fingerprint "settings"
       $pagePassed = $pagePassed -and
-        (Test-ContainsAll (Get-PropertyValue $settings "sectionHeadings") @("Settings", "General", "Switch Behavior", "Language")) -and
-        (Test-ContainsAll (Get-PropertyValue $settings "toggleLabels") @("Launch at startup", "Auto-start API proxy on launch", "Launch Codex after switch", "Auto smart switch", "Restart editors on switch")) -and
-        (Test-ContainsAll (Get-PropertyValue $settings "selectLabels") @("Editor restart target", "Language")) -and
-        (Test-ContainsAll (Get-PropertyValue $settings "footerButtons") @("GitHub Star", "Quit")) -and
+        (Test-SequenceEquals (Get-PropertyValue $settings "sectionHeadings") @("Settings", "General", "Switch Behavior", "Language")) -and
+        (Test-SequenceEquals (Get-PropertyValue $settings "toggleLabels") @("Launch at startup", "Launch Codex after switch", "Auto-start API proxy on launch", "Auto smart switch", "Restart editors on switch")) -and
+        (Test-SequenceEquals (Get-PropertyValue $settings "selectLabels") @("Editor restart target", "Language")) -and
+        (Test-SequenceEquals (Get-PropertyValue $settings "footerButtons") @("GitHub Star", "Quit")) -and
         (Get-NumberValue (Get-PropertyValue $settings "languageOptionCount")) -eq 11
     }
 

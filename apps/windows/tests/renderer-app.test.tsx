@@ -569,6 +569,24 @@ describe("Windows renderer app", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
 
+    expect(Array.from(container.querySelectorAll(".settings-layout h2, .settings-layout h3")).map((heading) => heading.textContent)).toEqual([
+      "Settings",
+      "General",
+      "Switch Behavior",
+      "Language"
+    ]);
+    expect(Array.from(container.querySelectorAll(".toggle-row > span")).map((label) => label.textContent)).toEqual([
+      "Launch at startup",
+      "Launch Codex after switch",
+      "Auto-start API proxy on launch",
+      "Auto smart switch",
+      "Restart editors on switch"
+    ]);
+    expect(Array.from(container.querySelectorAll(".select-row > span")).map((label) => label.textContent)).toEqual([
+      "Editor restart target",
+      "Language"
+    ]);
+    expect(Array.from(container.querySelectorAll(".settings-footer button")).map((button) => button.textContent)).toEqual(["GitHub Star", "Quit"]);
     expect(container.querySelectorAll(".settings-section .toggle-row")).toHaveLength(5);
     expect(container.querySelectorAll(".settings-section .select-row")).toHaveLength(2);
     expect(rendererStyles()).toContain(".toggle-row input:checked");
