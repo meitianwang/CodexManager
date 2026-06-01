@@ -271,6 +271,44 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(toolbar().querySelector(".refresh-icon.spinning")).toBeNull());
   });
 
+  it("mirrors macOS weekly quota warmup notice tones", async () => {
+    const account = makeAccount("a", "Work");
+    const api = installMockAPI({ accounts: [account] });
+    render(<App />);
+
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+
+    api.accounts.warmUpWeeklyQuota = vi.fn(async () => ({
+      accounts: [account],
+      failures: [],
+      succeededCount: 0,
+      targetCount: 0
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Warm up weekly quota" }));
+    expect(await screen.findByText("No accounts need weekly quota warmup")).toBeTruthy();
+    expect(document.querySelector(".notice.info")?.textContent).toContain("No accounts need weekly quota warmup");
+
+    api.accounts.warmUpWeeklyQuota = vi.fn(async () => ({
+      accounts: [account],
+      failures: [],
+      succeededCount: 1,
+      targetCount: 1
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Warm up weekly quota" }));
+    expect(await screen.findByText("Weekly quota warmup complete: 1 succeeded, 0 failed")).toBeTruthy();
+    expect(document.querySelector(".notice.success")?.textContent).toContain("Weekly quota warmup complete");
+
+    api.accounts.warmUpWeeklyQuota = vi.fn(async () => ({
+      accounts: [account],
+      failures: [{ accountId: "a", label: "Work", message: "quota exceeded" }],
+      succeededCount: 1,
+      targetCount: 2
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Warm up weekly quota" }));
+    expect(await screen.findByText("Weekly quota warmup finished with errors: 1 succeeded, 1 failed")).toBeTruthy();
+    expect(document.querySelector(".notice.error")?.textContent).toContain("Weekly quota warmup finished with errors");
+  });
+
   it("does not show a success notice when importing an account file is canceled", async () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
     api.accounts.importFile = vi.fn(async () => undefined);

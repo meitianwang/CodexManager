@@ -362,7 +362,7 @@ function App(): ReactElement {
                   }
                   const result = await api.accounts.warmUpWeeklyQuota();
                   setAccounts(result.accounts);
-                  setNotice({ tone: result.failures.length > 0 ? "info" : "success", text: weeklyWarmupNotice(result, t) });
+                  setNotice({ tone: weeklyWarmupNoticeTone(result), text: weeklyWarmupNotice(result, t) });
                 },
                 { accountToolbarBusyAction: "warmUpWeeklyQuota", silentSuccess: true }
               )
@@ -1504,6 +1504,13 @@ function weeklyWarmupNotice(result: WeeklyQuotaWarmupResult, t: Translator): str
     return t("accounts.notice.weekly_complete", { succeeded: result.succeededCount, failed: result.failures.length });
   }
   return t("accounts.notice.weekly_partial", { succeeded: result.succeededCount, failed: result.failures.length });
+}
+
+function weeklyWarmupNoticeTone(result: WeeklyQuotaWarmupResult): NoticeTone {
+  if (result.targetCount === 0) {
+    return "info";
+  }
+  return result.failures.length === 0 ? "success" : "error";
 }
 
 function smartSwitchNotice(account: AccountSummary, execution: SwitchAccountExecutionResult, t: Translator): Notice {
