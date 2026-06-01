@@ -6,18 +6,19 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26731915366
-- Commit: `b75d12238606c747e6602df046dc34eca9c92cfa`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26732245924
+- Commit: `480cc6e8a692a90f056549c526e1661ceb6f3508`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:ce05bdf478d2bb98026d62fd06658cfe18ea326be9eee3b58f9f0b962aa1523e`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:547e9d4da4b7ae938db0b750f3fe7fbb7782e19925824d96885b9fa18467701e`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:633ec907471f214b8a093feaf3fe411475e914b66ecab0d4178e1727a304669c`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:2e3b7e39b7609a78d2b1769f531245b4663c3f3d8fe717888c1c6f91650806a3`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:cdbf7ab95dac8089bdae9cb480881b7fb8e1f316c15eb760f24bee636f8d08e3`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:140c93eac93a15aef7c82eef3c857767e833f63d00ba2c631451c7fa13b63fc7`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
 - The 298 MB Squirrel artifact is present in GitHub Actions with the digest above. Local download of the large Squirrel artifact has previously failed from this macOS host with a GitHub TLS archive error, so the smaller automated report and screenshot artifacts are the locally downloaded evidence in this verification pass.
 - Windows renderer tests now compare shared UI labels against the macOS `Localizable.strings` source for Accounts, Proxy, and Settings labels across all 11 locales, and verify the team-name placeholder wording for all 11 locales.
 - Windows renderer tests now verify account card action labels stay `Switch`, `Refresh`, and `Delete` under localized UI, matching the macOS Swift account card implementation.
+- Windows renderer tests, source smoke, packaged smoke, and the verification collector now record account-card accessibility labels separately from visible labels, including `Switch to this`, `Refresh usage`, and `Delete`.
 - Windows source parity tests now compare proxy models, proxy endpoint paths, language choices, and editor restart target IDs against the macOS Swift source.
 - Windows renderer tests now verify the Proxy API key label stays `API Key` for all locales, matching the macOS hard-coded `ProxyFormRow(title: "API Key")`.
 - Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
