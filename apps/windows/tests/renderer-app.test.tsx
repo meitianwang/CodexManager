@@ -422,6 +422,27 @@ describe("Windows renderer app", () => {
     expect(await screen.findByRole("heading", { name: "设置" })).toBeTruthy();
   });
 
+  it("keeps account card action labels aligned with macOS under localized UI", async () => {
+    installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    render(<App />);
+
+    expect(macAccountCardPrimitives()).toContain('Label("Switch", systemImage: "arrow.left.arrow.right")');
+    expect(macAccountCardPrimitives()).toContain('Label(L10n.tr("common.refresh"), systemImage: "arrow.clockwise")');
+    expect(macAccountCardPrimitives()).toContain('Label("Delete", systemImage: "trash")');
+
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Language"), { target: { value: "zh-Hans" } });
+    fireEvent.click(await screen.findByRole("button", { name: "账号" }));
+
+    const row = screen.getByText("a@example.com").closest("article");
+    expect(row).toBeTruthy();
+    const accountActions = (row as HTMLElement).querySelector(".account-actions");
+    expect(accountActions?.textContent).toBe("SwitchRefreshDelete");
+    expect(within(row as HTMLElement).getByRole("button", { name: "Switch" })).toBeTruthy();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Refresh" })).toBeTruthy();
+    expect(within(row as HTMLElement).getByRole("button", { name: "Delete" })).toBeTruthy();
+  });
+
   it("opens the repository and quits from the settings footer through mocked IPC", async () => {
     const api = installMockAPI();
     render(<App />);
@@ -631,6 +652,10 @@ function codeBlockCopyButtons(): HTMLButtonElement[] {
 
 function rendererStyles(): string {
   return readFileSync("src/renderer/src/styles/app.css", "utf8");
+}
+
+function macAccountCardPrimitives(): string {
+  return readFileSync("../../Sources/CodexManager/Features/Accounts/AccountCardPrimitives.swift", "utf8");
 }
 
 async function flushRendererUpdates(): Promise<void> {

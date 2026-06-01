@@ -805,15 +805,15 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
           <div className="account-actions">
             <button className="account-action-button" type="button" onClick={onSwitch} disabled={account.isCurrent}>
               <span className="account-action-icon switch-icon" aria-hidden="true" />
-              <span>{t("accounts.action.switch")}</span>
+              <span>Switch</span>
             </button>
             <button className="account-action-button" type="button" onClick={onRefresh}>
               <span className="account-action-icon refresh-icon" aria-hidden="true" />
-              <span>{t("common.refresh")}</span>
+              <span>Refresh</span>
             </button>
             <button className="account-action-button danger" type="button" onClick={onDelete}>
               <span className="account-action-icon trash-icon" aria-hidden="true" />
-              <span>{t("accounts.action.delete")}</span>
+              <span>Delete</span>
             </button>
           </div>
         </>
@@ -827,7 +827,7 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
             onClick={onSwitch}
           >
             <span className="account-action-icon switch-icon" aria-hidden="true" />
-            <span>{t("accounts.action.switch")}</span>
+            <span>Switch</span>
           </button>
         </div>
       )}
