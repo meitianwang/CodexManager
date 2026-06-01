@@ -21,6 +21,7 @@ import "./styles/app.css";
 
 type PageID = "accounts" | "proxy" | "settings";
 type AccountViewMode = "grid" | "list";
+type AccountsContentState = { status: "error"; message: string } | { status: "loading" } | { status: "ready" };
 type NoticeTone = "success" | "error" | "info";
 type AccountTransferDialogState =
   | { mode: "export"; accounts: AccountTransferSelectableItem[] }
@@ -51,6 +52,9 @@ function App(): ReactElement {
   const [activePage, setActivePage] = useState<PageID>("accounts");
   const [appInfo, setAppInfo] = useState<AppInfo>(fallbackAppInfo);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
+  const [accountsContentState, setAccountsContentState] = useState<AccountsContentState>(() =>
+    api ? { status: "loading" } : { status: "ready" }
+  );
   const [transferDialog, setTransferDialog] = useState<AccountTransferDialogState | undefined>();
   const [settings, setSettings] = useState<AppSettings>(() => defaultAppSettings());
   const [installedEditors, setInstalledEditors] = useState<InstalledEditorApp[]>([]);
@@ -89,8 +93,10 @@ function App(): ReactElement {
 
   const loadData = useCallback(async () => {
     if (!api) {
+      setAccountsContentState({ status: "ready" });
       return;
     }
+    setAccountsContentState({ status: "loading" });
     const [nextInfo, nextAccounts, nextSettings, nextEditors, nextProxy] = await Promise.all([
       api.getAppInfo(),
       api.accounts.list(),
@@ -104,11 +110,14 @@ function App(): ReactElement {
     setInstalledEditors(nextEditors);
     setProxyState(nextProxy);
     setSelectedModel((current) => (nextProxy.availableModels.includes(current) ? current : nextProxy.availableModels[0] ?? current));
+    setAccountsContentState({ status: "ready" });
   }, [api]);
 
   useEffect(() => {
     void loadData().catch((error: unknown) => {
-      setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      setAccountsContentState({ status: "error", message });
+      setNotice({ tone: "error", text: message });
     });
   }, [loadData]);
 
@@ -244,6 +253,7 @@ function App(): ReactElement {
           <AccountsPage
             accounts={accounts}
             busyAction={busyAction}
+            contentState={accountsContentState}
             onAddViaLogin={() =>
               runAction(
                 t("accounts.action.sign_in"),
@@ -544,6 +554,7 @@ function App(): ReactElement {
 interface AccountsPageProps {
   accounts: AccountSummary[];
   busyAction?: string;
+  contentState: AccountsContentState;
   onAddViaLogin: () => void;
   onDeleteAccount: (id: string) => void;
   onExportSelected: () => void;
@@ -564,6 +575,8 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
   const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<string>>(new Set());
   const accountIds = useMemo(() => props.accounts.map((account) => account.id), [props.accounts]);
   const areAllAccountsCollapsed = accountIds.length > 0 && accountIds.every((id) => collapsedAccountIds.has(id));
+  const isContentLoading = props.contentState.status === "loading";
+  const isAccountActionDisabled = Boolean(props.busyAction) || isContentLoading || props.accounts.length === 0;
 
   useEffect(() => {
     setCollapsedAccountIds((current) => {
@@ -613,7 +626,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
               title={props.t(areAllAccountsCollapsed ? "accounts.action.expand_all" : "accounts.action.collapse_all")}
               type="button"
               onClick={toggleCollapseAll}
-              disabled={props.accounts.length === 0}
+              disabled={isContentLoading || props.accounts.length === 0}
             >
               <span className={areAllAccountsCollapsed ? "chevron-icon down" : "chevron-icon up"} aria-hidden="true" />
             </button>
@@ -624,7 +637,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             className="toolbar-action-button"
             type="button"
             onClick={props.onExportSelected}
-            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+            disabled={isAccountActionDisabled}
           >
             <ToolbarActionContent iconClassName="export-accounts-icon" label={props.t("accounts.action.export")} />
           </button>
@@ -641,7 +654,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             className="toolbar-action-button"
             type="button"
             onClick={props.onSmartSwitch}
-            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+            disabled={isAccountActionDisabled}
           >
             <ToolbarActionContent iconClassName="smart-switch-action-icon" label={props.t("accounts.action.smart_switch")} />
           </button>
@@ -649,7 +662,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             className="toolbar-action-button"
             type="button"
             onClick={props.onWarmUpWeeklyQuota}
-            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+            disabled={isAccountActionDisabled}
           >
             <ToolbarActionContent iconClassName="warmup-action-icon" label={props.t("accounts.action.warm_weekly_quota")} />
           </button>
@@ -659,14 +672,25 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             title={props.t("accounts.action.refresh_usage")}
             type="button"
             onClick={props.onRefreshAll}
-            disabled={Boolean(props.busyAction) || props.accounts.length === 0}
+            disabled={isAccountActionDisabled}
           >
             <span className="toolbar-action-icon refresh-icon" aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {props.accounts.length === 0 ? (
+      {props.contentState.status === "loading" ? (
+        <div className="empty-state loading-state" role="status">
+          <span className="empty-state-icon loading-icon" aria-hidden="true" />
+          <h3>{props.t("accounts.loading.message")}</h3>
+        </div>
+      ) : props.contentState.status === "error" ? (
+        <div className="empty-state error-state" role="alert">
+          <span className="empty-state-icon error-state-icon" aria-hidden="true" />
+          <h3>{props.t("accounts.error.load_failed")}</h3>
+          <p>{props.contentState.message}</p>
+        </div>
+      ) : props.accounts.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state-icon tray-icon" aria-hidden="true" />
           <h3>{props.t("accounts.empty.title")}</h3>

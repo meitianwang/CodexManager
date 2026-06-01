@@ -727,6 +727,37 @@ button.danger {
   color: #5933d6;
 }
 
+.loading-icon {
+  border: 2px solid rgba(89, 51, 214, 0.22);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.error-state-icon {
+  color: #e82b2e;
+}
+
+.error-state-icon::before,
+.error-state-icon::after {
+  position: absolute;
+  top: 11px;
+  left: 4px;
+  width: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.error-state-icon::before {
+  transform: rotate(45deg);
+}
+
+.error-state-icon::after {
+  transform: rotate(-45deg);
+}
+
 .tray-icon::before,
 .tray-icon::after {
   position: absolute;
@@ -766,6 +797,12 @@ button.danger {
   color: #575963;
   font-size: 13px;
   line-height: 1.35;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .account-list {

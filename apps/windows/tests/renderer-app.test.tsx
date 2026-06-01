@@ -67,6 +67,40 @@ describe("Windows renderer app", () => {
     expect(screen.getByText("Launch at startup")).toBeTruthy();
   });
 
+  it("shows the macOS-compatible accounts loading state while IPC data loads", async () => {
+    const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    const pendingAccounts = deferred<AccountSummary[]>();
+    api.accounts.list = vi.fn(() => pendingAccounts.promise);
+
+    render(<App />);
+
+    expect(screen.getByRole("status").textContent).toContain("Loading accounts...");
+    expect(screen.queryByText("No accounts yet. Add or import an account to get started.")).toBeNull();
+    expect(rendererStyles()).toContain(".loading-icon");
+    expect(rendererStyles()).toContain("@keyframes spin");
+
+    await act(async () => {
+      pendingAccounts.resolve([makeAccount("a", "Work")]);
+      await pendingAccounts.promise;
+    });
+
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+  });
+
+  it("shows the macOS-compatible accounts load error state instead of the empty state", async () => {
+    const api = installMockAPI();
+    api.accounts.list = vi.fn(async () => {
+      throw new Error("accounts.json missing");
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Failed to load accounts")).toBeTruthy();
+    expect(document.querySelector(".empty-state.error-state")?.textContent).toContain("accounts.json missing");
+    expect(screen.queryByText("No accounts yet. Add or import an account to get started.")).toBeNull();
+    expect(document.querySelector(".empty-state.error-state .error-state-icon")).toBeTruthy();
+  });
+
   it("drives account import, export, delete, refresh, and switch actions through mocked IPC", async () => {
     const account = makeAccount("a", "Work");
     const api = installMockAPI({ accounts: [account] });
@@ -654,6 +688,14 @@ function codeBlockCopyButtons(): HTMLButtonElement[] {
 
 function rendererStyles(): string {
   return readFileSync("src/renderer/src/styles/app.css", "utf8");
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 function macAccountCardPrimitives(): string {
