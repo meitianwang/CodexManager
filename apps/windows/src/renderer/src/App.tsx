@@ -393,6 +393,10 @@ function App(): ReactElement {
                     setNotice({ tone: "info", text: t("accounts.notice.no_switch_target") });
                     return;
                   }
+                  if (best.isCurrent) {
+                    setNotice({ tone: "info", text: t("accounts.notice.already_best") });
+                    return;
+                  }
                   const result = await api.accounts.smartSwitch();
                   await reloadAccounts();
                   if (!result) {

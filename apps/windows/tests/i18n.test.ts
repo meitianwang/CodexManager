@@ -56,6 +56,7 @@ const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["accounts.notice.account_deleted", "accounts.notice.account_deleted"],
   ["accounts.notice.team_name_updated", "accounts.notice.team_name_updated"],
   ["accounts.notice.no_switch_target", "accounts.notice.no_switch_target"],
+  ["accounts.notice.already_best", "accounts.notice.already_best"],
   ["accounts.notice.smart_switched_prefix_format", "accounts.notice.smart_switched_prefix_format"],
   ["accounts.notice.switch_done", "accounts.notice.switch_done"],
   ["accounts.notice.switch_done_fallback", "accounts.notice.switch_done_fallback"],

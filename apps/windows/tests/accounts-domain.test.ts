@@ -373,7 +373,7 @@ describe("accounts coordinator", () => {
     expect(authRepository.currentAuth).toEqual(account.authJson);
   });
 
-  it("smart-switches through the current account when it is already best", async () => {
+  it("does not smart-switch when the current account is already best", async () => {
     const current = makeStoredAccount({
       id: "current",
       accountId: "acct-current",
@@ -417,17 +417,11 @@ describe("accounts coordinator", () => {
 
     const result = await coordinator.smartSwitch();
 
-    expect(result?.account.id).toBe("current");
-    expect(result?.execution).toEqual({ restartedEditorApps: ["cursor"], usedFallbackCLI: true });
-    expect(launchedWorkspacePath).toBeUndefined();
-    expect(restartTargets).toEqual(["cursor"]);
+    expect(result).toBeUndefined();
+    expect(launchedWorkspacePath).toBe("not launched");
+    expect(restartTargets).toEqual([]);
     expect(authRepository.currentAuth).toEqual(current.authJson);
-    expect(storeRepository.store.currentSelection).toEqual({
-      accountId: "acct-current",
-      selectedAt: 1_780_000_000_000,
-      sourceDeviceID: "windows-local",
-      accountKey: accountKeyForStoredAccount(current)
-    });
+    expect(storeRepository.store.currentSelection).toBeUndefined();
   });
 
   it("smart-switches to the highest remaining non-current account", async () => {

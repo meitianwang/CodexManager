@@ -155,6 +155,7 @@ interface SmokeTrayWorkflowState {
   quitRequested: boolean;
   refreshAccountCount: number;
   smartSwitchAccountId: string;
+  smartSwitchSkippedAlreadyBest: boolean;
   tooltip: string;
 }
 
@@ -1151,6 +1152,7 @@ async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<Smok
   let refreshAccountCount = 0;
   let quitRequested = false;
   let smartSwitchAccountId = "";
+  let smartSwitchSkippedAlreadyBest = false;
   let smokeTray: TrayService | undefined;
   const actionErrors: string[] = [];
 
@@ -1174,6 +1176,7 @@ async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<Smok
         async smartSwitch() {
           const result = await context.accountsCoordinator.smartSwitch();
           smartSwitchAccountId = result?.account.accountId ?? "";
+          smartSwitchSkippedAlreadyBest = result === undefined;
           smokeTray?.updateState({ accounts: await context.accountsCoordinator.listAccounts() });
           completedActions.push("smartSwitch");
         },
@@ -1234,9 +1237,14 @@ async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<Smok
     if (!includesBooleanSequence(proxyToggleSequence, [true, false])) {
       throw new Error(`Smoke tray proxy toggle sequence failed: ${JSON.stringify(proxyToggleSequence)}`);
     }
-    if (!quitRequested || refreshAccountCount < 1 || smartSwitchAccountId.length === 0) {
+    if (!quitRequested || refreshAccountCount < 1 || !smartSwitchSkippedAlreadyBest || smartSwitchAccountId.length !== 0) {
       throw new Error(
-        `Smoke tray workflow result failed: ${JSON.stringify({ quitRequested, refreshAccountCount, smartSwitchAccountId })}`
+        `Smoke tray workflow result failed: ${JSON.stringify({
+          quitRequested,
+          refreshAccountCount,
+          smartSwitchAccountId,
+          smartSwitchSkippedAlreadyBest
+        })}`
       );
     }
 
@@ -1249,6 +1257,7 @@ async function verifySmokeTrayWorkflow(context: WindowsAppContext): Promise<Smok
       quitRequested,
       refreshAccountCount,
       smartSwitchAccountId,
+      smartSwitchSkippedAlreadyBest,
       tooltip: adapter.tooltip
     };
   } finally {

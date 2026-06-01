@@ -299,6 +299,9 @@ export class AccountsCoordinator {
     if (!best) {
       return undefined;
     }
+    if (best.isCurrent) {
+      return undefined;
+    }
 
     const execution = await this.switchAccountAndApplySettings(best.id);
     return { account: best, execution };

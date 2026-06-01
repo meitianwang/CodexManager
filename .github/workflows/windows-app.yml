@@ -353,7 +353,8 @@ jobs:
                   proxyToggleSequence = @($true, $false)
                   quitRequested = $true
                   refreshAccountCount = 1
-                  smartSwitchAccountId = "acct-ci"
+                  smartSwitchAccountId = ""
+                  smartSwitchSkippedAlreadyBest = $true
                   tooltip = "CodexManager - 5h 0% / 1w 0%"
                 }
               }

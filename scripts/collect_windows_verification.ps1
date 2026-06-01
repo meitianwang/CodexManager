@@ -586,7 +586,8 @@ function Add-SmokeResultChecks {
     (Get-NumberValue (Get-PropertyValue $tray "primaryClickShowWindowCount")) -ge 2 -and
     (Get-BoolValue (Get-PropertyValue $tray "quitRequested")) -and
     (Get-NumberValue (Get-PropertyValue $tray "refreshAccountCount")) -ge 1 -and
-    (-not ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $tray "smartSwitchAccountId")))))
+    (Get-BoolValue (Get-PropertyValue $tray "smartSwitchSkippedAlreadyBest")) -and
+    ([string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $tray "smartSwitchAccountId"))))
   ) $tray
 
   Add-Check "automated.proxySmoke" (

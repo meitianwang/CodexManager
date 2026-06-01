@@ -357,20 +357,16 @@ describe("Windows renderer app", () => {
     expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(false);
   });
 
-  it("smart-switches through the current account when it is already best", async () => {
+  it("does not smart-switch when the current account is already best", async () => {
     const currentAccount = { ...makeAccount("a", "Work"), isCurrent: true, usage: makeUsage(4, 6) };
     const api = installMockAPI({ accounts: [currentAccount] });
-    api.accounts.smartSwitch = vi.fn(async () => ({
-      account: currentAccount,
-      execution: { restartedEditorApps: [], usedFallbackCLI: false }
-    }));
     render(<App />);
 
     expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
 
-    await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("Smart switched to: Work · Switched account")).toBeTruthy();
+    expect(await screen.findByText("Current account is already the best available")).toBeTruthy();
+    expect(api.accounts.smartSwitch).not.toHaveBeenCalled();
   });
 
   it("shows mac-aligned switch and smart-switch result notices", async () => {
