@@ -32,8 +32,6 @@ const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["accounts.action.warming_up_weekly_quota", "accounts.action.warming_up_weekly_quota"],
   ["accounts.action.view_grid", "accounts.action.view_grid"],
   ["accounts.action.view_list", "accounts.action.view_list"],
-  ["accounts.action.collapse_all", "accounts.action.collapse_all"],
-  ["accounts.action.expand_all", "accounts.action.expand_all"],
   ["accounts.transfer.export.title", "accounts.transfer.export.title"],
   ["accounts.transfer.import.title", "accounts.transfer.import.title"],
   ["accounts.transfer.account_count_format", "accounts.transfer.account_count_format"],

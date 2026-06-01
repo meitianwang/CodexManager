@@ -595,9 +595,6 @@ interface AccountsPageProps {
 
 function AccountsPage(props: AccountsPageProps): ReactElement {
   const [viewMode, setViewMode] = useState<AccountViewMode>("grid");
-  const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<string>>(new Set());
-  const accountIds = useMemo(() => props.accounts.map((account) => account.id), [props.accounts]);
-  const areAllAccountsCollapsed = accountIds.length > 0 && accountIds.every((id) => collapsedAccountIds.has(id));
   const isContentLoading = props.contentState.status === "loading";
   const isAccountActionDisabled = Boolean(props.busyAction) || isContentLoading || props.accounts.length === 0;
   const exportActionLabel =
@@ -613,22 +610,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
       ? props.t("accounts.action.warming_up_weekly_quota")
       : props.t("accounts.action.warm_weekly_quota");
   const isRefreshAllBusy = props.accountToolbarBusyAction === "refreshAll";
-
-  useEffect(() => {
-    setCollapsedAccountIds((current) => {
-      const availableIds = new Set(accountIds);
-      return new Set([...current].filter((id) => availableIds.has(id)));
-    });
-  }, [accountIds]);
-
-  const toggleCollapseAll = useCallback(() => {
-    setCollapsedAccountIds((current) => {
-      if (accountIds.length === 0) {
-        return new Set();
-      }
-      return accountIds.every((id) => current.has(id)) ? new Set() : new Set(accountIds);
-    });
-  }, [accountIds]);
 
   return (
     <div className="accounts-layout">
@@ -656,16 +637,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
                 <span className="view-mode-icon list-icon" aria-hidden="true" />
               </button>
             </div>
-            <button
-              aria-label={props.t(areAllAccountsCollapsed ? "accounts.action.expand_all" : "accounts.action.collapse_all")}
-              className="icon-button"
-              title={props.t(areAllAccountsCollapsed ? "accounts.action.expand_all" : "accounts.action.collapse_all")}
-              type="button"
-              onClick={toggleCollapseAll}
-              disabled={isContentLoading || props.accounts.length === 0}
-            >
-              <span className={areAllAccountsCollapsed ? "chevron-icon down" : "chevron-icon up"} aria-hidden="true" />
-            </button>
           </div>
         </div>
         <div className="toolbar">
@@ -763,7 +734,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             <AccountRow
               key={account.id}
               account={account}
-              isCollapsed={collapsedAccountIds.has(account.id)}
               viewMode={viewMode}
               onDelete={() => props.onDeleteAccount(account.id)}
               onRefresh={() => props.onRefreshUsage(account.id)}
@@ -781,7 +751,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
 
 interface AccountRowProps {
   account: AccountSummary;
-  isCollapsed: boolean;
   onDelete: () => void;
   onRefresh: () => void;
   onSwitch: () => void;
@@ -791,158 +760,84 @@ interface AccountRowProps {
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
   const [alias, setAlias] = useState(account.teamAlias ?? "");
-  const [isCollapsedSwitchOverlayVisible, setCollapsedSwitchOverlayVisible] = useState(false);
   useEffect(() => {
     setAlias(account.teamAlias ?? "");
   }, [account.teamAlias]);
 
-  const canShowCollapsedSwitchOverlay = isCollapsed && !account.isCurrent;
-  const accountTitle = isCollapsed ? shortAccountName(account) : fullAccountName(account);
+  const accountTitle = fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
   const switchToThisLabel = t("accounts.card.switch_to_this");
   const refreshUsageLabel = t("common.refresh_usage");
-  useEffect(() => {
-    if (!canShowCollapsedSwitchOverlay) {
-      setCollapsedSwitchOverlayVisible(false);
-    }
-  }, [canShowCollapsedSwitchOverlay]);
-
-  const showCollapsedSwitchOverlay = () => {
-    if (canShowCollapsedSwitchOverlay) {
-      setCollapsedSwitchOverlayVisible(true);
-    }
-  };
-
-  const hideCollapsedSwitchOverlay = () => {
-    setCollapsedSwitchOverlayVisible(false);
-  };
 
   return (
     <article
-      aria-label={canShowCollapsedSwitchOverlay ? accountTitle : undefined}
-      className={accountCardClassName(account.isCurrent, isCollapsed, viewMode, isCollapsedSwitchOverlayVisible)}
-      tabIndex={canShowCollapsedSwitchOverlay ? 0 : undefined}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          hideCollapsedSwitchOverlay();
-        }
-      }}
-      onFocus={showCollapsedSwitchOverlay}
-      onMouseEnter={showCollapsedSwitchOverlay}
-      onMouseLeave={hideCollapsedSwitchOverlay}
+      className={accountCardClassName(account.isCurrent, viewMode)}
     >
       <div className="account-main">
-        {isCollapsed ? (
-          <div className="account-compact-header">
-            <div className="account-tag-line">
-              <span className={`badge plan compact-plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>
-                {account.normalizedPlanLabel}
-              </span>
-              {workspaceTag && (
-                <span className={`badge plan muted compact-plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{workspaceTag}</span>
-              )}
-            </div>
-            <h3>{accountTitle}</h3>
-          </div>
-        ) : (
-          <>
-            <div className="account-card-header">
-              <span className={`badge plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{account.normalizedPlanLabel}</span>
-              <span className="header-spacer" />
-              {account.isCurrent ? (
-                <span className="badge current-badge">{t("accounts.card.current")}</span>
-              ) : (
-                <span className="ellipsis-icon" aria-hidden="true">...</span>
-              )}
-            </div>
-            <div className="account-title-line">
-              <h3>{accountTitle}</h3>
-            </div>
-            {workspaceTag && <p className="workspace-name">{workspaceTag}</p>}
-            <div className="alias-line">
-              <input
-                aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
-                placeholder={t("accounts.card.team_alias")}
-                value={alias}
-                onChange={(event) => setAlias(event.target.value)}
-                onBlur={() => onUpdateAlias(alias)}
-              />
-            </div>
-          </>
-        )}
-      </div>
-      {isCollapsed ? (
-        <div className="compact-usage-row">
-          <UsageCell compact tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
-          <UsageCell compact tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+        <div className="account-card-header">
+          <span className={`badge plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{account.normalizedPlanLabel}</span>
+          <span className="header-spacer" />
+          {account.isCurrent ? (
+            <span className="badge current-badge">{t("accounts.card.current")}</span>
+          ) : (
+            <span className="ellipsis-icon" aria-hidden="true">...</span>
+          )}
         </div>
-      ) : (
-        <>
-          <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
-          <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
-          <ResetCell
-            fiveHourResetAt={account.usage?.fiveHour?.resetAt}
-            locale={locale}
-            oneWeekResetAt={account.usage?.oneWeek?.resetAt}
-            t={t}
+        <div className="account-title-line">
+          <h3>{accountTitle}</h3>
+        </div>
+        {workspaceTag && <p className="workspace-name">{workspaceTag}</p>}
+        <div className="alias-line">
+          <input
+            aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
+            placeholder={t("accounts.card.team_alias")}
+            value={alias}
+            onChange={(event) => setAlias(event.target.value)}
+            onBlur={() => onUpdateAlias(alias)}
           />
-          {account.usageError && <p className="usage-error">{account.usageError}</p>}
-          <div className="account-actions">
-            <button
-              aria-label={switchToThisLabel}
-              className="account-action-button"
-              disabled={account.isCurrent}
-              title={switchToThisLabel}
-              type="button"
-              onClick={onSwitch}
-            >
-              <span className="account-action-icon switch-icon" aria-hidden="true" />
-              <span>Switch</span>
-            </button>
-            <button aria-label={refreshUsageLabel} className="account-action-button" title={refreshUsageLabel} type="button" onClick={onRefresh}>
-              <span className="account-action-icon refresh-icon" aria-hidden="true" />
-              <span>Refresh</span>
-            </button>
-            <button className="account-action-button danger" type="button" onClick={onDelete}>
-              <span className="account-action-icon trash-icon" aria-hidden="true" />
-              <span>Delete</span>
-            </button>
-          </div>
-        </>
-      )}
-      {canShowCollapsedSwitchOverlay && (
-        <div className="collapsed-switch-overlay" aria-hidden={!isCollapsedSwitchOverlayVisible}>
-          <button
-            aria-label={switchToThisLabel}
-            className="account-action-button collapsed-switch-button"
-            tabIndex={isCollapsedSwitchOverlayVisible ? 0 : -1}
-            title={switchToThisLabel}
-            type="button"
-            onClick={onSwitch}
-          >
-            <span className="account-action-icon switch-icon" aria-hidden="true" />
-            <span>Switch</span>
-          </button>
         </div>
-      )}
+      </div>
+      <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+      <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+      <ResetCell
+        fiveHourResetAt={account.usage?.fiveHour?.resetAt}
+        locale={locale}
+        oneWeekResetAt={account.usage?.oneWeek?.resetAt}
+        t={t}
+      />
+      {account.usageError && <p className="usage-error">{account.usageError}</p>}
+      <div className="account-actions">
+        <button
+          aria-label={switchToThisLabel}
+          className="account-action-button"
+          disabled={account.isCurrent}
+          title={switchToThisLabel}
+          type="button"
+          onClick={onSwitch}
+        >
+          <span className="account-action-icon switch-icon" aria-hidden="true" />
+          <span>Switch</span>
+        </button>
+        <button aria-label={refreshUsageLabel} className="account-action-button" title={refreshUsageLabel} type="button" onClick={onRefresh}>
+          <span className="account-action-icon refresh-icon" aria-hidden="true" />
+          <span>Refresh</span>
+        </button>
+        <button className="account-action-button danger" type="button" onClick={onDelete}>
+          <span className="account-action-icon trash-icon" aria-hidden="true" />
+          <span>Delete</span>
+        </button>
+      </div>
     </article>
   );
 }
 
-function accountCardClassName(
-  isCurrent: boolean,
-  isCollapsed: boolean,
-  viewMode: AccountViewMode,
-  isCollapsedSwitchOverlayVisible = false
-): string {
+function accountCardClassName(isCurrent: boolean, viewMode: AccountViewMode): string {
   return [
     "account-row",
     viewMode,
-    isCurrent ? "current" : "",
-    isCollapsed ? "collapsed" : "",
-    isCollapsedSwitchOverlayVisible ? "switch-overlay-visible" : ""
+    isCurrent ? "current" : ""
   ].filter(Boolean).join(" ");
 }
 
@@ -960,15 +855,6 @@ function planBadgeClassName(planLabel: string): string {
     default:
       return "team-plan";
   }
-}
-
-function shortAccountName(account: AccountSummary): string {
-  const displayValue = fullAccountName(account);
-  const atIndex = displayValue.indexOf("@");
-  if (atIndex > 0) {
-    return displayValue.slice(0, atIndex);
-  }
-  return displayValue;
 }
 
 function fullAccountName(account: AccountSummary): string {
@@ -1064,13 +950,11 @@ type QuotaRingStyle = CSSProperties & {
 };
 
 function UsageCell({
-  compact = false,
   title,
   tone,
   usedPercent,
   t
 }: {
-  compact?: boolean;
   title: string;
   tone: "success" | "info";
   usedPercent?: number;
@@ -1082,23 +966,14 @@ function UsageCell({
   const remainingText = hasUsage ? `${Math.round(remaining)}%` : "--";
   const usedText = hasUsage ? t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` }) : t("accounts.usage.no_data");
   return (
-    <div className={`usage-cell quota-ring-card ${tone}${compact ? " compact" : ""}`}>
+    <div className={`usage-cell quota-ring-card ${tone}`}>
       <div className="quota-ring" style={quotaRingStyle(remaining)}>
         <div className="quota-ring-center">
-          {compact ? (
-            <>
-              <strong>{remainingText}</strong>
-              <span>{compactWindowTitle(title)}</span>
-            </>
-          ) : (
-            <>
-              <span>{compactWindowTitle(title)}</span>
-              <strong>{remainingText}</strong>
-            </>
-          )}
+          <span>{compactWindowTitle(title)}</span>
+          <strong>{remainingText}</strong>
         </div>
       </div>
-      {!compact && <small>{usedText}</small>}
+      <small>{usedText}</small>
     </div>
   );
 }

@@ -66,6 +66,7 @@ interface SmokeUIFingerprint {
     teamAliasLabels: string[];
     teamAliasPlaceholders: string[];
     toolbarButtons: string[];
+    viewControlButtons: string[];
   };
   navItemCount: number;
   proxy?: {
@@ -601,7 +602,8 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
           teamAliasPlaceholders: Array.from(document.querySelectorAll(".alias-line input"))
             .map((element) => element.getAttribute("placeholder") ?? "")
             .filter((value) => value.length > 0),
-          toolbarButtons: labels(".toolbar button")
+          toolbarButtons: labels(".toolbar button"),
+          viewControlButtons: labels(".accounts-view-controls button")
         };
       }
 
@@ -658,6 +660,8 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
         "Smart switch",
         "Warm up weekly quota"
       ]) &&
+      fingerprint.accounts.viewControlButtons.length === 2 &&
+      includesAll(fingerprint.accounts.viewControlButtons, ["Grid view", "List view"]) &&
       includesAll(fingerprint.accounts.actionAccessibilityLabels, ["Switch to this", "Refresh usage", "Delete"]) &&
       includesAll(fingerprint.accounts.actionButtons, ["Switch", "Refresh", "Delete"])
     );

@@ -110,7 +110,7 @@ describe("Windows renderer app", () => {
     expect(within(accountRow("Work")).getByText("a@example.com")).toBeTruthy();
     expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("PRO");
     expect(accountRow("Work").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
-    expect(rendererStyles()).toContain(".badge.plan.pro-plan.compact-plan");
+    expect(rendererStyles()).not.toContain("compact-plan");
     expect(rendererStyles()).toContain("background: #e8e0ff;");
     expect(accountRow("Work").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
     expect(accountRow("Work").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
@@ -337,10 +337,10 @@ describe("Windows renderer app", () => {
     expect(screen.queryByRole("dialog", { name: "Choose accounts to import" })).toBeNull();
   });
 
-  it("shows usage refresh errors on expanded account cards only", async () => {
+  it("shows usage refresh errors on account cards", async () => {
     const account = { ...makeAccount("a", "Work"), usageError: "Usage refresh failed" };
     installMockAPI({ accounts: [account] });
-    const { container } = render(<App />);
+    render(<App />);
 
     expect(await screen.findByText("Usage refresh failed")).toBeTruthy();
     expect(accountRow("Work").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
@@ -350,18 +350,18 @@ describe("Windows renderer app", () => {
       throw new Error("usage error ordering elements were not found");
     }
     expect(usageError.compareDocumentPosition(accountActions)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-
-    fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
-    expect(container.querySelector(".account-row.collapsed .usage-error")).toBeNull();
-    expect(screen.queryByText("Usage refresh failed")).toBeNull();
   });
 
-  it("toggles account grid/list presentation and collapse state", async () => {
+  it("toggles account grid/list presentation without macOS-absent collapse controls", async () => {
     const account = makeAccount("a", "Work");
-    const api = installMockAPI({ accounts: [account] });
+    installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
     expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(Array.from(container.querySelectorAll(".accounts-view-controls button")).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Grid view",
+      "List view"
+    ]);
     expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
     expect(container.querySelector(".account-list")?.classList.contains("grid")).toBe(true);
     expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
@@ -373,27 +373,15 @@ describe("Windows renderer app", () => {
     expect(rendererStyles()).toContain("grid-template-columns: 58px 58px minmax(0, 1fr);");
     expect(rendererStyles()).toContain("min-height: 178px;");
     expect(rendererStyles()).not.toContain(".account-row:not(.grid) .account-actions");
+    expect(rendererStyles()).not.toContain(".account-row.collapsed");
+    expect(rendererStyles()).not.toContain("collapsed-switch-overlay");
+    expect(screen.queryByRole("button", { name: "Collapse all cards" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Expand all cards" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
     expect(container.querySelector(".account-row")?.classList.contains("list")).toBe(true);
     expect(container.querySelector(".account-list")?.classList.contains("list")).toBe(true);
     expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe("true");
-
-    fireEvent.click(screen.getByRole("button", { name: "Collapse all cards" }));
-    expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(true);
-    expect(container.querySelector(".account-row.collapsed .compact-usage-row")).toBeTruthy();
-    expect(container.querySelectorAll(".account-row.collapsed .quota-ring")).toHaveLength(2);
-    expect(container.querySelector(".account-row.collapsed .reset-cell")).toBeNull();
-    expect(container.querySelector(".account-row.collapsed .account-actions")).toBeNull();
-    expect(container.querySelector(".account-row.collapsed .collapsed-switch-overlay")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Switch to this" })).toBeNull();
-    fireEvent.mouseEnter(container.querySelector(".account-row.collapsed") as HTMLElement);
-    expect(container.querySelector(".account-row.collapsed")?.classList.contains("switch-overlay-visible")).toBe(true);
-    fireEvent.click(within(container.querySelector(".account-row.collapsed") as HTMLElement).getByRole("button", { name: "Switch to this" }));
-    await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
-    expect(screen.getByRole("button", { name: "Expand all cards" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Expand all cards" }));
     expect(container.querySelector(".account-row")?.classList.contains("collapsed")).toBe(false);
   });
 

@@ -677,22 +677,6 @@ select:focus {
     linear-gradient(currentColor 0 0) 0 13px / 15px 2px no-repeat;
 }
 
-.chevron-icon {
-  display: block;
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-}
-
-.chevron-icon.up {
-  transform: translateY(2px) rotate(225deg);
-}
-
-.chevron-icon.down {
-  transform: translateY(-2px) rotate(45deg);
-}
-
 .primary-action,
 button.primary-action {
   border-color: #5933d6;
@@ -851,51 +835,9 @@ button.danger {
   grid-column: 1 / -1;
 }
 
-.account-row.collapsed {
-  min-height: 120px;
-  grid-template-columns: minmax(0, 1fr);
-  row-gap: 10px;
-  padding: 12px;
-}
-
-.account-row.grid.collapsed {
-  gap: 10px;
-}
-
-.account-row.grid.collapsed .account-main,
-.account-row.grid.collapsed .compact-usage-row {
-  grid-column: 1;
-}
-
 .account-row.current {
   border-color: rgba(89, 51, 214, 0.18);
   background: rgba(255, 255, 255, 0.97);
-}
-
-.collapsed-switch-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  padding: 12px;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.96);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 130ms ease;
-}
-
-.account-row.switch-overlay-visible .collapsed-switch-overlay {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.collapsed-switch-button {
-  min-width: 118px;
-  border-color: rgba(89, 51, 214, 0.38);
-  background: rgba(255, 255, 255, 0.96);
-  color: #4521ba;
 }
 
 .account-card-header {
@@ -929,8 +871,7 @@ button.danger {
   min-width: 0;
 }
 
-.account-title-line h3,
-.account-compact-header h3 {
+.account-title-line h3 {
   overflow: hidden;
   margin: 0;
   color: #121217;
@@ -944,22 +885,6 @@ button.danger {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: normal;
-}
-
-.account-compact-header h3 {
-  white-space: nowrap;
-}
-
-.account-compact-header {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.account-tag-line {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
 }
 
 .workspace-name {
@@ -1015,33 +940,6 @@ button.danger {
   color: #de6121;
 }
 
-.badge.plan.pro-plan.compact-plan,
-.badge.plan.team-plan.compact-plan {
-  background: rgba(222, 97, 33, 0.11);
-  color: #de6121;
-}
-
-.badge.plan.plus-plan.compact-plan {
-  background: rgba(46, 107, 214, 0.11);
-  color: #2661d6;
-}
-
-.badge.plan.enterprise-plan.compact-plan {
-  background: rgba(89, 51, 214, 0.11);
-  color: #5933d6;
-}
-
-.badge.plan.free-plan.compact-plan {
-  background: rgba(97, 102, 115, 0.11);
-  color: #616673;
-}
-
-.badge.plan.muted {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .usage-cell span,
 .proxy-control label span,
 .api-key-field > label,
@@ -1063,13 +961,6 @@ button.danger {
   min-width: 58px;
 }
 
-.compact-usage-row {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  min-width: 108px;
-}
-
 .quota-ring {
   position: relative;
   display: grid;
@@ -1088,11 +979,6 @@ button.danger {
 
 .quota-ring-card.info {
   --quota-tint: #2e6bd6;
-}
-
-.quota-ring-card.compact {
-  --quota-ring-size: 48px;
-  gap: 0;
 }
 
 .quota-ring::after {
@@ -1125,16 +1011,6 @@ button.danger {
   font-size: 10px;
   font-weight: 700;
   line-height: 1.1;
-}
-
-.quota-ring-card.compact .quota-ring-center span {
-  color: #575963;
-  font-size: 7px;
-  font-weight: 700;
-}
-
-.quota-ring-card.compact .quota-ring-center strong {
-  font-size: 10px;
 }
 
 .reset-cell {
