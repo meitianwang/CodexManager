@@ -1095,6 +1095,10 @@ button.danger {
   color: currentColor;
 }
 
+.account-action-icon.loading-icon {
+  box-sizing: border-box;
+}
+
 .switch-icon::before,
 .switch-icon::after,
 .refresh-icon::before,

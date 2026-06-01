@@ -26,7 +26,6 @@ export interface CodexManagerAPI {
     refreshUsage: (id: string) => Promise<AccountSummary>;
     smartSwitch: () => Promise<SmartSwitchResult | undefined>;
     switch: (id: string, workspacePath?: string) => Promise<SwitchAccountExecutionResult>;
-    updateTeamAlias: (id: string, alias?: string) => Promise<AccountSummary>;
     warmUpWeeklyQuota: () => Promise<WeeklyQuotaWarmupResult>;
   };
   clipboard: {
@@ -72,7 +71,6 @@ const api: CodexManagerAPI = {
     refreshUsage: (id) => invoke<AccountSummary>(ipcChannels.accountsRefreshUsage, { id }),
     smartSwitch: () => invoke<SmartSwitchResult | undefined>(ipcChannels.accountsSmartSwitch),
     switch: (id, workspacePath) => invoke<SwitchAccountExecutionResult>(ipcChannels.accountsSwitch, { id, workspacePath }),
-    updateTeamAlias: (id, alias) => invoke<AccountSummary>(ipcChannels.accountsUpdateTeamAlias, { id, alias }),
     warmUpWeeklyQuota: () => invoke<WeeklyQuotaWarmupResult>(ipcChannels.accountsWarmUpWeeklyQuota)
   },
   clipboard: {

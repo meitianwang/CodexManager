@@ -17,7 +17,6 @@ export const ipcChannels = {
   accountsRefreshUsage: "accounts:refreshUsage",
   accountsSmartSwitch: "accounts:smartSwitch",
   accountsSwitch: "accounts:switch",
-  accountsUpdateTeamAlias: "accounts:updateTeamAlias",
   accountsWarmUpWeeklyQuota: "accounts:warmUpWeeklyQuota",
   clipboardWriteText: "clipboard:writeText",
   proxyGetState: "proxy:getState",
@@ -40,11 +39,6 @@ export const accountIdSchema = z.object({
 export const switchAccountSchema = z.object({
   id: accountId,
   workspacePath: z.string().optional()
-});
-
-export const updateTeamAliasSchema = z.object({
-  id: accountId,
-  alias: z.string().optional()
 });
 
 export const exportAccountsPackageSchema = z.object({

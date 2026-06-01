@@ -65,6 +65,7 @@ function App(): ReactElement {
   const [notice, setNotice] = useState<Notice | undefined>();
   const [busyAction, setBusyAction] = useState<string | undefined>();
   const [accountToolbarBusyAction, setAccountToolbarBusyAction] = useState<AccountToolbarBusyAction | undefined>();
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | undefined>();
   const t = useMemo(() => createTranslator(settings.locale), [settings.locale]);
   const pages = useMemo(
     () => [
@@ -79,11 +80,14 @@ function App(): ReactElement {
     async (
       label: string,
       action: () => Promise<void>,
-      options: { accountToolbarBusyAction?: AccountToolbarBusyAction; silentSuccess?: boolean; success?: string } = {}
+      options: { accountToolbarBusyAction?: AccountToolbarBusyAction; silentSuccess?: boolean; success?: string; switchingAccountId?: string } = {}
     ) => {
       setBusyAction(label);
       if (options.accountToolbarBusyAction) {
         setAccountToolbarBusyAction(options.accountToolbarBusyAction);
+      }
+      if (options.switchingAccountId) {
+        setSwitchingAccountId(options.switchingAccountId);
       }
       setNotice(undefined);
       try {
@@ -95,6 +99,9 @@ function App(): ReactElement {
         setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
       } finally {
         setBusyAction(undefined);
+        if (options.switchingAccountId) {
+          setSwitchingAccountId((current) => (current === options.switchingAccountId ? undefined : current));
+        }
         if (options.accountToolbarBusyAction) {
           setAccountToolbarBusyAction((current) => (current === options.accountToolbarBusyAction ? undefined : current));
         }
@@ -266,6 +273,7 @@ function App(): ReactElement {
             accounts={accounts}
             accountToolbarBusyAction={accountToolbarBusyAction}
             busyAction={busyAction}
+            switchingAccountId={switchingAccountId}
             contentState={accountsContentState}
             onAddViaLogin={() =>
               runAction(
@@ -418,7 +426,7 @@ function App(): ReactElement {
                   await reloadAccounts();
                   setNotice(switchNotice(execution, t));
                 },
-                { silentSuccess: true }
+                { silentSuccess: true, switchingAccountId: id }
               )
             }
             locale={settings.locale}
@@ -563,6 +571,7 @@ interface AccountsPageProps {
   accounts: AccountSummary[];
   accountToolbarBusyAction?: AccountToolbarBusyAction;
   busyAction?: string;
+  switchingAccountId?: string;
   contentState: AccountsContentState;
   onAddViaLogin: () => void;
   onDeleteAccount: (id: string) => void;
@@ -719,6 +728,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             <AccountRow
               key={account.id}
               account={account}
+              isSwitching={props.switchingAccountId === account.id}
               viewMode={viewMode}
               onDelete={() => props.onDeleteAccount(account.id)}
               onRefresh={() => props.onRefreshUsage(account.id)}
@@ -735,6 +745,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
 
 interface AccountRowProps {
   account: AccountSummary;
+  isSwitching: boolean;
   onDelete: () => void;
   onRefresh: () => void;
   onSwitch: () => void;
@@ -743,7 +754,7 @@ interface AccountRowProps {
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitch, t, viewMode }: AccountRowProps): ReactElement {
   const accountTitle = fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
   const switchToThisLabel = t("accounts.card.switch_to_this");
@@ -781,13 +792,19 @@ function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, t, viewMod
         <button
           aria-label={switchToThisLabel}
           className="account-action-button"
-          disabled={account.isCurrent}
+          disabled={account.isCurrent || isSwitching}
           title={switchToThisLabel}
           type="button"
           onClick={onSwitch}
         >
-          <span className="account-action-icon switch-icon" aria-hidden="true" />
-          <span>Switch</span>
+          {isSwitching ? (
+            <span className="account-action-icon loading-icon" aria-hidden="true" />
+          ) : (
+            <>
+              <span className="account-action-icon switch-icon" aria-hidden="true" />
+              <span>Switch</span>
+            </>
+          )}
         </button>
         <button aria-label={refreshUsageLabel} className="account-action-button" title={refreshUsageLabel} type="button" onClick={onRefresh}>
           <span className="account-action-icon refresh-icon" aria-hidden="true" />

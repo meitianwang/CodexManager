@@ -157,20 +157,6 @@ export class AccountsCoordinator {
     await this.storeRepository.saveStore(store);
   }
 
-  async updateTeamAlias(id: string, alias: string | undefined): Promise<AccountSummary> {
-    const store = await this.storeRepository.loadStore();
-    const index = store.accounts.findIndex((account) => account.id === id);
-    const account = store.accounts[index];
-    if (index < 0 || !account) {
-      throw new Error("Account was not found for update");
-    }
-
-    account.teamAlias = normalizeTeamName(alias);
-    account.updatedAt = this.dateProvider.unixSecondsNow();
-    await this.storeRepository.saveStore(store);
-    return toAccountSummary(account, await this.currentAuthAccountKey());
-  }
-
   async switchAccount(id: string): Promise<void> {
     const account = await this.prepareStoredAccountForSwitch(id);
     await this.updateCurrentAccountProjection(account.authJson);

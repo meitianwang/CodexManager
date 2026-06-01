@@ -24,8 +24,7 @@ import {
   parseIpcInput,
   proxyStartSchema,
   settingsPatchSchema,
-  switchAccountSchema,
-  updateTeamAliasSchema
+  switchAccountSchema
 } from "../../shared/ipc/schema";
 import { parseAccountsTransferPackage } from "../repositories/store-parsers";
 import { validateAccountsTransferPackage } from "../services/accounts-coordinator";
@@ -93,13 +92,6 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: WindowsAppContext
     const { id } = parseIpcInput(accountIdSchema, input);
     await context.accountsCoordinator.deleteAccount(id);
     await publishLatestAccounts(context, options);
-  });
-
-  ipcMain.handle(ipcChannels.accountsUpdateTeamAlias, async (_event, input: unknown) => {
-    const { id, alias } = parseIpcInput(updateTeamAliasSchema, input);
-    const account = await context.accountsCoordinator.updateTeamAlias(id, alias);
-    await publishLatestAccounts(context, options);
-    return account;
   });
 
   ipcMain.handle(ipcChannels.accountsExportPackage, async (_event, input: unknown) => {

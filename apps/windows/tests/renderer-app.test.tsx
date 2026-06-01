@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { appInfo as fallbackAppInfo } from "../src/shared/app-info";
 import type { AccountsImportFileResult, AccountTransferSelectableItem } from "../src/shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "../src/shared/models/accounts";
-import type { InstalledEditorApp, SmartSwitchResult } from "../src/shared/models/app";
+import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../src/shared/models/app";
 import { proxyAvailableModels, type ProxyRuntimeState } from "../src/shared/models/proxy";
 import { defaultAppSettings, resolveAppLocale, type AppSettings } from "../src/shared/models/settings";
 import type { CodexManagerAPI } from "../src/preload";
@@ -227,6 +227,31 @@ describe("Windows renderer app", () => {
     expect(macAccountCardPresentation()).toContain("window: account.usage?.fiveHour");
     expect(macAccountCardPresentation()).toContain("let usedRaw = clamped(window?.usedPercent, fallback: 100)");
     expect(macAccountCardPrimitives()).toContain("Text(\"\\(Int(presentation.remainingPercent.rounded()))%\")");
+  });
+
+  it("mirrors macOS direct account switch progress on the account card", async () => {
+    const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
+    const pendingSwitch = deferred<SwitchAccountExecutionResult>();
+    api.accounts.switch = vi.fn(() => pendingSwitch.promise);
+
+    render(<App />);
+
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    const switchButton = within(accountRow("a@example.com")).getByRole("button", { name: "Switch to this" }) as HTMLButtonElement;
+    fireEvent.click(switchButton);
+
+    await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
+    await waitFor(() => expect(switchButton.disabled).toBe(true));
+    expect(switchButton.textContent).toBe("");
+    expect(switchButton.querySelector(".loading-icon")).toBeTruthy();
+    expect(macAccountCardPrimitives()).toContain("if switching {");
+    expect(macAccountCardPrimitives()).toContain("ProgressView()");
+    expect(macAccountCardPrimitives()).toContain(".disabled(switching || !isEnabled)");
+
+    await resolveDeferred(pendingSwitch, { restartedEditorApps: [], usedFallbackCLI: false });
+
+    await waitFor(() => expect(switchButton.disabled).toBe(false));
+    expect(switchButton.textContent).toBe("Switch");
   });
 
   it("mirrors macOS account toolbar busy labels and refresh spinner", async () => {
@@ -697,11 +722,6 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
       }),
       smartSwitch: vi.fn(async () => undefined as SmartSwitchResult | undefined),
       switch: vi.fn(async () => ({ restartedEditorApps: [], usedFallbackCLI: false })),
-      updateTeamAlias: vi.fn(async (id, alias) => {
-        const updated = { ...(accounts.find((account) => account.id === id) ?? makeAccount(id, id)), teamAlias: alias };
-        accounts = accounts.map((account) => (account.id === id ? updated : account));
-        return updated;
-      }),
       warmUpWeeklyQuota: vi.fn(async () => ({
         accounts,
         failures: [],
