@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26735359113
-- Commit: `fdc31db0072e6dba96171860950dd6073d41b518`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26735720267
+- Commit: `04bbdbabf719534d82bc60d700ff6b4ff88ec170`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:d49f961ea107d3bcea73c21e5befa8ff034611401a81d222b90d8e96c697442b`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:761a19d31635320c4d095caf9fc9551d2053ca0572ac58a392120a08faabfc1f`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:7f680a3278913cd074af70afc2fc06180ad09dbcde3a18e3760553273cf92414`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:8a82ad252a5be72588e47b9349641d2c4b844e01ead1191d4264e4034e4ea672`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:caa491bdde3698d9ff9c5ddd8cb9082e92bdae381be018abfe390f95f182b9ec`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:3c6b27bb63d171246d9fc751a7c54eb18ed7278c66489207c1cae587e882b89e`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
@@ -21,6 +21,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer tests now mirror the macOS Accounts action descriptor busy labels for export, import package, import current auth, add account/login, weekly quota warmup, and refresh usage spinner states.
 - Windows renderer tests now mirror the macOS Accounts refresh/delete notice behavior: full refresh and account delete use info notices, while single-account usage refresh updates the account card without showing a success toast.
 - Windows renderer tests now mirror the macOS missing usage window fallback in account cards: missing usage displays `Used 100%` and `0%` remaining instead of the removed Windows-only `No data` label.
+- Windows renderer tests now mirror the macOS direct account switch progress state: the selected account's Switch action is disabled and shows the same progress indicator pattern while the switch is pending.
 - Windows renderer tests now mirror the macOS weekly quota warmup notice behavior: no warmup targets use an info notice, complete warmups use success, and partial failures use error; the three warmup notice strings are also parity-checked against the macOS localization source across all 11 locales.
 - Windows renderer, domain, source smoke, packaged smoke, and verification collector now mirror the macOS Smart Switch already-best behavior: the current best account is reported as already best and no switch side effects run.
 - Windows renderer tests now verify account card action labels stay `Switch`, `Refresh`, and `Delete` under localized UI, matching the macOS Swift account card implementation.
@@ -32,6 +33,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer, source smoke, packaged smoke, and the verification collector now mirror the macOS desktop Accounts view controls: only `Grid view` and `List view` are exposed, and the previous Windows-only collapse controls are absent from the Windows desktop UI.
 - Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
 - Windows renderer, source smoke, packaged smoke, and the verification collector no longer expose or require the previous Windows-only editable Accounts team-name input; the packaged account fingerprint contains no `teamAliasLabels` or `teamAliasPlaceholders` fields.
+- Windows preload, IPC handlers, and account coordinator no longer expose the dead `accounts:updateTeamAlias` path after that Windows-only editable team-name control was removed; stored `teamAlias` data is still preserved for imported account display.
 - Packaged smoke now records and asserts the Accounts card action labels `Switch`, `Refresh`, and `Delete`; the downloaded Windows screenshot confirms these labels render fully at `944x471`.
 - Packaged smoke now records and asserts the Proxy form labels `Port` and `API Key`.
 - Packaged smoke and the Windows verification collector now assert the shared tray action labels include `Open Main Panel`, `Refresh Accounts`, `Smart Switch`, `Start Proxy`, and `Quit`.
