@@ -470,10 +470,14 @@ function App(): ReactElement {
                 { silentSuccess: true }
               )
             }
-            onStart={(port, apiKey) =>
+            onStart={(portText, apiKey) =>
               runAction(
                 t("common.start"),
                 async () => {
+                  const port = parseProxyPort(portText);
+                  if (port === undefined) {
+                    throw new Error(t("error.proxy_runtime.invalid_port_format", { value: portText }));
+                  }
                   if (!api) {
                     setProxyState((current) => ({ ...current, apiKey, isRunning: true, port, proxyURL: `http://localhost:${port}` }));
                     return;
@@ -1141,7 +1145,7 @@ interface ProxyPageProps {
   busyAction?: string;
   onCopy: (text: string, success?: string) => void;
   onRegenerateApiKey: () => void;
-  onStart: (port: number, apiKey: string) => void;
+  onStart: (port: string, apiKey: string) => void;
   onStop: () => void;
   proxyState: ProxyRuntimeState;
   selectedEndpoint: ProxyEndpointID;
@@ -1220,7 +1224,7 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
                 className="primary-action"
                 type="button"
                 disabled={isBusy}
-                onClick={() => props.onStart(Number(port), apiKey)}
+                onClick={() => props.onStart(port, apiKey)}
               >
                 {props.t("common.start")}
               </button>
@@ -1476,6 +1480,18 @@ function proxyConfigText(baseURL: string, endpoint: ProxyEndpointID, apiKey: str
     return `ANTHROPIC_BASE_URL=${baseURL}\nANTHROPIC_API_KEY=${apiKey}`;
   }
   return `OPENAI_BASE_URL=${baseURL}/v1\nOPENAI_API_KEY=${apiKey}`;
+}
+
+function parseProxyPort(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+  const port = Number(trimmed);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    return undefined;
+  }
+  return port;
 }
 
 function proxyEndpointDescription(endpoint: ProxyEndpointID, t: Translator): string {

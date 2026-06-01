@@ -482,6 +482,24 @@ describe("Windows renderer app", () => {
     expect(proxyUsageText()).toContain("sk-local-...");
     expect(proxyUsageText()).not.toContain("sk-local-test");
 
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    await waitFor(() => expect(document.querySelector(".notice.error")?.textContent).toContain("Invalid proxy port:"));
+    expect(api.proxy.start).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(await screen.findByText("Invalid proxy port: 0")).toBeTruthy();
+    expect(document.querySelector(".notice.error")?.textContent).toContain("Invalid proxy port: 0");
+    expect(api.proxy.start).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "65536" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(await screen.findByText("Invalid proxy port: 65536")).toBeTruthy();
+    expect(document.querySelector(".notice.error")?.textContent).toContain("Invalid proxy port: 65536");
+    expect(api.proxy.start).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Port"), { target: { value: "17888" } });
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => expect(api.proxy.start).toHaveBeenCalledWith(17888, "sk-local-test"));
     expect(await screen.findByText("Running")).toBeTruthy();

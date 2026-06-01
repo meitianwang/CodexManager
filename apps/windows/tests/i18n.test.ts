@@ -18,6 +18,7 @@ const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["common.cancel", "common.cancel"],
   ["common.select_all", "common.select_all"],
   ["common.deselect_all", "common.deselect_all"],
+  ["error.proxy_runtime.invalid_port_format", "error.proxy_runtime.invalid_port_format"],
   ["accounts.loading.message", "accounts.loading.message"],
   ["accounts.action.sign_in", "accounts.action.add_account"],
   ["accounts.action.import_current", "accounts.action.import_current_auth"],
