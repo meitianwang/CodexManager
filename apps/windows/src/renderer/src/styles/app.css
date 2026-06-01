@@ -1269,6 +1269,10 @@ button.danger {
   transform: rotate(20deg);
 }
 
+.refresh-icon.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
 .trash-icon::before {
   left: 4px;
   top: 1px;

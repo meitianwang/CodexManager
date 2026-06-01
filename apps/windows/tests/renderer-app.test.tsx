@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appInfo as fallbackAppInfo } from "../src/shared/app-info";
-import type { AccountTransferSelectableItem } from "../src/shared/models/account-transfer";
-import type { AccountSummary } from "../src/shared/models/accounts";
+import type { AccountsImportFileResult, AccountTransferSelectableItem } from "../src/shared/models/account-transfer";
+import type { AccountSummary, WeeklyQuotaWarmupResult } from "../src/shared/models/accounts";
 import type { InstalledEditorApp, SmartSwitchResult } from "../src/shared/models/app";
 import { proxyAvailableModels, type ProxyRuntimeState } from "../src/shared/models/proxy";
 import { defaultAppSettings, resolveAppLocale, type AppSettings } from "../src/shared/models/settings";
@@ -212,6 +212,61 @@ describe("Windows renderer app", () => {
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
     expect(await screen.findByText("Account deleted")).toBeTruthy();
+  });
+
+  it("mirrors macOS account toolbar busy labels and refresh spinner", async () => {
+    const account = makeAccount("a", "Work");
+    const api = installMockAPI({ accounts: [account] });
+    const { container } = render(<App />);
+    const toolbar = (): HTMLElement => container.querySelector(".toolbar") as HTMLElement;
+
+    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+
+    const pendingExport = deferred<{ canceled: boolean; path?: string }>();
+    api.accounts.exportPackage = vi.fn(() => pendingExport.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Export accounts" }));
+    const exportDialog = await screen.findByRole("dialog", { name: "Choose accounts to export" });
+    fireEvent.click(within(exportDialog).getByRole("button", { name: "Export" }));
+    expect(await screen.findByRole("button", { name: "Exporting..." })).toBeTruthy();
+    await resolveDeferred(pendingExport, { canceled: false, path: String.raw`C:\exports\accounts.codexmanager.json` });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export accounts" })).toBeTruthy());
+
+    const pendingImportFile = deferred<AccountsImportFileResult | undefined>();
+    api.accounts.importFile = vi.fn(() => pendingImportFile.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+    expect(await screen.findByRole("button", { name: "Importing..." })).toBeTruthy();
+    await resolveDeferred(pendingImportFile, undefined);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import file" })).toBeTruthy());
+
+    const pendingImportCurrent = deferred<AccountSummary>();
+    api.accounts.importCurrentAuth = vi.fn(() => pendingImportCurrent.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
+    expect(await screen.findByRole("button", { name: "Importing..." })).toBeTruthy();
+    await resolveDeferred(pendingImportCurrent, makeAccount("current", "Current auth"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import current auth" })).toBeTruthy());
+
+    const pendingAdd = deferred<AccountSummary>();
+    api.accounts.addViaLogin = vi.fn(() => pendingAdd.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const waitingForLoginButton = await screen.findByRole("button", { name: "Waiting for login..." });
+    expect((waitingForLoginButton as HTMLButtonElement).disabled).toBe(true);
+    await resolveDeferred(pendingAdd, makeAccount("login", "OAuth"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add account" })).toBeTruthy());
+
+    const pendingWarmup = deferred<WeeklyQuotaWarmupResult>();
+    api.accounts.warmUpWeeklyQuota = vi.fn(() => pendingWarmup.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Warm up weekly quota" }));
+    expect(await screen.findByRole("button", { name: "Warming up..." })).toBeTruthy();
+    await resolveDeferred(pendingWarmup, { accounts: [account], failures: [], succeededCount: 1, targetCount: 1 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Warm up weekly quota" })).toBeTruthy());
+
+    const pendingRefreshAll = deferred<AccountSummary[]>();
+    api.accounts.refreshAllUsage = vi.fn(() => pendingRefreshAll.promise);
+    fireEvent.click(within(toolbar()).getByRole("button", { name: "Refresh usage" }));
+    await waitFor(() => expect(toolbar().querySelector(".refresh-icon.spinning")).toBeTruthy());
+    expect(rendererStyles()).toContain(".refresh-icon.spinning");
+    await resolveDeferred(pendingRefreshAll, [account]);
+    await waitFor(() => expect(toolbar().querySelector(".refresh-icon.spinning")).toBeNull());
   });
 
   it("does not show a success notice when importing an account file is canceled", async () => {
@@ -696,6 +751,13 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
     resolve = nextResolve;
   });
   return { promise, resolve };
+}
+
+async function resolveDeferred<T>(pending: { promise: Promise<T>; resolve: (value: T) => void }, value: T): Promise<void> {
+  await act(async () => {
+    pending.resolve(value);
+    await pending.promise;
+  });
 }
 
 function macAccountCardPrimitives(): string {

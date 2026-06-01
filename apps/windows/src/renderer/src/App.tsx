@@ -22,6 +22,7 @@ import "./styles/app.css";
 type PageID = "accounts" | "proxy" | "settings";
 type AccountViewMode = "grid" | "list";
 type AccountsContentState = { status: "error"; message: string } | { status: "loading" } | { status: "ready" };
+type AccountToolbarBusyAction = "add" | "export" | "importCurrent" | "importPackage" | "refreshAll" | "warmUpWeeklyQuota";
 type NoticeTone = "success" | "error" | "info";
 type AccountTransferDialogState =
   | { mode: "export"; accounts: AccountTransferSelectableItem[] }
@@ -63,6 +64,7 @@ function App(): ReactElement {
   const [selectedModel, setSelectedModel] = useState<string>("gpt-5");
   const [notice, setNotice] = useState<Notice | undefined>();
   const [busyAction, setBusyAction] = useState<string | undefined>();
+  const [accountToolbarBusyAction, setAccountToolbarBusyAction] = useState<AccountToolbarBusyAction | undefined>();
   const t = useMemo(() => createTranslator(settings.locale), [settings.locale]);
   const pages = useMemo(
     () => [
@@ -74,8 +76,15 @@ function App(): ReactElement {
   );
 
   const runAction = useCallback(
-    async (label: string, action: () => Promise<void>, options: { silentSuccess?: boolean; success?: string } = {}) => {
+    async (
+      label: string,
+      action: () => Promise<void>,
+      options: { accountToolbarBusyAction?: AccountToolbarBusyAction; silentSuccess?: boolean; success?: string } = {}
+    ) => {
       setBusyAction(label);
+      if (options.accountToolbarBusyAction) {
+        setAccountToolbarBusyAction(options.accountToolbarBusyAction);
+      }
       setNotice(undefined);
       try {
         await action();
@@ -86,6 +95,9 @@ function App(): ReactElement {
         setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
       } finally {
         setBusyAction(undefined);
+        if (options.accountToolbarBusyAction) {
+          setAccountToolbarBusyAction((current) => (current === options.accountToolbarBusyAction ? undefined : current));
+        }
       }
     },
     [t]
@@ -161,7 +173,7 @@ function App(): ReactElement {
                 : { tone: "success", text: t("accounts.notice.exported_format", { count: accountCount }) }
             );
           },
-          { silentSuccess: true }
+          { accountToolbarBusyAction: "export", silentSuccess: true }
         );
         return;
       }
@@ -183,7 +195,7 @@ function App(): ReactElement {
             })
           });
         },
-        { silentSuccess: true }
+        { accountToolbarBusyAction: "importPackage", silentSuccess: true }
       );
     },
     [api, reloadAccounts, runAction, t, transferDialog]
@@ -252,6 +264,7 @@ function App(): ReactElement {
         {activePage === "accounts" && (
           <AccountsPage
             accounts={accounts}
+            accountToolbarBusyAction={accountToolbarBusyAction}
             busyAction={busyAction}
             contentState={accountsContentState}
             onAddViaLogin={() =>
@@ -268,7 +281,7 @@ function App(): ReactElement {
                     text: t("accounts.notice.imported_new_format", { account: imported.label })
                   });
                 },
-                { silentSuccess: true }
+                { accountToolbarBusyAction: "add", silentSuccess: true }
               )
             }
             onDeleteAccount={(id) =>
@@ -303,7 +316,7 @@ function App(): ReactElement {
                   await reloadAccounts();
                   setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: imported.label }) });
                 },
-                { silentSuccess: true }
+                { accountToolbarBusyAction: "importCurrent", silentSuccess: true }
               )
             }
             onImportPackage={() =>
@@ -324,7 +337,7 @@ function App(): ReactElement {
                   await reloadAccounts();
                   setNotice({ tone: "success", text: t("accounts.notice.imported_format", { account: result.account.label }) });
                 },
-                { silentSuccess: true }
+                { accountToolbarBusyAction: "importPackage", silentSuccess: true }
               )
             }
             onRefreshAll={() =>
@@ -337,7 +350,7 @@ function App(): ReactElement {
                   setAccounts(await api.accounts.refreshAllUsage());
                   setNotice({ tone: "success", text: t("accounts.notice.accounts_refreshed") });
                 },
-                { silentSuccess: true }
+                { accountToolbarBusyAction: "refreshAll", silentSuccess: true }
               )
             }
             onWarmUpWeeklyQuota={() =>
@@ -351,7 +364,7 @@ function App(): ReactElement {
                   setAccounts(result.accounts);
                   setNotice({ tone: result.failures.length > 0 ? "info" : "success", text: weeklyWarmupNotice(result, t) });
                 },
-                { silentSuccess: true }
+                { accountToolbarBusyAction: "warmUpWeeklyQuota", silentSuccess: true }
               )
             }
             onRefreshUsage={(id) =>
@@ -553,6 +566,7 @@ function App(): ReactElement {
 
 interface AccountsPageProps {
   accounts: AccountSummary[];
+  accountToolbarBusyAction?: AccountToolbarBusyAction;
   busyAction?: string;
   contentState: AccountsContentState;
   onAddViaLogin: () => void;
@@ -577,6 +591,19 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
   const areAllAccountsCollapsed = accountIds.length > 0 && accountIds.every((id) => collapsedAccountIds.has(id));
   const isContentLoading = props.contentState.status === "loading";
   const isAccountActionDisabled = Boolean(props.busyAction) || isContentLoading || props.accounts.length === 0;
+  const exportActionLabel =
+    props.accountToolbarBusyAction === "export" ? props.t("accounts.action.exporting") : props.t("accounts.action.export");
+  const importPackageActionLabel =
+    props.accountToolbarBusyAction === "importPackage" ? props.t("accounts.action.importing") : props.t("accounts.action.import_package");
+  const importCurrentActionLabel =
+    props.accountToolbarBusyAction === "importCurrent" ? props.t("accounts.action.importing") : props.t("accounts.action.import_current");
+  const addActionLabel =
+    props.accountToolbarBusyAction === "add" ? props.t("accounts.action.waiting_for_login") : props.t("accounts.action.sign_in");
+  const warmUpWeeklyQuotaActionLabel =
+    props.accountToolbarBusyAction === "warmUpWeeklyQuota"
+      ? props.t("accounts.action.warming_up_weekly_quota")
+      : props.t("accounts.action.warm_weekly_quota");
+  const isRefreshAllBusy = props.accountToolbarBusyAction === "refreshAll";
 
   useEffect(() => {
     setCollapsedAccountIds((current) => {
@@ -634,21 +661,44 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
         </div>
         <div className="toolbar">
           <button
+            aria-label={exportActionLabel}
             className="toolbar-action-button"
+            title={exportActionLabel}
             type="button"
             onClick={props.onExportSelected}
             disabled={isAccountActionDisabled}
           >
-            <ToolbarActionContent iconClassName="export-accounts-icon" label={props.t("accounts.action.export")} />
+            <ToolbarActionContent iconClassName="export-accounts-icon" label={exportActionLabel} />
           </button>
-          <button className="toolbar-action-button" type="button" onClick={props.onImportPackage} disabled={Boolean(props.busyAction)}>
-            <ToolbarActionContent iconClassName="import-package-icon" label={props.t("accounts.action.import_package")} />
+          <button
+            aria-label={importPackageActionLabel}
+            className="toolbar-action-button"
+            title={importPackageActionLabel}
+            type="button"
+            onClick={props.onImportPackage}
+            disabled={Boolean(props.busyAction)}
+          >
+            <ToolbarActionContent iconClassName="import-package-icon" label={importPackageActionLabel} />
           </button>
-          <button className="toolbar-action-button" type="button" onClick={props.onImportCurrent} disabled={Boolean(props.busyAction)}>
-            <ToolbarActionContent iconClassName="import-current-icon" label={props.t("accounts.action.import_current")} />
+          <button
+            aria-label={importCurrentActionLabel}
+            className="toolbar-action-button"
+            title={importCurrentActionLabel}
+            type="button"
+            onClick={props.onImportCurrent}
+            disabled={Boolean(props.busyAction)}
+          >
+            <ToolbarActionContent iconClassName="import-current-icon" label={importCurrentActionLabel} />
           </button>
-          <button className="toolbar-action-button primary-action" type="button" onClick={props.onAddViaLogin} disabled={Boolean(props.busyAction)}>
-            <ToolbarActionContent iconClassName="add-account-icon" label={props.t("accounts.action.sign_in")} />
+          <button
+            aria-label={addActionLabel}
+            className="toolbar-action-button primary-action"
+            title={addActionLabel}
+            type="button"
+            onClick={props.onAddViaLogin}
+            disabled={Boolean(props.busyAction)}
+          >
+            <ToolbarActionContent iconClassName="add-account-icon" label={addActionLabel} />
           </button>
           <button
             className="toolbar-action-button"
@@ -659,12 +709,14 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             <ToolbarActionContent iconClassName="smart-switch-action-icon" label={props.t("accounts.action.smart_switch")} />
           </button>
           <button
+            aria-label={warmUpWeeklyQuotaActionLabel}
             className="toolbar-action-button"
+            title={warmUpWeeklyQuotaActionLabel}
             type="button"
             onClick={props.onWarmUpWeeklyQuota}
             disabled={isAccountActionDisabled}
           >
-            <ToolbarActionContent iconClassName="warmup-action-icon" label={props.t("accounts.action.warm_weekly_quota")} />
+            <ToolbarActionContent iconClassName="warmup-action-icon" label={warmUpWeeklyQuotaActionLabel} />
           </button>
           <button
             aria-label={props.t("accounts.action.refresh_usage")}
@@ -674,7 +726,7 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
             onClick={props.onRefreshAll}
             disabled={isAccountActionDisabled}
           >
-            <span className="toolbar-action-icon refresh-icon" aria-hidden="true" />
+            <span className={isRefreshAllBusy ? "toolbar-action-icon refresh-icon spinning" : "toolbar-action-icon refresh-icon"} aria-hidden="true" />
           </button>
         </div>
       </div>
