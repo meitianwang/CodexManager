@@ -716,6 +716,8 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
   const canShowCollapsedSwitchOverlay = isCollapsed && !account.isCurrent;
   const accountTitle = isCollapsed ? shortAccountName(account) : fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
+  const switchToThisLabel = t("accounts.card.switch_to_this");
+  const refreshUsageLabel = t("common.refresh_usage");
   useEffect(() => {
     if (!canShowCollapsedSwitchOverlay) {
       setCollapsedSwitchOverlayVisible(false);
@@ -803,11 +805,18 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
           />
           {account.usageError && <p className="usage-error">{account.usageError}</p>}
           <div className="account-actions">
-            <button className="account-action-button" type="button" onClick={onSwitch} disabled={account.isCurrent}>
+            <button
+              aria-label={switchToThisLabel}
+              className="account-action-button"
+              disabled={account.isCurrent}
+              title={switchToThisLabel}
+              type="button"
+              onClick={onSwitch}
+            >
               <span className="account-action-icon switch-icon" aria-hidden="true" />
               <span>Switch</span>
             </button>
-            <button className="account-action-button" type="button" onClick={onRefresh}>
+            <button aria-label={refreshUsageLabel} className="account-action-button" title={refreshUsageLabel} type="button" onClick={onRefresh}>
               <span className="account-action-icon refresh-icon" aria-hidden="true" />
               <span>Refresh</span>
             </button>
@@ -821,8 +830,10 @@ function AccountRow({ account, isCollapsed, locale, onDelete, onRefresh, onSwitc
       {canShowCollapsedSwitchOverlay && (
         <div className="collapsed-switch-overlay" aria-hidden={!isCollapsedSwitchOverlayVisible}>
           <button
+            aria-label={switchToThisLabel}
             className="account-action-button collapsed-switch-button"
             tabIndex={isCollapsedSwitchOverlayVisible ? 0 : -1}
+            title={switchToThisLabel}
             type="button"
             onClick={onSwitch}
           >

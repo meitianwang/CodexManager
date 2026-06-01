@@ -498,6 +498,7 @@ function Add-SmokeResultChecks {
         (Test-ContainsAll (Get-PropertyValue $accounts "teamAliasLabels") @("Set team name Smoke account")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "teamAliasPlaceholders") @("Set team name")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "toolbarButtons") @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota")) -and
+        (Test-ContainsAll (Get-PropertyValue $accounts "actionAccessibilityLabels") @("Switch to this", "Refresh usage", "Delete")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "actionButtons") @("Switch", "Refresh", "Delete"))
     } elseif ($page -eq "proxy") {
       $proxy = Get-PropertyValue $fingerprint "proxy"

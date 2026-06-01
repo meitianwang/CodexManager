@@ -57,6 +57,7 @@ interface SmokeUISnapshot {
 
 interface SmokeUIFingerprint {
   accounts?: {
+    actionAccessibilityLabels: string[];
     accountCount: number;
     actionButtons: string[];
     currentBadgeCount: number;
@@ -590,7 +591,8 @@ async function readSmokeUIFingerprint(browserWindow: BrowserWindow): Promise<Smo
       if (document.querySelector(".accounts-layout")) {
         fingerprint.accounts = {
           accountCount: document.querySelectorAll(".account-row").length,
-          actionButtons: labels(".account-actions button"),
+          actionAccessibilityLabels: labels(".account-actions button"),
+          actionButtons: text(".account-actions button"),
           currentBadgeCount: Array.from(document.querySelectorAll(".badge")).filter((element) => element.textContent?.trim() === "CURRENT").length,
           hasSmokeAccount: bodyText.includes("Smoke account") || bodyText.includes("Smoke Team") || bodyText.includes("smoke@example.com"),
           hasSmokeEmail: bodyText.includes("smoke@example.com"),
@@ -655,6 +657,7 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
         "Smart switch",
         "Warm up weekly quota"
       ]) &&
+      includesAll(fingerprint.accounts.actionAccessibilityLabels, ["Switch to this", "Refresh usage", "Delete"]) &&
       includesAll(fingerprint.accounts.actionButtons, ["Switch", "Refresh", "Delete"])
     );
   }

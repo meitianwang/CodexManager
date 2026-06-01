@@ -224,6 +224,7 @@ jobs:
                     sidebarStatus = "Proxy: Stopped"
                     accounts = @{
                       accountCount = 1
+                      actionAccessibilityLabels = @("Switch to this", "Refresh usage", "Delete")
                       actionButtons = @("Switch", "Refresh", "Delete")
                       currentBadgeCount = 1
                       hasSmokeAccount = $true
@@ -529,6 +530,8 @@ jobs:
               $MissingToolbarButtons = @($RequiredToolbarButtons | Where-Object { @($AccountFingerprint.toolbarButtons) -notcontains $_ })
               $RequiredAccountActions = @("Switch", "Refresh", "Delete")
               $MissingAccountActions = @($RequiredAccountActions | Where-Object { @($AccountFingerprint.actionButtons) -notcontains $_ })
+              $RequiredAccountActionAccessibilityLabels = @("Switch to this", "Refresh usage", "Delete")
+              $MissingAccountActionAccessibilityLabels = @($RequiredAccountActionAccessibilityLabels | Where-Object { @($AccountFingerprint.actionAccessibilityLabels) -notcontains $_ })
               if (
                 $null -eq $AccountFingerprint -or
                 $AccountFingerprint.accountCount -ne 1 -or
@@ -538,7 +541,8 @@ jobs:
                 @($AccountFingerprint.teamAliasLabels) -notcontains "Set team name Smoke account" -or
                 @($AccountFingerprint.teamAliasPlaceholders) -notcontains "Set team name" -or
                 $MissingToolbarButtons.Count -gt 0 -or
-                $MissingAccountActions.Count -gt 0
+                $MissingAccountActions.Count -gt 0 -or
+                $MissingAccountActionAccessibilityLabels.Count -gt 0
               ) {
                 throw "Packaged app smoke test accounts fingerprint failed: $(ConvertTo-Json $AccountFingerprint -Compress -Depth 8)"
               }

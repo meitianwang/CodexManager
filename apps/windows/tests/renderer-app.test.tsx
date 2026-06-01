@@ -134,7 +134,7 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.accounts.importPreparedPackage).toHaveBeenCalledWith("draft-1", ["package"]));
     expect(await screen.findByText("Imported 1 accounts, updated 0")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh usage" }));
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
     expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
     expect(within(accountRow("Work")).getByText("88%")).toBeTruthy();
@@ -152,8 +152,9 @@ describe("Windows renderer app", () => {
     expect(resetRows[1]).toContain("1 week");
     expect(resetRows[1]).not.toContain("--");
 
-    const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh" });
+    const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh usage" });
     expect(accountRefreshButton).toBeDefined();
+    expect((accountRefreshButton as HTMLElement).textContent).toBe("Refresh");
     fireEvent.click(accountRefreshButton as HTMLElement);
     await waitFor(() => expect(api.accounts.refreshUsage).toHaveBeenCalledWith("a"));
     expect(await screen.findByText("Usage refreshed")).toBeTruthy();
@@ -161,8 +162,9 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledOnce());
 
-    const accountSwitchButton = within(accountRow("Work")).getByRole("button", { name: "Switch" });
+    const accountSwitchButton = within(accountRow("Work")).getByRole("button", { name: "Switch to this" });
     expect(accountSwitchButton).toBeDefined();
+    expect((accountSwitchButton as HTMLElement).textContent).toBe("Switch");
     fireEvent.click(accountSwitchButton as HTMLElement);
     await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
 
@@ -255,10 +257,10 @@ describe("Windows renderer app", () => {
     expect(container.querySelector(".account-row.collapsed .reset-cell")).toBeNull();
     expect(container.querySelector(".account-row.collapsed .account-actions")).toBeNull();
     expect(container.querySelector(".account-row.collapsed .collapsed-switch-overlay")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Switch" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Switch to this" })).toBeNull();
     fireEvent.mouseEnter(container.querySelector(".account-row.collapsed") as HTMLElement);
     expect(container.querySelector(".account-row.collapsed")?.classList.contains("switch-overlay-visible")).toBe(true);
-    fireEvent.click(within(container.querySelector(".account-row.collapsed") as HTMLElement).getByRole("button", { name: "Switch" }));
+    fireEvent.click(within(container.querySelector(".account-row.collapsed") as HTMLElement).getByRole("button", { name: "Switch to this" }));
     await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
     expect(screen.getByRole("button", { name: "Expand all cards" })).toBeTruthy();
 
@@ -303,7 +305,7 @@ describe("Windows renderer app", () => {
       await screen.findByText("Smart switched to: Personal · Switched account (via codex app command) · Editors restarted: cursor")
     ).toBeTruthy();
 
-    const accountSwitchButton = within(accountRow("Personal")).getByRole("button", { name: "Switch" });
+    const accountSwitchButton = within(accountRow("Personal")).getByRole("button", { name: "Switch to this" });
     expect(accountSwitchButton).toBeDefined();
     fireEvent.click(accountSwitchButton as HTMLElement);
     expect(await screen.findByText("Switched account · Editor restart failed: taskkill failed")).toBeTruthy();
@@ -438,8 +440,8 @@ describe("Windows renderer app", () => {
     expect(row).toBeTruthy();
     const accountActions = (row as HTMLElement).querySelector(".account-actions");
     expect(accountActions?.textContent).toBe("SwitchRefreshDelete");
-    expect(within(row as HTMLElement).getByRole("button", { name: "Switch" })).toBeTruthy();
-    expect(within(row as HTMLElement).getByRole("button", { name: "Refresh" })).toBeTruthy();
+    expect(within(row as HTMLElement).getByRole("button", { name: "切换到此账号" })).toBeTruthy();
+    expect(within(row as HTMLElement).getByRole("button", { name: "刷新用量" })).toBeTruthy();
     expect(within(row as HTMLElement).getByRole("button", { name: "Delete" })).toBeTruthy();
   });
 
