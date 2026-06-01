@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26735720267
-- Commit: `04bbdbabf719534d82bc60d700ff6b4ff88ec170`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26736084604
+- Commit: `fcffa182f5ee12cc542439a1194d1953d9c0c219`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:8a82ad252a5be72588e47b9349641d2c4b844e01ead1191d4264e4034e4ea672`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:caa491bdde3698d9ff9c5ddd8cb9082e92bdae381be018abfe390f95f182b9ec`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:3c6b27bb63d171246d9fc751a7c54eb18ed7278c66489207c1cae587e882b89e`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:b54198bafafc2141f06af8caa5b9187846e89ef39691c34aee0561daa7364e64`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:01b22db2602b642226c6b8c3e791dfea4b9857150d50daed1f3d6df660e0b92f`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:c9e5fff6ea7cfe7e394ce330e4b64e2c0b3bfe6101d8f84fb274e3549578717d`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
@@ -34,6 +34,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
 - Windows renderer, source smoke, packaged smoke, and the verification collector no longer expose or require the previous Windows-only editable Accounts team-name input; the packaged account fingerprint contains no `teamAliasLabels` or `teamAliasPlaceholders` fields.
 - Windows preload, IPC handlers, and account coordinator no longer expose the dead `accounts:updateTeamAlias` path after that Windows-only editable team-name control was removed; stored `teamAlias` data is still preserved for imported account display.
+- Windows renderer tests, source smoke, packaged smoke, GitHub Actions, and the verification collector now assert the Settings page headings, toggle labels, select labels, and footer buttons by exact sequence instead of loose containment. The packaged Settings fingerprint is `Settings`, `General`, `Switch Behavior`, `Language`, with toggles ordered `Launch at startup`, `Launch Codex after switch`, `Auto-start API proxy on launch`, `Auto smart switch`, `Restart editors on switch`.
 - Packaged smoke now records and asserts the Accounts card action labels `Switch`, `Refresh`, and `Delete`; the downloaded Windows screenshot confirms these labels render fully at `944x471`.
 - Packaged smoke now records and asserts the Proxy form labels `Port` and `API Key`.
 - Packaged smoke and the Windows verification collector now assert the shared tray action labels include `Open Main Panel`, `Refresh Accounts`, `Smart Switch`, `Start Proxy`, and `Quit`.
