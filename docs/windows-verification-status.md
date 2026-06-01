@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26734064894
-- Commit: `e9bdc05ae7e3bb20239a540489294d6963f75e54`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26734365536
+- Commit: `8ab6b51fc454f63f72e775a2b5e006287e0592e7`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:cf2533ee5762bb465332ab03633b9d5d127e7c79ddde1f9c6d6c7a132eca9249`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:b1a1b8cc6d8d2a0e42ba78f2fcb3a2202e9d67a0c2d324375cd8b7a8160b0dfd`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:e39b13c188603d36b6f6ae5c86cc99f918163c18c1cd8ff3a640eaab3b53ad63`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:774dda06624e78038dfbc9bb6e36b9fe71adf03d466128c946d6b43597f167da`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:666fe38ac2c2966b072806dda64fa515e76afe310ffdf9df0222508690b44912`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:8e4ed26762e66faed638c5b3977a7f343bb235b6edfd9695ff28d8437c787171`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
@@ -26,6 +26,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer tests, source smoke, packaged smoke, and the verification collector now record account-card accessibility labels separately from visible labels, including `Switch to this`, `Refresh usage`, and `Delete`.
 - Windows source parity tests now compare proxy models, proxy endpoint paths, language choices, and editor restart target IDs against the macOS Swift source.
 - Windows renderer tests now verify the Proxy API key label stays `API Key` for all locales, matching the macOS hard-coded `ProxyFormRow(title: "API Key")`.
+- Windows renderer tests now mirror the macOS Proxy invalid-port behavior before proxy startup: blank, zero, and out-of-range ports show the localized invalid-port error and do not call the start IPC; the invalid-port string is parity-checked against macOS localizations across all 11 locales.
 - Windows platform service tests now compare shared tray labels and account-count status formatting against the macOS tray localization sources for English, Simplified Chinese, Japanese, and Korean.
 - Packaged smoke now records and asserts the Accounts team-name input label `Set team name Smoke account` and placeholder `Set team name`.
 - Packaged smoke now records and asserts the Accounts card action labels `Switch`, `Refresh`, and `Delete`; the downloaded Windows screenshot confirms these labels render fully at `944x471`.
