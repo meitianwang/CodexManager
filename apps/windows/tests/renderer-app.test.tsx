@@ -476,6 +476,8 @@ describe("Windows renderer app", () => {
     expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
     expect(proxyUsageText()).not.toContain("sk-local-test");
+    fireEvent.click(screen.getByRole("button", { name: "gpt-5-mini" }));
+    expect(document.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5-mini");
 
     fireEvent.change(screen.getByLabelText("Port"), { target: { value: "17888" } });
     fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "sk-local-test" } });
@@ -517,6 +519,7 @@ describe("Windows renderer app", () => {
     expect(await screen.findByText("Proxy stopped", { selector: ".notice-text" })).toBeTruthy();
     expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
+    await waitFor(() => expect(document.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5"));
 
     fireEvent.click(await screen.findByRole("button", { name: "Regenerate API Key" }));
     await waitFor(() => expect(api.proxy.regenerateApiKey).toHaveBeenCalledOnce());

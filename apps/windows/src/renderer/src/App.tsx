@@ -493,9 +493,11 @@ function App(): ReactElement {
                 async () => {
                   if (!api) {
                     setProxyState((current) => ({ ...current, isRunning: false }));
+                    setSelectedModel(proxyAvailableModels[0] ?? selectedModel);
                     return;
                   }
                   setProxyState(await api.proxy.stop());
+                  setSelectedModel(proxyAvailableModels[0] ?? selectedModel);
                 },
                 { success: t("proxy.notice.stopped") }
               )
