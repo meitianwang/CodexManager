@@ -41,10 +41,10 @@ const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["accounts.empty.message", "accounts.empty.message.no_accounts"],
   ["accounts.error.load_failed", "accounts.error.load_failed"],
   ["accounts.card.current", "accounts.card.current"],
-  ["accounts.card.team_alias", "accounts.card.team.set_name"],
   ["accounts.card.switch_to_this", "accounts.card.switch_to_this"],
   ["accounts.window.five_hour", "accounts.window.five_hour"],
   ["accounts.window.weekly", "accounts.window.one_week"],
+  ["accounts.usage.used_percent", "accounts.window.used_format"],
   ["accounts.window.reset_header", "accounts.window.reset_header"],
   ["accounts.window.reset_at_format", "accounts.window.reset_at_format"],
   ["accounts.notice.imported_format", "accounts.notice.imported_format"],
@@ -56,7 +56,6 @@ const sharedLabelParityKeys: Array<[MessageKey, string]> = [
   ["accounts.notice.usage_refreshed", "accounts.notice.usage_refreshed"],
   ["accounts.notice.accounts_refreshed", "accounts.notice.accounts_refreshed"],
   ["accounts.notice.account_deleted", "accounts.notice.account_deleted"],
-  ["accounts.notice.team_name_updated", "accounts.notice.team_name_updated"],
   ["accounts.notice.no_switch_target", "accounts.notice.no_switch_target"],
   ["accounts.notice.already_best", "accounts.notice.already_best"],
   ["accounts.notice.smart_switched_prefix_format", "accounts.notice.smart_switched_prefix_format"],
@@ -132,15 +131,6 @@ describe("renderer i18n", () => {
           normalizePlaceholders(macMessages.get(macKey) ?? "")
         );
       }
-    }
-  });
-
-  it("uses the macOS team-name placeholder wording for every locale", () => {
-    for (const locale of appLocales) {
-      const macMessages = readMacLocalization(locale);
-      const expected = macMessages.get("accounts.card.team.set_name");
-      expect(expected, `${locale}:macOS team-name localization`).toBeDefined();
-      expect(createTranslator(locale)("accounts.card.team_alias"), `${locale}:accounts.card.team_alias`).toBe(expected);
     }
   });
 

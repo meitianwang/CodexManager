@@ -229,8 +229,6 @@ jobs:
                       currentBadgeCount = 1
                       hasSmokeAccount = $true
                       hasSmokeEmail = $true
-                      teamAliasLabels = @("Set team name Smoke account")
-                      teamAliasPlaceholders = @("Set team name")
                       toolbarButtons = @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota", "Refresh usage")
                       viewControlButtons = @("Grid view", "List view")
                     }
@@ -542,8 +540,6 @@ jobs:
                 $AccountFingerprint.currentBadgeCount -ne 1 -or
                 -not ([bool] $AccountFingerprint.hasSmokeAccount) -or
                 -not ([bool] $AccountFingerprint.hasSmokeEmail) -or
-                @($AccountFingerprint.teamAliasLabels) -notcontains "Set team name Smoke account" -or
-                @($AccountFingerprint.teamAliasPlaceholders) -notcontains "Set team name" -or
                 $MissingToolbarButtons.Count -gt 0 -or
                 $MissingAccountActions.Count -gt 0 -or
                 $MissingAccountActionAccessibilityLabels.Count -gt 0 -or

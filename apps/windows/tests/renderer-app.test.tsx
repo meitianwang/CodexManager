@@ -84,7 +84,7 @@ describe("Windows renderer app", () => {
       await pendingAccounts.promise;
     });
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
   });
 
   it("shows the macOS-compatible accounts load error state instead of the empty state", async () => {
@@ -106,21 +106,24 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("a@example.com")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".account-card-header")?.textContent).toContain("PRO");
-    expect(accountRow("Work").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getByText("a@example.com")).toBeTruthy();
+    expect(screen.queryByLabelText("Set team name Work")).toBeNull();
+    expect(accountRow("a@example.com").querySelector(".alias-line")).toBeNull();
+    expect(accountRow("a@example.com").querySelector(".account-card-header")?.textContent).toContain("PRO");
+    expect(accountRow("a@example.com").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
     expect(rendererStyles()).not.toContain("compact-plan");
+    expect(rendererStyles()).not.toContain(".alias-line");
     expect(rendererStyles()).toContain("background: #e8e0ff;");
-    expect(accountRow("Work").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
-    expect(accountRow("Work").querySelector(".account-identifier")).toBeNull();
-    expect(accountRow("Work").querySelector(".account-actions")?.textContent).toBe("SwitchRefreshDelete");
-    expect(accountRow("Work").querySelector(".account-actions .switch-icon")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".account-actions .refresh-icon")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".account-actions .trash-icon")).toBeTruthy();
-    expect(within(accountRow("Work")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
-    expect(within(accountRow("Work")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
+    expect(accountRow("a@example.com").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
+    expect(accountRow("a@example.com").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
+    expect(accountRow("a@example.com").querySelector(".account-identifier")).toBeNull();
+    expect(accountRow("a@example.com").querySelector(".account-actions")?.textContent).toBe("SwitchRefreshDelete");
+    expect(accountRow("a@example.com").querySelector(".account-actions .switch-icon")).toBeTruthy();
+    expect(accountRow("a@example.com").querySelector(".account-actions .refresh-icon")).toBeTruthy();
+    expect(accountRow("a@example.com").querySelector(".account-actions .trash-icon")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getAllByText("5h").length).toBeGreaterThanOrEqual(1);
+    expect(within(accountRow("a@example.com")).getAllByText("1 week").length).toBeGreaterThanOrEqual(1);
     const toolbar = container.querySelector(".toolbar") as HTMLElement;
     expect(Array.from(toolbar.querySelectorAll("button")).map((button) => button.textContent)).toEqual([
       "Export accounts",
@@ -172,22 +175,22 @@ describe("Windows renderer app", () => {
     await waitFor(() => expect(api.accounts.refreshAllUsage).toHaveBeenCalledOnce());
     expect(await screen.findByText("Accounts refreshed")).toBeTruthy();
     expect(document.querySelector(".notice.info")?.textContent).toContain("Accounts refreshed");
-    expect(within(accountRow("Work")).getByText("88%")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("66%")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("Used 12%")).toBeTruthy();
-    expect(within(accountRow("Work")).getByText("Used 34%")).toBeTruthy();
-    expect(accountRow("Work").querySelectorAll(".quota-ring")).toHaveLength(2);
-    expect(accountRow("Work").querySelector(".usage-track")).toBeNull();
-    expect(within(accountRow("Work")).getByText("Reset")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getByText("88%")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getByText("66%")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getByText("Used 12%")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getByText("Used 34%")).toBeTruthy();
+    expect(accountRow("a@example.com").querySelectorAll(".quota-ring")).toHaveLength(2);
+    expect(accountRow("a@example.com").querySelector(".usage-track")).toBeNull();
+    expect(within(accountRow("a@example.com")).getByText("Reset")).toBeTruthy();
     expect(screen.queryByText("Usage refresh failed")).toBeNull();
-    const resetRows = Array.from(accountRow("Work").querySelectorAll(".reset-row")).map((row) => row.textContent ?? "");
+    const resetRows = Array.from(accountRow("a@example.com").querySelectorAll(".reset-row")).map((row) => row.textContent ?? "");
     expect(resetRows).toHaveLength(2);
     expect(resetRows[0]).toContain("5h");
     expect(resetRows[0]).not.toContain("--");
     expect(resetRows[1]).toContain("1 week");
     expect(resetRows[1]).not.toContain("--");
 
-    const accountRefreshButton = within(accountRow("Work")).getByRole("button", { name: "Refresh usage" });
+    const accountRefreshButton = within(accountRow("a@example.com")).getByRole("button", { name: "Refresh usage" });
     expect(accountRefreshButton).toBeDefined();
     expect((accountRefreshButton as HTMLElement).textContent).toBe("Refresh");
     fireEvent.click(accountRefreshButton as HTMLElement);
@@ -197,23 +200,33 @@ describe("Windows renderer app", () => {
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     await waitFor(() => expect(api.accounts.smartSwitch).toHaveBeenCalledOnce());
 
-    const accountSwitchButton = within(accountRow("Work")).getByRole("button", { name: "Switch to this" });
+    const accountSwitchButton = within(accountRow("a@example.com")).getByRole("button", { name: "Switch to this" });
     expect(accountSwitchButton).toBeDefined();
     expect((accountSwitchButton as HTMLElement).textContent).toBe("Switch");
     fireEvent.click(accountSwitchButton as HTMLElement);
     await waitFor(() => expect(api.accounts.switch).toHaveBeenCalledWith("a"));
 
-    fireEvent.change(screen.getByLabelText("Set team name Work"), { target: { value: "Platform" } });
-    fireEvent.blur(screen.getByLabelText("Set team name Work"));
-    await waitFor(() => expect(api.accounts.updateTeamAlias).toHaveBeenCalledWith("a", "Platform"));
-    expect(await screen.findByText("Team name updated")).toBeTruthy();
-
-    const accountDeleteButton = within(accountRow("Work")).getByRole("button", { name: "Delete" });
+    const accountDeleteButton = within(accountRow("a@example.com")).getByRole("button", { name: "Delete" });
     expect(accountDeleteButton).toBeDefined();
     fireEvent.click(accountDeleteButton as HTMLElement);
     await waitFor(() => expect(api.accounts.delete).toHaveBeenCalledWith("a"));
     expect(await screen.findByText("Account deleted")).toBeTruthy();
     expect(document.querySelector(".notice.info")?.textContent).toContain("Account deleted");
+  });
+
+  it("mirrors macOS missing usage window fallback in account cards", async () => {
+    installMockAPI({ accounts: [makeAccount("a", "Work")] });
+
+    render(<App />);
+
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    expect(within(accountRow("a@example.com")).getAllByText("0%")).toHaveLength(2);
+    expect(within(accountRow("a@example.com")).getAllByText("Used 100%")).toHaveLength(2);
+    expect(screen.queryByText("No data")).toBeNull();
+    expect(within(accountRow("a@example.com")).getAllByText("--")).toHaveLength(2);
+    expect(macAccountCardPresentation()).toContain("window: account.usage?.fiveHour");
+    expect(macAccountCardPresentation()).toContain("let usedRaw = clamped(window?.usedPercent, fallback: 100)");
+    expect(macAccountCardPrimitives()).toContain("Text(\"\\(Int(presentation.remainingPercent.rounded()))%\")");
   });
 
   it("mirrors macOS account toolbar busy labels and refresh spinner", async () => {
@@ -222,7 +235,7 @@ describe("Windows renderer app", () => {
     const { container } = render(<App />);
     const toolbar = (): HTMLElement => container.querySelector(".toolbar") as HTMLElement;
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
 
     const pendingExport = deferred<{ canceled: boolean; path?: string }>();
     api.accounts.exportPackage = vi.fn(() => pendingExport.promise);
@@ -276,7 +289,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
 
     api.accounts.warmUpWeeklyQuota = vi.fn(async () => ({
       accounts: [account],
@@ -314,7 +327,7 @@ describe("Windows renderer app", () => {
     api.accounts.importFile = vi.fn(async () => undefined);
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
 
@@ -328,7 +341,7 @@ describe("Windows renderer app", () => {
     api.accounts.importFile = vi.fn(async () => ({ kind: "auth" as const, account: imported }));
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
 
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
@@ -343,9 +356,9 @@ describe("Windows renderer app", () => {
     render(<App />);
 
     expect(await screen.findByText("Usage refresh failed")).toBeTruthy();
-    expect(accountRow("Work").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
-    const usageError = accountRow("Work").querySelector(".usage-error");
-    const accountActions = accountRow("Work").querySelector(".account-actions");
+    expect(accountRow("a@example.com").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
+    const usageError = accountRow("a@example.com").querySelector(".usage-error");
+    const accountActions = accountRow("a@example.com").querySelector(".account-actions");
     if (!(usageError instanceof Node) || !(accountActions instanceof Node)) {
       throw new Error("usage error ordering elements were not found");
     }
@@ -357,7 +370,7 @@ describe("Windows renderer app", () => {
     installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
     expect(Array.from(container.querySelectorAll(".accounts-view-controls button")).map((button) => button.getAttribute("aria-label"))).toEqual([
       "Grid view",
       "List view"
@@ -390,7 +403,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [currentAccount] });
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
 
     expect(await screen.findByText("Current account is already the best available")).toBeTruthy();
@@ -412,13 +425,13 @@ describe("Windows renderer app", () => {
     }));
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     expect(
       await screen.findByText("Smart switched to: Personal · Switched account (via codex app command) · Editors restarted: cursor")
     ).toBeTruthy();
 
-    const accountSwitchButton = within(accountRow("Personal")).getByRole("button", { name: "Switch to this" });
+    const accountSwitchButton = within(accountRow("b@example.com")).getByRole("button", { name: "Switch to this" });
     expect(accountSwitchButton).toBeDefined();
     fireEvent.click(accountSwitchButton as HTMLElement);
     expect(await screen.findByText("Switched account · Editor restart failed: taskkill failed")).toBeTruthy();
@@ -610,7 +623,7 @@ describe("Windows renderer app", () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
     render(<App />);
 
-    expect(await screen.findByLabelText("Set team name Work")).toBeTruthy();
+    expect(await screen.findByText("a@example.com")).toBeTruthy();
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
@@ -766,10 +779,10 @@ function makeAccount(id: string, label: string): AccountSummary {
   };
 }
 
-function accountRow(label: string): HTMLElement {
-  const row = screen.getByLabelText(`Set team name ${label}`).closest("article");
+function accountRow(accountTitle: string): HTMLElement {
+  const row = screen.getByText(accountTitle).closest("article");
   if (!row) {
-    throw new Error(`Account row ${label} was not found`);
+    throw new Error(`Account row ${accountTitle} was not found`);
   }
   return row;
 }
@@ -807,6 +820,10 @@ async function resolveDeferred<T>(pending: { promise: Promise<T>; resolve: (valu
 
 function macAccountCardPrimitives(): string {
   return readFileSync("../../Sources/CodexManager/Features/Accounts/AccountCardPrimitives.swift", "utf8");
+}
+
+function macAccountCardPresentation(): string {
+  return readFileSync("../../Sources/CodexManager/Features/Accounts/AccountCardPresentation.swift", "utf8");
 }
 
 async function flushRendererUpdates(): Promise<void> {

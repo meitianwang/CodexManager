@@ -900,10 +900,6 @@ button.danger {
   font-size: 11px;
 }
 
-.alias-line input {
-  width: min(240px, 100%);
-}
-
 .badge {
   flex: 0 0 auto;
   padding: 3px 7px;

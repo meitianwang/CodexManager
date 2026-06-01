@@ -421,20 +421,6 @@ function App(): ReactElement {
                 { silentSuccess: true }
               )
             }
-            onUpdateAlias={(id, alias) =>
-              runAction(
-                t("accounts.card.team_alias"),
-                async () => {
-                  if (!api) {
-                    throw new Error(t("error.ipc_bridge_unavailable"));
-                  }
-                  const updated = await api.accounts.updateTeamAlias(id, alias);
-                  setAccounts((current) => current.map((account) => (account.id === id ? updated : account)));
-                  setNotice({ tone: "success", text: t("accounts.notice.team_name_updated") });
-                },
-                { silentSuccess: true }
-              )
-            }
             locale={settings.locale}
             t={t}
           />
@@ -587,7 +573,6 @@ interface AccountsPageProps {
   onRefreshUsage: (id: string) => void;
   onSmartSwitch: () => void;
   onSwitchAccount: (id: string) => void;
-  onUpdateAlias: (id: string, alias?: string) => void;
   onWarmUpWeeklyQuota: () => void;
   locale: AppLocaleID;
   t: Translator;
@@ -738,7 +723,6 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
               onDelete={() => props.onDeleteAccount(account.id)}
               onRefresh={() => props.onRefreshUsage(account.id)}
               onSwitch={() => props.onSwitchAccount(account.id)}
-              onUpdateAlias={(alias) => props.onUpdateAlias(account.id, alias)}
               locale={props.locale}
               t={props.t}
             />
@@ -754,18 +738,12 @@ interface AccountRowProps {
   onDelete: () => void;
   onRefresh: () => void;
   onSwitch: () => void;
-  onUpdateAlias: (alias?: string) => void;
   locale: AppLocaleID;
   t: Translator;
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, onUpdateAlias, t, viewMode }: AccountRowProps): ReactElement {
-  const [alias, setAlias] = useState(account.teamAlias ?? "");
-  useEffect(() => {
-    setAlias(account.teamAlias ?? "");
-  }, [account.teamAlias]);
-
+function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, t, viewMode }: AccountRowProps): ReactElement {
   const accountTitle = fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
   const switchToThisLabel = t("accounts.card.switch_to_this");
@@ -789,15 +767,6 @@ function AccountRow({ account, locale, onDelete, onRefresh, onSwitch, onUpdateAl
           <h3>{accountTitle}</h3>
         </div>
         {workspaceTag && <p className="workspace-name">{workspaceTag}</p>}
-        <div className="alias-line">
-          <input
-            aria-label={`${t("accounts.card.team_alias")} ${account.label}`}
-            placeholder={t("accounts.card.team_alias")}
-            value={alias}
-            onChange={(event) => setAlias(event.target.value)}
-            onBlur={() => onUpdateAlias(alias)}
-          />
-        </div>
       </div>
       <UsageCell tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
       <UsageCell tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
@@ -960,11 +929,10 @@ function UsageCell({
   usedPercent?: number;
   t: Translator;
 }): ReactElement {
-  const hasUsage = usedPercent !== undefined && Number.isFinite(usedPercent);
-  const used = hasUsage ? clampPercent(usedPercent) : 0;
-  const remaining = hasUsage ? Math.max(0, 100 - used) : 0;
-  const remainingText = hasUsage ? `${Math.round(remaining)}%` : "--";
-  const usedText = hasUsage ? t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` }) : t("accounts.usage.no_data");
+  const used = usedPercent !== undefined && Number.isFinite(usedPercent) ? clampPercent(usedPercent) : 100;
+  const remaining = Math.max(0, 100 - used);
+  const remainingText = `${Math.round(remaining)}%`;
+  const usedText = t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` });
   return (
     <div className={`usage-cell quota-ring-card ${tone}`}>
       <div className="quota-ring" style={quotaRingStyle(remaining)}>
