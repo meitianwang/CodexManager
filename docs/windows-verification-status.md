@@ -6,12 +6,12 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 
 ## Automated Evidence
 
-- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26733854002
-- Commit: `86947d8600b1be3da114df9b01ac2677497b1ec5`
+- Windows CI run: https://github.com/meitianwang/CodexManager/actions/runs/26734064894
+- Commit: `e9bdc05ae7e3bb20239a540489294d6963f75e54`
 - Result: success.
-- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:3325f4665d6a532254798009094bcb1272437a3386c57864efa3dc5617191cdd`.
-- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:6210bc541e05d27bcb92636875ff261f1bd43023c50e4841277aa44eccad4a67`.
-- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:4aca431964d81f43a63e3072c6af59d2304b061976b17adcc0491a9b4b64e708`.
+- Automated verification artifact: `CodexManager-Windows-Automated-Verification`, digest `sha256:cf2533ee5762bb465332ab03633b9d5d127e7c79ddde1f9c6d6c7a132eca9249`.
+- Windows Squirrel artifact: `CodexManager-Windows-x64-Squirrel`, digest `sha256:b1a1b8cc6d8d2a0e42ba78f2fcb3a2202e9d67a0c2d324375cd8b7a8160b0dfd`.
+- Smoke screenshots artifact: `CodexManager-Windows-Smoke-Screenshots`, digest `sha256:e39b13c188603d36b6f6ae5c86cc99f918163c18c1cd8ff3a640eaab3b53ad63`.
 - Automated verification artifact contents were downloaded and checked locally: `automated-verification.json`, raw packaged smoke `smoke-result.json`, and prefilled `manual-verification-template.ps1`.
 - Smoke screenshots artifact contents were downloaded and checked locally: `accounts.png`, `proxy.png`, and `settings.png`.
 - The generated manual verification template was self-tested in Windows CI and successfully invoked the collector with named parameters and `-RequireComplete`.
@@ -20,6 +20,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Windows renderer tests now mirror the macOS Accounts content-state model for loading, load failure, empty, and content states, with loading/error labels verified against macOS localizations across all 11 locales.
 - Windows renderer tests now mirror the macOS Accounts action descriptor busy labels for export, import package, import current auth, add account/login, weekly quota warmup, and refresh usage spinner states.
 - Windows renderer tests now mirror the macOS Accounts refresh/delete notice behavior: full refresh and account delete use info notices, while single-account usage refresh updates the account card without showing a success toast.
+- Windows renderer tests now mirror the macOS weekly quota warmup notice behavior: no warmup targets use an info notice, complete warmups use success, and partial failures use error; the three warmup notice strings are also parity-checked against the macOS localization source across all 11 locales.
 - Windows renderer, domain, source smoke, packaged smoke, and verification collector now mirror the macOS Smart Switch already-best behavior: the current best account is reported as already best and no switch side effects run.
 - Windows renderer tests now verify account card action labels stay `Switch`, `Refresh`, and `Delete` under localized UI, matching the macOS Swift account card implementation.
 - Windows renderer tests, source smoke, packaged smoke, and the verification collector now record account-card accessibility labels separately from visible labels, including `Switch to this`, `Refresh usage`, and `Delete`.
