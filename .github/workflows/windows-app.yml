@@ -232,6 +232,7 @@ jobs:
                       teamAliasLabels = @("Set team name Smoke account")
                       teamAliasPlaceholders = @("Set team name")
                       toolbarButtons = @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota", "Refresh usage")
+                      viewControlButtons = @("Grid view", "List view")
                     }
                   }
                   page = "accounts"
@@ -533,6 +534,8 @@ jobs:
               $MissingAccountActions = @($RequiredAccountActions | Where-Object { @($AccountFingerprint.actionButtons) -notcontains $_ })
               $RequiredAccountActionAccessibilityLabels = @("Switch to this", "Refresh usage", "Delete")
               $MissingAccountActionAccessibilityLabels = @($RequiredAccountActionAccessibilityLabels | Where-Object { @($AccountFingerprint.actionAccessibilityLabels) -notcontains $_ })
+              $RequiredAccountViewControls = @("Grid view", "List view")
+              $MissingAccountViewControls = @($RequiredAccountViewControls | Where-Object { @($AccountFingerprint.viewControlButtons) -notcontains $_ })
               if (
                 $null -eq $AccountFingerprint -or
                 $AccountFingerprint.accountCount -ne 1 -or
@@ -543,7 +546,9 @@ jobs:
                 @($AccountFingerprint.teamAliasPlaceholders) -notcontains "Set team name" -or
                 $MissingToolbarButtons.Count -gt 0 -or
                 $MissingAccountActions.Count -gt 0 -or
-                $MissingAccountActionAccessibilityLabels.Count -gt 0
+                $MissingAccountActionAccessibilityLabels.Count -gt 0 -or
+                @($AccountFingerprint.viewControlButtons).Count -ne 2 -or
+                $MissingAccountViewControls.Count -gt 0
               ) {
                 throw "Packaged app smoke test accounts fingerprint failed: $(ConvertTo-Json $AccountFingerprint -Compress -Depth 8)"
               }
