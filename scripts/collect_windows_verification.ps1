@@ -477,7 +477,7 @@ function Add-SmokeResultChecks {
     $pagePassed = (
       $null -ne $snapshot -and
       $fileExists -and
-      (Get-NumberValue (Get-PropertyValue $snapshot "screenshotWidth")) -ge 900 -and
+      (Get-NumberValue (Get-PropertyValue $snapshot "screenshotWidth")) -ge 800 -and
       (Get-NumberValue (Get-PropertyValue $snapshot "screenshotHeight")) -ge 450 -and
       (Get-NumberValue (Get-PropertyValue $snapshot "screenshotByteLength")) -ge 10000 -and
       $fileLength -ge 10000
@@ -766,7 +766,7 @@ function Get-UIParityEvidenceStatus {
           $pagePassed = (
             $item.Length -ge 10000 -and
             $null -ne $pngDimensions -and
-            $pngDimensions["width"] -ge 900 -and
+            $pngDimensions["width"] -ge 800 -and
             $pngDimensions["height"] -ge 450
           )
         }

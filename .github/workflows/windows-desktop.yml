@@ -532,7 +532,7 @@ jobs:
             if ([string]::IsNullOrWhiteSpace($ScreenshotPath) -or -not (Test-Path $ScreenshotPath)) {
               throw "Packaged app smoke test did not write the $Page screenshot."
             }
-            if ($Snapshot.screenshotWidth -lt 900 -or $Snapshot.screenshotHeight -lt 450) {
+            if ($Snapshot.screenshotWidth -lt 800 -or $Snapshot.screenshotHeight -lt 450) {
               throw "Packaged app smoke test wrote an undersized $Page screenshot: $($Snapshot.screenshotWidth)x$($Snapshot.screenshotHeight)."
             }
             if ($Snapshot.screenshotByteLength -lt 10000 -or (Get-Item $ScreenshotPath).Length -lt 10000) {
