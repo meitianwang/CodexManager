@@ -22,7 +22,7 @@ alfred/team654301-card-tool-src/__pycache__/
 
 # Orphaned files from referenced Codex Electron project
 package.json
-!apps/windows/package.json
+!apps/desktop/package.json
 node_modules/
 config-queries-*.js
 external-agent-config-utils-*.js
@@ -30,3 +30,6 @@ app-session-*.js
 main-*.js
 onboarding-login-content-*.js
 use-auth-*.js
+
+# Local leftovers from before the Electron app was renamed to apps/desktop
+apps/windows/

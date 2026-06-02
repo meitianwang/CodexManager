@@ -4,6 +4,10 @@ Date: 2026-05-30
 
 Spec: `docs/superpowers/specs/2026-05-30-windows-app-design.md`
 
+Superseded by `docs/superpowers/specs/2026-06-01-desktop-mainline-migration-design.md` for ongoing desktop-mainline work. This document is retained as historical context for the original Windows port implementation.
+
+Do not use the `apps/windows` paths below as current implementation guidance. The current Electron desktop mainline lives under `apps/desktop`, and new cross-platform work should follow the desktop-mainline migration design plus the platform adapter boundary.
+
 ## Operating Rules
 
 - Keep the existing Swift macOS app working throughout the migration.

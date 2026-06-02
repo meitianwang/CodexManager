@@ -1,0 +1,97 @@
+name: macOS Desktop
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/macos-desktop.yml"
+      - "apps/desktop/**"
+      - "docs/release-desktop.md"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/macos-desktop.yml"
+      - "apps/desktop/**"
+      - "docs/release-desktop.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-smoke:
+    name: Package and smoke macOS desktop
+    runs-on: macos-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - name: Install desktop app dependencies
+        working-directory: apps/desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify desktop package assets
+        working-directory: apps/desktop
+        run: pnpm run verify:package-assets
+
+      - name: Typecheck desktop app
+        working-directory: apps/desktop
+        run: pnpm run typecheck
+
+      - name: Test desktop app
+        working-directory: apps/desktop
+        run: pnpm test
+
+      - name: Smoke test packaged macOS desktop app
+        working-directory: apps/desktop
+        env:
+          CODEX_MANAGER_ELECTRON_PACKAGE_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/codexmanager-macos-package-smoke
+          CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS: "45000"
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: pnpm run smoke:macos-package
+
+      - name: Verify packaged macOS icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$(find apps/desktop/out -path "*/CodexManager.app" -type d | head -n 1)"
+          if [[ -z "$app_path" ]]; then
+            echo "No packaged CodexManager.app was found under apps/desktop/out." >&2
+            exit 1
+          fi
+          icon_file="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$app_path/Contents/Info.plist")"
+          if [[ "$icon_file" != "electron.icns" ]]; then
+            echo "Expected CFBundleIconFile to be electron.icns, got: $icon_file" >&2
+            exit 1
+          fi
+          test -f "$app_path/Contents/Resources/electron.icns"
+
+      - name: Upload macOS smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexManager-macOS-Smoke
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ runner.temp }}/codexmanager-macos-package-smoke/**
+
+      - name: Upload packaged macOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexManager-macOS-App
+          if-no-files-found: error
+          retention-days: 14
+          path: apps/desktop/out/CodexManager-darwin-*/CodexManager.app/**

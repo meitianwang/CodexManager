@@ -1,7 +1,11 @@
-# macOS Packaging Workflow
+# Deprecated Swift macOS Packaging Workflow
+
+The native Swift macOS app is deprecated and is no longer the CodexManager desktop release target. Use the Electron desktop release flow in `docs/release-desktop.md` for current macOS releases.
+
+This document is retained only for historical Swift packaging reference until the Swift sources and scripts are removed in a later cleanup.
 
 ## Scope
-- Uses a single entrypoint: `scripts/package_macos.sh`
+- Legacy Swift-only flow using `scripts/package_macos.sh`
 - Keeps outputs under `artifacts/macos/`
 - Keeps intermediate build/archive files under `build/package/`
 - Supports local preview packaging and signed release packaging

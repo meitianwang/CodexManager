@@ -2,7 +2,9 @@
 
 Last updated: 2026-06-01 Asia/Shanghai.
 
-This file tracks current evidence for the Windows app goal. It is not a release note and does not replace the manual checklist in `docs/release-windows.md`.
+This file tracks current evidence for the Windows release of the Electron desktop app. It is not a release note and does not replace the manual checklist in `docs/release-windows.md`.
+
+Desktop-mainline migration note: this file preserves Windows-release evidence from the Windows Electron phase. Current cross-platform desktop migration status lives in `docs/desktop-migration-acceptance-audit.md` and `docs/release-desktop.md`; new shared workflow contracts should use the TypeScript desktop contracts under `apps/desktop`, not Swift-source parity as the long-term source of truth.
 
 ## Automated Evidence
 
@@ -44,7 +46,7 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 - Packaged Proxy auth smoke: missing and wrong API keys returned `401`.
 - Packaged account workflows: smoke-safe OAuth import, current auth import, standalone auth file import, account package import/export, smart switch, and restored current-account persistence passed.
 - Packaged platform workflows: smoke-safe Codex launch, Cursor restart, launch-at-startup toggle, and tray actions passed.
-- Windows app local verification on macOS host: `pnpm run typecheck`, `pnpm test`, `pnpm run build`, source Electron smoke with screenshots, and `git diff --check` passed for the current Windows app change set. The source smoke was run under a Simplified Chinese host locale, proving the smoke controller no longer fails before seeded English UI verification.
+- Electron desktop Windows-release local verification on macOS host: `pnpm run typecheck`, `pnpm test`, `pnpm run build`, source Electron smoke with screenshots, and `git diff --check` passed for the current Windows release change set. The source smoke was run under a Simplified Chinese host locale, proving the smoke controller no longer fails before seeded English UI verification.
 - macOS regression gate: after `swift package clean`, `swift test` passed with 94 XCTest tests and 4 Swift Testing tests.
 
 ## Remaining Completion Evidence
@@ -52,8 +54,8 @@ This file tracks current evidence for the Windows app goal. It is not a release 
 The goal is not complete until a real Windows machine verifies the non-smoke behaviors below and produces a `scripts/collect_windows_verification.ps1 -RequireComplete` report:
 
 - Installed app launches on Windows and opens Accounts.
-- UI parity with the macOS app is checked from real Accounts, Proxy, and Settings screenshots or notes.
-- Real ChatGPT OAuth completes in the Windows app.
+- UI parity is checked against the Electron desktop UI baseline, not the Swift macOS app as the sole source of truth, using real Accounts, Proxy, and Settings screenshots or notes.
+- Real ChatGPT OAuth completes in the Windows release.
 - Current auth import, standalone auth import, account package import/export, account switch, and smart switch are verified against real local files.
 - Usage refresh is verified with a real account or a visible user-facing usage error.
 - Proxy start/stop is verified from the real Proxy page.

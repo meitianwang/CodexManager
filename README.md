@@ -1,21 +1,35 @@
 # CodexManager
 
-A native macOS app for managing multiple Codex / ChatGPT accounts with usage-aware smart switching and a local API reverse proxy.
+A desktop app for managing multiple Codex / ChatGPT accounts with usage-aware smart switching and a local API reverse proxy. The released desktop app is now the Electron app under `apps/desktop`.
 
-原生 macOS 应用，用于管理多个 Codex / ChatGPT 账号，支持用量感知的智能切换和本地 API 反向代理。
+桌面应用，用于管理多个 Codex / ChatGPT 账号，支持用量感知的智能切换和本地 API 反向代理。当前发布版本已切换为 `apps/desktop` 下的 Electron 应用。
+
+## Desktop Release Status / 桌面端发布状态
+
+- Electron under `apps/desktop` is the desktop mainline and release target for macOS and Windows.
+- The native Swift macOS app is deprecated and no longer used as the release target or feature source of truth.
+- Linux remains unsupported until a dedicated Linux release pass is requested.
+
+---
+
+- `apps/desktop` 下的 Electron 应用是 macOS 和 Windows 的桌面端发布主线。
+- 原生 Swift macOS 应用已废弃，不再作为发布目标或功能事实源。
+- Linux 暂不支持，直到后续单独做 Linux 发布收口。
 
 ## Features / 功能概览
 
 ### Multi-Account Management / 多账号管理
 - Import and manage multiple ChatGPT / Codex accounts (Free, Plus, Pro, Team, Enterprise)
 - Real-time usage monitoring with 5-hour and 1-week quota windows
-- Automatic sync across Macs via iCloud / CloudKit
+- Local account/settings compatibility across macOS and Windows
+- Cross-device sync is deferred and is not part of the Electron desktop release
 
 ---
 
 - 导入并管理多个 ChatGPT / Codex 账号（支持 Free、Plus、Pro、Team、Enterprise 等套餐）
 - 实时查看各账号的 5 小时和 1 周用量配额，余量一目了然
-- 通过 iCloud / CloudKit 在多台 Mac 之间自动同步账号数据
+- 支持 macOS 和 Windows 本地账号/设置数据兼容
+- 跨设备同步已延后，不属于 Electron 桌面端发布范围
 
 ### Smart Switching / 智能切换
 - One-click manual account switching
@@ -72,36 +86,54 @@ Go to the [Releases](https://github.com/meitianwang/CodexManager/releases) page,
 
 ### Build from Source / 从源码构建
 
-**Requirements / 环境要求：**
-- macOS 14.0+
-- Xcode 16+
-- Swift 6.1+
+**Electron desktop app / Electron 桌面应用**
+
+Requirements / 环境要求：
+- Node.js 22+
+- pnpm 10.x
 
 ```bash
 git clone https://github.com/meitianwang/CodexManager.git
 cd CodexManager
-
-# Build directly
-swift build
-
-# Or generate Xcode project (requires XcodeGen)
-xcodegen generate
-open CodexManager.xcodeproj
+cd apps/desktop
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm test
+pnpm run build
 ```
+
+On macOS, the packaged local smoke check is:
+
+在 macOS 上，本地打包 smoke 检查为：
+
+```bash
+pnpm run smoke:macos-package
+```
+
+This smoke path uses isolated/smoke-safe data.
+
+该 smoke 路径使用隔离或 smoke 安全数据。
 
 ### Packaging / 打包
 
-```bash
-# Local preview (ad-hoc signed, for testing)
-./scripts/package_macos.sh local
+**Electron desktop app / Electron 桌面应用**
 
-# Release build (Developer ID signed + notarized)
-./scripts/package_macos.sh release
+```bash
+cd apps/desktop
+pnpm run verify:package-assets
+pnpm run package:macos
+pnpm run smoke:macos-package
 ```
 
-Artifacts are output to `artifacts/macos/`, including `.app`, `.zip`, `.dmg` and their SHA256 checksums.
+For Windows desktop packaging, run the repository wrapper on a Windows machine:
 
-产物输出到 `artifacts/macos/` 目录，包含 `.app`、`.zip`、`.dmg` 及对应的 SHA256 校验文件。
+```powershell
+.\scripts\package_windows.ps1 -Target make -Arch x64
+```
+
+See `docs/release-desktop.md` and `docs/release-windows.md` for macOS and Windows release artifacts.
+
+Windows 桌面端打包需要在 Windows 机器上运行仓库封装脚本。macOS 和 Windows 发布产物见 `docs/release-desktop.md` 和 `docs/release-windows.md`。
 
 ## Usage / 使用方法
 
@@ -136,6 +168,10 @@ curl http://localhost:18317/v1/chat/completions \
 
 ## Architecture / 架构
 
+The Electron desktop app keeps shared behavior in TypeScript under `apps/desktop/src/main` and isolates OS-specific behavior under `apps/desktop/src/main/platform`.
+
+Electron 桌面应用将共享行为放在 `apps/desktop/src/main` 的 TypeScript 代码中，并把操作系统差异隔离在 `apps/desktop/src/main/platform`。
+
 ```
 App → Features → Behavior → Infrastructure → Domain
 ```
@@ -143,10 +179,10 @@ App → Features → Behavior → Infrastructure → Domain
 | Layer | Responsibility |
 |-------|---------------|
 | **Domain** | Core models, protocols, error types / 核心模型、协议、错误类型 |
-| **Infrastructure** | File I/O, CloudKit sync, HTTP server, OAuth / 文件读写、CloudKit 同步、HTTP 服务器、OAuth 认证 |
+| **Infrastructure** | File I/O, HTTP server, OAuth, platform adapters / 文件读写、HTTP 服务器、OAuth、平台适配 |
 | **Behavior** | Business logic coordinators / 业务逻辑协调器（账号、代理、设置） |
-| **Features** | SwiftUI views and ViewModels / SwiftUI 视图和 ViewModel |
-| **App** | Entry point, DI, menu bar tray / 入口、依赖注入、菜单栏托盘 |
+| **Renderer** | React UI and presentation state / React UI 和展示状态 |
+| **App** | Electron entry point, IPC, tray / Electron 入口、IPC、托盘 |
 
 ## Supported Editors / 支持的编辑器
 

@@ -954,10 +954,10 @@ Add-SmokeResultChecks $SmokeResultPath
 Add-Check "manual.appLaunch" $AppLaunchVerified.IsPresent "Pass -AppLaunchVerified only after the installed app opens and shows the Accounts page."
 $uiEvidenceStatus = Get-UIParityEvidenceStatus $UIParityEvidencePath
 Add-Check "manual.uiParity" ($UIParityVerified.IsPresent -and $uiEvidenceStatus.exists -and $uiEvidenceStatus["requiredPagesPassed"]) ([ordered]@{
-  instruction = "Pass -UIParityVerified only after comparing Accounts, Proxy, and Settings UI with the macOS app and storing page-specific screenshots or notes at -UIParityEvidencePath."
+  instruction = "Pass -UIParityVerified only after comparing Accounts, Proxy, and Settings UI with the Electron desktop UI baseline and storing page-specific screenshots or notes at -UIParityEvidencePath. Do not use the Swift macOS app as the sole source of truth for new shared desktop behavior."
   evidence = $uiEvidenceStatus
 })
-Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows app."
+Add-Check "manual.oauth" $OAuthVerified.IsPresent "Pass -OAuthVerified only after completing ChatGPT OAuth in the Windows release."
 Add-Check "manual.importCurrentAuth" $ImportCurrentAuthVerified.IsPresent "Pass -ImportCurrentAuthVerified only after importing the current Codex auth file."
 Add-Check "manual.importAuthFile" $ImportAuthFileVerified.IsPresent "Pass -ImportAuthFileVerified only after importing a selected auth.json file through Import file."
 Add-Check "manual.importExportPackage" $ImportExportPackageVerified.IsPresent "Pass -ImportExportPackageVerified only after exporting and importing an account transfer package."
@@ -994,9 +994,9 @@ if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
 }
 
 if ($ProxyPort -le 0) {
-  Add-Check "proxy.health" $false "Pass -ProxyPort after starting the proxy in the Windows app."
-  Add-Check "proxy.rejectsMissingApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows app."
-  Add-Check "proxy.rejectsWrongApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows app."
+  Add-Check "proxy.health" $false "Pass -ProxyPort after starting the proxy in the Windows release."
+  Add-Check "proxy.rejectsMissingApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows release."
+  Add-Check "proxy.rejectsWrongApiKey" $false "Pass -ProxyPort after starting the proxy in the Windows release."
   Add-Check "proxy.routes" $false "Pass -ProbeProxyRoutes, -ProxyPort, and -ProxyApiKey after selecting an account."
 } else {
   $client = New-HttpClient

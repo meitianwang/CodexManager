@@ -1,6 +1,6 @@
 # Windows Release
 
-This document covers the Electron Windows app in `apps/windows`. The Swift macOS release flow remains in `docs/release-macos.md`.
+This document covers the Windows release of the Electron desktop app in `apps/desktop`. The native Swift macOS app is deprecated and is no longer part of the desktop release path.
 
 ## Prerequisites
 
@@ -16,15 +16,10 @@ Windows installer artifacts should be produced on Windows. Running `pnpm run pac
 From the repository root:
 
 ```powershell
-cd apps/windows
-pnpm install --frozen-lockfile
-pnpm run typecheck
-pnpm test
-pnpm run build
-pnpm run package
+.\scripts\package_windows.ps1 -Target package -Arch x64
 ```
 
-The package smoke test writes an unpacked app under `apps/windows/out`.
+The wrapper runs from `apps/desktop`, performs typecheck, tests, asset verification, build, and an explicit Electron Forge `package --platform win32 --arch x64`. It writes an unpacked Windows app under `apps/desktop/out/CodexManager-win32-x64`.
 
 ## Windows Installer
 
@@ -38,9 +33,9 @@ The script runs typecheck, tests, build, and Electron Forge `make` for `win32`.
 
 Expected Squirrel.Windows outputs:
 
-- `apps/windows/out/make/squirrel.windows/x64/CodexManagerSetup.exe`
-- `apps/windows/out/make/squirrel.windows/x64/*.nupkg`
-- `apps/windows/out/make/squirrel.windows/x64/RELEASES`
+- `apps/desktop/out/make/squirrel.windows/x64/CodexManagerSetup.exe`
+- `apps/desktop/out/make/squirrel.windows/x64/*.nupkg`
+- `apps/desktop/out/make/squirrel.windows/x64/RELEASES`
 
 For an unpacked app only:
 
@@ -50,9 +45,9 @@ For an unpacked app only:
 
 ## CI Artifact Build
 
-The `.github/workflows/windows-app.yml` workflow runs the same packaging script on `windows-latest`.
+The `.github/workflows/windows-desktop.yml` workflow runs the same packaging script on `windows-latest`.
 
-It runs on pushes and pull requests that touch the Windows app, release document, packaging script, or the workflow itself. It can also be started manually from GitHub Actions with `workflow_dispatch`.
+It runs on pushes and pull requests that touch the Electron desktop app, release document, packaging script, or the workflow itself. It can also be started manually from GitHub Actions with `workflow_dispatch`.
 
 The workflow uploads one artifact named `CodexManager-Windows-x64-Squirrel` containing:
 
@@ -108,7 +103,7 @@ After installing `CodexManagerSetup.exe` on Windows, complete the manual actions
   -RequireComplete
 ```
 
-`-ProbeProxyRoutes` sends small real requests through the selected account for every supported proxy route: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. `-UIParityEvidencePath` must point to a file or directory containing screenshots or notes from comparing the Windows app with the macOS app. The evidence must include separate file names containing `accounts`, `proxy`, and `settings`; PNG evidence is checked for non-trivial dimensions and byte size. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
+`-ProbeProxyRoutes` sends small real requests through the selected account for every supported proxy route: `/v1/models`, `/v1/chat/completions`, `/v1/responses`, `/v1/responses/compact`, `/v1/memories/trace_summarize`, `/v1/alpha/search`, and `/v1/messages`. Omit it during dry runs. `-ExpectedCurrentAccountId` is optional, but include it when you know the ChatGPT account ID so the report can prove the active `%USERPROFILE%\.codex\auth.json` matches the account you switched to. `-UIParityEvidencePath` must point to a file or directory containing screenshots or notes from comparing the Windows release with the Electron desktop UI baseline: the TypeScript desktop contracts, accepted desktop design, and current macOS Electron candidate screenshots when available. Do not use the Swift macOS app as the sole source of truth for new shared desktop behavior. The evidence must include separate file names containing `accounts`, `proxy`, and `settings`; PNG evidence is checked for non-trivial dimensions and byte size. The manual `*Verified` switches should only be passed after completing the matching checklist item below. The script records non-secret summaries only, keeps at most an 8 KB response preview per request, and writes a JSON report to `%TEMP%` unless `-OutputPath` is provided.
 `-SmokeResultPath` is optional for manual verification. Use it when attaching CI packaged-smoke evidence to the same report; it adds automated checks but does not replace the manual `*Verified` switches. `-RequireAutomated` fails only artifact/environment/automated/path checks, while `-RequireComplete` fails any missing manual or live proxy route check.
 
 The downloaded `CodexManager-Windows-Automated-Verification` artifact also contains `manual-verification-template.ps1` with the CI run URL and Squirrel artifact digest prefilled. Run it from the repository root after completing the checklist and saving UI parity evidence:
@@ -122,7 +117,7 @@ The downloaded `CodexManager-Windows-Automated-Verification` artifact also conta
 Add `-ExpectedCurrentAccountId "<account-id-after-switch>"` when you know the selected ChatGPT account ID.
 
 - App launches and opens the Accounts page.
-- Accounts, Proxy, and Settings pages visually match the macOS app layout, labels, controls, density, and empty/error states; save screenshots or notes under `-UIParityEvidencePath` with `accounts`, `proxy`, and `settings` in the evidence file names.
+- Accounts, Proxy, and Settings pages visually match the Electron desktop UI baseline: TypeScript desktop contracts, accepted desktop design, and current macOS Electron candidate screenshots when available. Save screenshots or notes under `-UIParityEvidencePath` with `accounts`, `proxy`, and `settings` in the evidence file names.
 - Accounts page can import the current `%USERPROFILE%\.codex\auth.json`.
 - Accounts page can import a selected standalone `auth.json` through **Import file**.
 - ChatGPT OAuth opens the default browser, completes callback, imports the account, and surfaces errors on failure.
@@ -141,5 +136,5 @@ Add `-ExpectedCurrentAccountId "<account-id-after-switch>"` when you know the se
 
 ## Notes
 
-- `apps/windows/assets/icon.svg` is the source icon. `apps/windows/assets/icon.ico` is the multi-size Windows icon wired into Electron Forge `packagerConfig.icon`, BrowserWindow, and the Squirrel setup executable.
+- `apps/desktop/assets/icon.svg` is the source icon. `apps/desktop/assets/icon.ico` is the multi-size Windows icon wired into Electron Forge `packagerConfig.icon`, BrowserWindow, and the Squirrel setup executable.
 - Signing and auto-update publishing are intentionally not configured yet. Add them only after a Windows CI runner and certificate strategy are selected.

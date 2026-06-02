@@ -54,11 +54,11 @@ if ($ArtifactDigest -eq $ArtifactDigestPlaceholder -or [string]::IsNullOrWhiteSp
 }
 
 if ($ProxyPort -le 0) {
-  throw "Pass -ProxyPort with the running proxy port shown in the Windows app."
+  throw "Pass -ProxyPort with the running proxy port shown in the Windows release."
 }
 
 if ([string]::IsNullOrWhiteSpace($ProxyApiKey)) {
-  throw "Pass -ProxyApiKey with the API key shown in the Windows app."
+  throw "Pass -ProxyApiKey with the API key shown in the Windows release."
 }
 
 if (-not (Test-Path -LiteralPath $CollectorPath)) {
@@ -70,7 +70,7 @@ if (-not (Test-Path -LiteralPath $SmokeResultPath)) {
 }
 
 if (-not (Test-Path -LiteralPath $UIParityEvidencePath)) {
-  throw "UI parity evidence was not found at $UIParityEvidencePath. Save Accounts, Proxy, and Settings screenshots or notes there before running this template."
+  throw "UI parity evidence was not found at $UIParityEvidencePath. Save Accounts, Proxy, and Settings screenshots or notes against the Electron desktop UI baseline before running this template."
 }
 
 $OutputDirectory = Split-Path -Parent $OutputPath

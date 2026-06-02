@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$WindowsApp = Join-Path $RepoRoot "apps/windows"
+$DesktopApp = Join-Path $RepoRoot "apps/desktop"
 
 function Write-LimitedTree {
   param(
@@ -27,7 +27,7 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
   throw "pnpm is required. Install it with Corepack or npm before packaging."
 }
 
-Push-Location $WindowsApp
+Push-Location $DesktopApp
 try {
   if (-not $SkipInstall -and -not (Test-Path "node_modules")) {
     pnpm install --frozen-lockfile
@@ -35,30 +35,29 @@ try {
 
   pnpm run typecheck
   pnpm test
+  pnpm run verify:package-assets
 
-  if ($Target -eq "package") {
-    pnpm run package
-  } else {
-    pnpm run build
+  pnpm run build
 
-    pnpm exec electron-forge package --platform win32 --arch $Arch
-    $PackageOutput = Join-Path $WindowsApp "out/CodexManager-win32-$Arch"
-    $PackageExe = Join-Path $PackageOutput "CodexManager.exe"
-    $PackageDeadline = (Get-Date).AddSeconds(60)
-    while (-not (Test-Path $PackageExe) -and (Get-Date) -lt $PackageDeadline) {
-      Start-Sleep -Seconds 1
-    }
-    if (-not (Test-Path $PackageExe)) {
-      Write-LimitedTree -Path (Join-Path $WindowsApp "out")
-      throw "Packaged Windows app was not created: $PackageExe"
-    }
+  pnpm exec electron-forge package --platform win32 --arch $Arch
+  $PackageOutput = Join-Path $DesktopApp "out/CodexManager-win32-$Arch"
+  $PackageExe = Join-Path $PackageOutput "CodexManager.exe"
+  $PackageDeadline = (Get-Date).AddSeconds(60)
+  while (-not (Test-Path $PackageExe) -and (Get-Date) -lt $PackageDeadline) {
+    Start-Sleep -Seconds 1
+  }
+  if (-not (Test-Path $PackageExe)) {
+    Write-LimitedTree -Path (Join-Path $DesktopApp "out")
+    throw "Packaged Windows release was not created: $PackageExe"
+  }
 
+  if ($Target -eq "make") {
     pnpm exec electron-forge make --skip-package --targets squirrel --platform win32 --arch $Arch
 
-    $MakeRoot = Join-Path $WindowsApp "out/make"
+    $MakeRoot = Join-Path $DesktopApp "out/make"
     $SquirrelOutput = Join-Path (Join-Path $MakeRoot "squirrel.windows") $Arch
     if (-not (Test-Path $SquirrelOutput)) {
-      Write-LimitedTree -Path (Join-Path $WindowsApp "out")
+      Write-LimitedTree -Path (Join-Path $DesktopApp "out")
       throw "Squirrel.Windows output directory was not created: $SquirrelOutput"
     }
 

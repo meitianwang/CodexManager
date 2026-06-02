@@ -2,6 +2,10 @@
 
 Date: 2026-05-30
 
+Superseded by `docs/superpowers/specs/2026-06-01-desktop-mainline-migration-design.md` for ongoing desktop-mainline work. This document is retained as historical context for the original Windows port.
+
+Do not use the `apps/windows` paths or "Swift macOS as source of truth" statements below as current implementation guidance. The current Electron desktop mainline lives under `apps/desktop`, with shared behavior in TypeScript and OS-specific behavior behind platform adapters.
+
 ## Decision
 
 Build a separate Windows desktop app with Electron + React + TypeScript. Keep the existing SwiftUI/AppKit macOS app unchanged, and treat it as the behavioral source of truth for feature parity.
