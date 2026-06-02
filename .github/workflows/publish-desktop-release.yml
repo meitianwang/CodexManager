@@ -1,0 +1,115 @@
+name: Publish Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag, for example v1.0.11
+        required: true
+        type: string
+      version:
+        description: Release version, for example 1.0.11
+        required: true
+        type: string
+      windows_run_id:
+        description: Successful Windows Desktop workflow run ID
+        required: true
+        type: string
+      release_target:
+        description: Commit-ish to use if the release does not exist
+        required: true
+        default: main
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Publish desktop release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Windows release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_RUN_ID: ${{ inputs.windows_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets/windows-x64 release-assets/windows-verification
+          gh run download "$WINDOWS_RUN_ID" \
+            --name CodexManager-Windows-x64-Squirrel \
+            --dir release-assets/windows-x64
+          gh run download "$WINDOWS_RUN_ID" \
+            --name CodexManager-Windows-Automated-Verification \
+            --dir release-assets/windows-verification
+
+      - name: Check Windows release artifact shape
+        run: |
+          set -euo pipefail
+          test -f release-assets/windows-x64/CodexManagerSetup.exe
+          test -f release-assets/windows-x64/RELEASES
+          shopt -s nullglob
+          nupkg_files=(release-assets/windows-x64/*.nupkg)
+          if [[ ${#nupkg_files[@]} -eq 0 ]]; then
+            echo "No Squirrel nupkg files were downloaded." >&2
+            exit 1
+          fi
+          test -f release-assets/windows-verification/automated-verification.json
+          test -f release-assets/windows-verification/smoke-result.json
+
+      - name: Generate Windows release checksums
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          (
+            cd release-assets
+            find windows-x64 windows-verification -type f -print0 \
+              | sort -z \
+              | xargs -0 sha256sum
+          ) >"release-assets/CodexManager-${VERSION}-Windows-x64.sha256"
+
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TARGET: ${{ inputs.release_target }}
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          notes_file="$(mktemp)"
+          cat >"$notes_file" <<EOF
+          CodexManager ${VERSION} desktop stable release.
+
+          - Electron desktop is the release target for macOS and Windows.
+          - The native Swift macOS app is deprecated and no longer blocks desktop release.
+          - Windows assets are the Squirrel.Windows installer, RELEASES file, nupkg package, and automated verification evidence.
+          EOF
+
+          gh release create "$TAG" \
+            --target "$RELEASE_TARGET" \
+            --title "CodexManager ${VERSION}" \
+            --notes-file "$notes_file"
+
+      - name: Upload Windows assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release-assets -type f -print | sort)
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release assets found." >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
