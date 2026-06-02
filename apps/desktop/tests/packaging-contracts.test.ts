@@ -123,7 +123,7 @@ describe("desktop packaging contracts", () => {
     expect(workflow).toContain("pnpm run verify:package-assets");
     expect(workflow).toContain("pnpm run typecheck");
     expect(workflow).toContain("pnpm test");
-    expect(workflow).toContain("swift test");
+    expect(workflow).not.toContain("swift test");
     expect(workflow).toContain("pnpm run smoke:macos-package");
     expect(workflow).toContain("CFBundleIconFile");
     expect(workflow).toContain("CodexManager-macOS-Smoke");
