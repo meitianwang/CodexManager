@@ -1,5 +1,6 @@
 import path from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import started from "electron-squirrel-startup";
 import { appInfo } from "../shared/app-info";
@@ -17,6 +18,7 @@ import { createDesktopAppContext, type DesktopAppContext } from "./app-context";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { TrayService, type TrayActionID, type TrayAdapter, type TrayMenuItem } from "./platform/tray-service";
 import { BackgroundAccountMaintenanceService } from "./services/background-account-maintenance-service";
+import { allowedDevServerURL, isAllowedExternalURL, isAllowedNavigationURL } from "./window-security";
 
 if (started) {
   app.quit();
@@ -189,6 +191,8 @@ function assetPath(assetName: string): string {
 }
 
 function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow {
+  const appFileURL = pathToFileURL(rendererEntry()).toString();
+  const devServerURL = allowedDevServerURL(process.env.VITE_DEV_SERVER_URL);
   mainWindow = new BrowserWindow({
     width: 900,
     height: 552,
@@ -203,7 +207,7 @@ function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow 
       contextIsolation: true,
       nodeIntegration: false,
       preload: preloadEntry(),
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -224,16 +228,28 @@ function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow 
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (isAllowedExternalURL(url)) {
+      void shell.openExternal(url).catch((error: unknown) => {
+        console.warn(`Failed to open external URL: ${errorMessage(error)}`);
+      });
+    }
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isAllowedNavigationURL(url, { appFileURL, devServerURL })) {
+      event.preventDefault();
+    }
   });
 
   options.beforeLoad?.(mainWindow);
 
-  const devServerURL = process.env.VITE_DEV_SERVER_URL;
   if (devServerURL) {
     void mainWindow.loadURL(devServerURL);
   } else {
+    if (process.env.VITE_DEV_SERVER_URL) {
+      console.warn("Ignoring non-local VITE_DEV_SERVER_URL; falling back to the packaged renderer.");
+    }
     void mainWindow.loadFile(rendererEntry());
   }
   return mainWindow;

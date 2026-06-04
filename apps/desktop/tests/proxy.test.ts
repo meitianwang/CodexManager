@@ -216,6 +216,62 @@ describe("local proxy", () => {
     }
   });
 
+  it("aborts upstream streams when the downstream client disconnects", async () => {
+    const upstreamAborted = deferred();
+    const upstream = new FakeUpstreamClient([
+      (request) => {
+        request.signal?.addEventListener("abort", () => upstreamAborted.resolve(), { once: true });
+        return streamingSSEResult(async function* () {
+          yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early abort" }));
+          await upstreamAborted.promise;
+        }());
+      }
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    expect(await readUntilText(reader!, "early abort")).toContain("early abort");
+    await reader?.cancel().catch(() => undefined);
+
+    await expect(withTimeout(upstreamAborted.promise, 1_000, "upstream abort")).resolves.toBeUndefined();
+    expect(upstream.requests[0]?.signal?.aborted).toBe(true);
+  });
+
+  it("stops quickly by aborting active upstream requests and closing client sockets", async () => {
+    const upstreamAborted = deferred();
+    const upstream = new FakeUpstreamClient([
+      (request) => {
+        request.signal?.addEventListener("abort", () => upstreamAborted.resolve(), { once: true });
+        return streamingSSEResult(async function* () {
+          yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early stop" }));
+          await upstreamAborted.promise;
+        }());
+      }
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+    expect(await readUntilText(reader!, "early stop")).toContain("early stop");
+
+    await expect(withTimeout(context.proxy.stop(), 1_000, "proxy stop")).resolves.toBeUndefined();
+    await expect(withTimeout(upstreamAborted.promise, 1_000, "upstream abort")).resolves.toBeUndefined();
+    expect(upstream.requests[0]?.signal?.aborted).toBe(true);
+    await reader?.cancel().catch(() => undefined);
+  });
+
   it("adds encrypted reasoning include for Responses requests that use reasoning", async () => {
     const upstream = new FakeUpstreamClient([completedResponseResult({ id: "resp-reasoning" })]);
     const context = await makeProxyContext({ upstream });
@@ -1309,14 +1365,20 @@ class FakeRefreshTokenService {
   }
 }
 
+type FakeUpstreamResult =
+  | CodexUpstreamResult
+  | CodexUpstreamError
+  | ((request: CodexUpstreamRequest) => CodexUpstreamResult | CodexUpstreamError | Promise<CodexUpstreamResult | CodexUpstreamError>);
+
 class FakeUpstreamClient implements CodexUpstreamClientLike {
   public readonly requests: CodexUpstreamRequest[] = [];
 
-  constructor(private readonly results: Array<CodexUpstreamResult | CodexUpstreamError>) {}
+  constructor(private readonly results: FakeUpstreamResult[]) {}
 
   async execute(request: CodexUpstreamRequest): Promise<CodexUpstreamResult> {
     this.requests.push(request);
-    const result = this.results.shift();
+    const queued = this.results.shift();
+    const result = typeof queued === "function" ? await queued(request) : queued;
     if (!result) {
       throw new Error("No queued upstream result");
     }
@@ -1474,6 +1536,22 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
     resolve = resolver;
   });
   return { promise, resolve };
+}
+
+async function withTimeout<Result>(promise: Promise<Result>, timeoutMs: number, label: string): Promise<Result> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<Result>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
 }
 
 async function readUntilText(reader: ReadableStreamDefaultReader<Uint8Array>, expected: string): Promise<string> {

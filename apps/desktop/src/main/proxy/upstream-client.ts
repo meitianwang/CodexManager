@@ -28,6 +28,7 @@ export interface CodexUpstreamRequest {
   accessToken: string;
   accountId: string;
   isStream: boolean;
+  signal?: AbortSignal;
 }
 
 export interface CodexUpstreamCompleteResult {
@@ -119,7 +120,8 @@ export class CodexUpstreamClient implements CodexUpstreamClientLike {
     const response = await this.fetchImpl(request.url, {
       method: request.method,
       headers,
-      body: request.body.byteLength > 0 ? request.body.toString("utf8") : undefined
+      body: request.body.byteLength > 0 ? request.body.toString("utf8") : undefined,
+      signal: request.signal
     });
 
     if (!response.ok) {

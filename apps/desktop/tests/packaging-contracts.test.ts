@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ipcChannels } from "../src/shared/ipc/schema";
 
 const appRoot = process.cwd();
 const require = createRequire(import.meta.url);
@@ -132,6 +133,15 @@ describe("desktop packaging contracts", () => {
     expect(verifier).toContain("must not expose Linux ZIP packaging while Linux is unsupported");
     expect(releaseDoc).toContain("Linux hardening remains deferred");
     expect(releaseDoc).toContain("Linux explicit as unsupported");
+  });
+
+  it("keeps the preload script compatible with Electron renderer sandboxing", () => {
+    const preloadSource = readAppFile("src/preload/index.ts").toString("utf8");
+
+    expect(preloadSource).not.toContain("../shared/ipc/schema");
+    for (const channel of Object.values(ipcChannels)) {
+      expect(preloadSource).toContain(`"${channel}"`);
+    }
   });
 
   it("keeps macOS package smoke wired into CI", () => {

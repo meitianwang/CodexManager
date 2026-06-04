@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { once } from "node:events";
-import type { AddressInfo } from "node:net";
+import type { AddressInfo, Socket } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
 import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
@@ -130,6 +129,8 @@ export class ProxyCoordinator {
   private readonly dateProvider: { unixSecondsNow(): number };
   private readonly accountCooldowns = new Map<string, number>();
   private readonly accountModelCooldowns = new Map<string, number>();
+  private readonly activeRequestControllers = new Set<AbortController>();
+  private readonly activeSockets = new Set<Socket>();
   private server: Server | undefined;
 
   constructor(private readonly options: ProxyCoordinatorOptions) {
@@ -146,7 +147,14 @@ export class ProxyCoordinator {
     const settings = await this.options.settingsRepository.loadSettings();
     const listenPort = port ?? settings.proxyPort;
     this.server = createServer((request, response) => {
-      void this.handle(request, response);
+      const lifecycle = this.trackRequestLifecycle(request, response);
+      void this.handle(request, response, lifecycle.signal).finally(lifecycle.dispose);
+    });
+    this.server.on("connection", (socket) => {
+      this.activeSockets.add(socket);
+      socket.once("close", () => {
+        this.activeSockets.delete(socket);
+      });
     });
     await listen(this.server, listenPort);
     const address = this.server.address() as AddressInfo | null;
@@ -159,10 +167,44 @@ export class ProxyCoordinator {
     }
     const server = this.server;
     this.server = undefined;
-    await closeServer(server);
+    for (const controller of this.activeRequestControllers) {
+      abortController(controller, "Proxy stopped");
+    }
+    const closePromise = closeServer(server);
+    destroyActiveSockets(this.activeSockets);
+    await closePromise;
   }
 
-  private async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  private trackRequestLifecycle(
+    request: IncomingMessage,
+    response: ServerResponse
+  ): { signal: AbortSignal; dispose: () => void } {
+    const controller = new AbortController();
+    this.activeRequestControllers.add(controller);
+
+    const abortRequest = () => {
+      abortController(controller, "Proxy request disconnected");
+    };
+    const abortResponse = () => {
+      if (!response.writableEnded) {
+        abortController(controller, "Proxy response disconnected");
+      }
+    };
+
+    request.once("aborted", abortRequest);
+    response.once("close", abortResponse);
+
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        request.off("aborted", abortRequest);
+        response.off("close", abortResponse);
+        this.activeRequestControllers.delete(controller);
+      }
+    };
+  }
+
+  private async handle(request: IncomingMessage, response: ServerResponse, signal: AbortSignal): Promise<void> {
     setCorsHeaders(response);
     if (request.method === "OPTIONS") {
       response.writeHead(204);
@@ -184,7 +226,7 @@ export class ProxyCoordinator {
 
     try {
       if (request.method === "GET" && url.pathname === "/v1/models") {
-        await this.forwardProxyRequest(request, response, "models", Buffer.alloc(0), false, "", true, modelsQueryString(request, url));
+        await this.forwardProxyRequest(request, response, signal, "models", Buffer.alloc(0), false, "", true, modelsQueryString(request, url));
         return;
       }
 
@@ -200,29 +242,32 @@ export class ProxyCoordinator {
 
       const body = await readRequestBody(request);
       if (url.pathname === "/v1/messages") {
-        await this.handleAnthropicMessages(request, response, parseAnthropicJsonObject(body));
+        await this.handleAnthropicMessages(request, response, signal, parseAnthropicJsonObject(body));
         return;
       }
 
       const json = parseJsonObject(body);
       switch (url.pathname) {
         case "/v1/chat/completions":
-          await this.handleChatCompletions(request, response, json);
+          await this.handleChatCompletions(request, response, signal, json);
           return;
         case "/v1/responses":
-          await this.forwardCodexJSON(request, response, "responses", json, true);
+          await this.forwardCodexJSON(request, response, signal, "responses", json, true);
           return;
         case "/v1/responses/compact":
-          await this.forwardCodexJSONPassthrough(request, response, "responses/compact", body, json);
+          await this.forwardCodexJSONPassthrough(request, response, signal, "responses/compact", body, json);
           return;
         case "/v1/memories/trace_summarize":
-          await this.forwardCodexJSONPassthrough(request, response, "memories/trace_summarize", body, json);
+          await this.forwardCodexJSONPassthrough(request, response, signal, "memories/trace_summarize", body, json);
           return;
         case "/v1/alpha/search":
-          await this.forwardCodexJSONPassthrough(request, response, "alpha/search", body, json, "");
+          await this.forwardCodexJSONPassthrough(request, response, signal, "alpha/search", body, json, "");
           return;
       }
     } catch (error) {
+      if (signal.aborted || response.destroyed || response.writableEnded) {
+        return;
+      }
       if (error instanceof ProxyBadRequestError) {
         sendProxyError(response, 400, error.message);
         return;
@@ -247,6 +292,7 @@ export class ProxyCoordinator {
   private async handleChatCompletions(
     request: IncomingMessage,
     response: ServerResponse,
+    signal: AbortSignal,
     json: Record<string, unknown>
   ): Promise<void> {
     const model = readOptionalString(json.model);
@@ -266,6 +312,7 @@ export class ProxyCoordinator {
     const result = await this.forwardProxyRequest(
       request,
       response,
+      signal,
       "responses",
       Buffer.from(JSON.stringify(codexBody)),
       true,
@@ -292,6 +339,7 @@ export class ProxyCoordinator {
   private async handleAnthropicMessages(
     request: IncomingMessage,
     response: ServerResponse,
+    signal: AbortSignal,
     json: Record<string, unknown>
   ): Promise<void> {
     const translation = translateAnthropicRequest(json);
@@ -303,6 +351,7 @@ export class ProxyCoordinator {
     const result = await this.forwardProxyRequest(
       request,
       response,
+      signal,
       "responses",
       Buffer.from(JSON.stringify(translation.codexBody)),
       true,
@@ -329,6 +378,7 @@ export class ProxyCoordinator {
   private async forwardCodexJSON(
     request: IncomingMessage,
     response: ServerResponse,
+    signal: AbortSignal,
     normalizedPath: string,
     json: Record<string, unknown>,
     forceStream: boolean
@@ -339,6 +389,7 @@ export class ProxyCoordinator {
     const result = await this.forwardProxyRequest(
       request,
       response,
+      signal,
       normalizedPath,
       Buffer.from(JSON.stringify(body)),
       forceStream,
@@ -356,6 +407,7 @@ export class ProxyCoordinator {
   private async forwardCodexJSONPassthrough(
     request: IncomingMessage,
     response: ServerResponse,
+    signal: AbortSignal,
     normalizedPath: string,
     body: Buffer,
     json: Record<string, unknown>,
@@ -365,6 +417,7 @@ export class ProxyCoordinator {
     const result = await this.forwardProxyRequest(
       request,
       response,
+      signal,
       normalizedPath,
       body,
       false,
@@ -377,6 +430,7 @@ export class ProxyCoordinator {
   private async forwardProxyRequest(
     request: IncomingMessage,
     response: ServerResponse,
+    signal: AbortSignal,
     normalizedPath: string,
     body: Buffer,
     isStream: boolean,
@@ -403,13 +457,17 @@ export class ProxyCoordinator {
           url,
           body,
           headers: requestHeaders(request),
-          isStream
+          isStream,
+          signal
         }, account, extracted, model);
         if (writeResponse) {
           await sendUpstream(response, result, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
         }
         return result;
       } catch (error) {
+        if (signal.aborted) {
+          throw signalAbortError(signal);
+        }
         failures.push(`${account.label}: ${error instanceof Error ? error.message : String(error)}`);
         if (!(error instanceof CodexUpstreamError) || !error.isRetryable) {
           throw error;
@@ -435,6 +493,9 @@ export class ProxyCoordinator {
         })
       );
     } catch (error) {
+      if (request.signal?.aborted) {
+        throw signalAbortError(request.signal);
+      }
       if (error instanceof CodexUpstreamError && isAuthenticationFailure(error)) {
         const refreshed = await this.refreshProxyAccountAuth(account);
         if (refreshed) {
@@ -908,6 +969,8 @@ async function sendByteStream(
   contentType: string,
   headers: Record<string, string> = {}
 ): Promise<void> {
+  const disconnect = responseDisconnectSignal(response);
+  const iterator = chunks[Symbol.asyncIterator]();
   response.writeHead(statusCode, {
     ...filterResponseHeaders(headers),
     "Content-Type": headers["content-type"] ?? contentType,
@@ -916,13 +979,18 @@ async function sendByteStream(
   });
 
   try {
-    for await (const chunk of chunks) {
+    while (true) {
+      const next = await abortable(iterator.next(), disconnect.signal);
+      if (next.done) {
+        break;
+      }
+      const chunk = next.value;
       if (response.destroyed) {
         break;
       }
       const buffer = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : Buffer.from(chunk);
       if (!response.write(buffer)) {
-        await once(response, "drain");
+        await waitForDrain(response, disconnect.signal);
       }
     }
     if (!response.destroyed) {
@@ -932,7 +1000,104 @@ async function sendByteStream(
     if (!response.destroyed) {
       response.destroy(error instanceof Error ? error : new Error(String(error)));
     }
+  } finally {
+    disconnect.dispose();
+    void iterator.return?.().catch(() => undefined);
   }
+}
+
+function responseDisconnectSignal(response: ServerResponse): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const abortClosed = () => {
+    if (!response.writableEnded) {
+      abortController(controller, "Proxy response disconnected");
+    }
+  };
+  const abortErrored = (error: Error) => {
+    abortController(controller, error.message);
+  };
+
+  if (response.destroyed) {
+    abortController(controller, "Proxy response disconnected");
+  } else {
+    response.once("close", abortClosed);
+    response.once("error", abortErrored);
+  }
+
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      response.off("close", abortClosed);
+      response.off("error", abortErrored);
+    }
+  };
+}
+
+function waitForDrain(response: ServerResponse, signal: AbortSignal): Promise<void> {
+  if (response.destroyed) {
+    return Promise.reject(new Error("Proxy response disconnected"));
+  }
+  if (signal.aborted) {
+    return Promise.reject(signalAbortError(signal));
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener("abort", onAbort);
+      response.off("drain", onDrain);
+      response.off("close", onClose);
+      response.off("error", onError);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signalAbortError(signal));
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error("Proxy response disconnected before drain"));
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    response.once("drain", onDrain);
+    response.once("close", onClose);
+    response.once("error", onError);
+  });
+}
+
+function abortable<Result>(promise: Promise<Result>, signal: AbortSignal): Promise<Result> {
+  if (signal.aborted) {
+    return Promise.reject(signalAbortError(signal));
+  }
+
+  return new Promise<Result>((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signalAbortError(signal));
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      }
+    );
+  });
 }
 
 function filterResponseHeaders(headers: Record<string, string>): Record<string, string> {
@@ -1016,6 +1181,30 @@ async function closeServer(server: Server): Promise<void> {
       }
     });
   });
+}
+
+function destroyActiveSockets(sockets: Set<Socket>): void {
+  for (const socket of sockets) {
+    socket.destroy();
+  }
+  sockets.clear();
+}
+
+function abortController(controller: AbortController, message: string): void {
+  if (!controller.signal.aborted) {
+    controller.abort(new Error(message));
+  }
+}
+
+function signalAbortError(signal: AbortSignal): Error {
+  const reason = (signal as AbortSignal & { reason?: unknown }).reason;
+  if (reason instanceof Error) {
+    return reason;
+  }
+  if (typeof reason === "string" && reason.trim().length > 0) {
+    return new Error(reason);
+  }
+  return new Error("Proxy request aborted");
 }
 
 function refreshTokenFromAuth(auth: StoredAccount["authJson"]): string | undefined {

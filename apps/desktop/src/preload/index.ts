@@ -5,7 +5,33 @@ import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/a
 import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../shared/models/app";
 import type { AppSettings, AppSettingsPatch } from "../shared/models/settings";
 import type { ProxyRuntimeState } from "../shared/models/proxy";
-import { ipcChannels } from "../shared/ipc/schema";
+
+const ipcChannels = {
+  appInfo: "app:info",
+  appOpenRepository: "app:openRepository",
+  appQuit: "app:quit",
+  accountsAddViaLogin: "accounts:addViaLogin",
+  accountsChanged: "accounts:changed",
+  accountsDelete: "accounts:delete",
+  accountsExportPackage: "accounts:exportPackage",
+  accountsImportFile: "accounts:importFile",
+  accountsImportCurrentAuth: "accounts:importCurrentAuth",
+  accountsImportPreparedPackage: "accounts:importPreparedPackage",
+  accountsList: "accounts:list",
+  accountsRefreshAllUsage: "accounts:refreshAllUsage",
+  accountsRefreshUsage: "accounts:refreshUsage",
+  accountsSmartSwitch: "accounts:smartSwitch",
+  accountsSwitch: "accounts:switch",
+  accountsWarmUpWeeklyQuota: "accounts:warmUpWeeklyQuota",
+  clipboardWriteText: "clipboard:writeText",
+  proxyGetState: "proxy:getState",
+  proxyRegenerateApiKey: "proxy:regenerateApiKey",
+  proxyStart: "proxy:start",
+  proxyStop: "proxy:stop",
+  settingsGet: "settings:get",
+  settingsListEditors: "settings:listEditors",
+  settingsUpdate: "settings:update"
+} as const;
 
 export interface CodexManagerAPI {
   getAppInfo: () => Promise<AppInfo>;
