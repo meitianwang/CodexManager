@@ -1,6 +1,6 @@
 # Windows Release
 
-This document covers the Windows release of the Electron desktop app in `apps/desktop`. The native Swift macOS app is deprecated and is no longer part of the desktop release path.
+This document covers the Windows release of the Electron desktop app in `apps/desktop`. The native Swift macOS app has been removed and is no longer part of the desktop release path.
 
 ## Prerequisites
 

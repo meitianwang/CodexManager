@@ -7,13 +7,13 @@ A desktop app for managing multiple Codex / ChatGPT accounts with usage-aware sm
 ## Desktop Release Status / 桌面端发布状态
 
 - Electron under `apps/desktop` is the desktop mainline and release target for macOS and Windows.
-- The native Swift macOS app is deprecated and no longer used as the release target or feature source of truth.
+- The native Swift macOS app has been removed and is no longer used as the release target or feature source of truth.
 - Linux remains unsupported until a dedicated Linux release pass is requested.
 
 ---
 
 - `apps/desktop` 下的 Electron 应用是 macOS 和 Windows 的桌面端发布主线。
-- 原生 Swift macOS 应用已废弃，不再作为发布目标或功能事实源。
+- 原生 Swift macOS 应用已移除，不再作为发布目标或功能事实源。
 - Linux 暂不支持，直到后续单独做 Linux 发布收口。
 
 ## Features / 功能概览

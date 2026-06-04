@@ -92,7 +92,7 @@ jobs:
           CodexManager ${VERSION} desktop stable release.
 
           - Electron desktop is the release target for macOS and Windows.
-          - The native Swift macOS app is deprecated and no longer blocks desktop release.
+          - The native Swift macOS app has been removed and no longer blocks desktop release.
           - Windows assets are the Squirrel.Windows installer, RELEASES file, nupkg package, and automated verification evidence.
           EOF
 

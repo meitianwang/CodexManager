@@ -51,6 +51,25 @@ describe("desktop packaging contracts", () => {
     expect(packageJson.description).not.toContain("Windows");
   });
 
+  it("does not keep the removed native Swift macOS app entrypoints", () => {
+    const repoRoot = resolve(appRoot, "..", "..");
+    const removedSwiftPaths = [
+      "Package.swift",
+      "CodexManager.xcodeproj",
+      "Sources/CodexManager",
+      "Sources/CodexManagerWidgets",
+      "Tests/CodexManagerTests",
+      "project.yml",
+      "scripts/package_macos.sh",
+      "scripts/release_macos.sh",
+      "docs/release-macos.md"
+    ];
+
+    for (const removedPath of removedSwiftPaths) {
+      expect(existsSync(resolve(repoRoot, removedPath))).toBe(false);
+    }
+  });
+
   it("keeps package icon assets available for Windows and macOS", () => {
     const svg = readAppFile("assets/icon.svg").toString("utf8");
     const ico = readAppFile("assets/icon.ico");

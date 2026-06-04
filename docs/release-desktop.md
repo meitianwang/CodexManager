@@ -1,28 +1,28 @@
 # CodexManager Desktop Release Verification
 
-This document tracks the Electron desktop release path for macOS and Windows. The native Swift macOS app is deprecated and is no longer a release target.
+This document tracks the Electron desktop release path for macOS and Windows. The native Swift macOS app has been removed and is no longer a release target.
 
 ## Current Release Boundary
 
 - Electron under `apps/desktop` is the desktop mainline and release target.
 - macOS packaging uses Electron Forge from `apps/desktop`.
 - Windows packaging remains the current Windows release path; see `docs/release-windows.md`.
-- The native Swift macOS app is deprecated. Keep the Swift sources only as legacy reference until they are removed in a later cleanup.
+- The native Swift macOS app and its legacy packaging scripts have been removed from the repository.
 - Linux hardening remains deferred. The desktop platform selector keeps Linux explicit as unsupported instead of routing Linux through the Windows adapter.
 
 ## macOS-Only Feature Boundary
 
-The Electron desktop release intentionally does not carry these Swift-only macOS integrations:
+The Electron desktop release intentionally does not carry these former Swift-only macOS integrations:
 
 | Feature | Classification during migration | Release implication |
 | --- | --- | --- |
-| CloudKit account sync | Deprecated Swift-only capability | Not part of the Electron desktop release. A cross-platform replacement needs a later approved design. |
-| CloudKit current selection sync and push notifications | Deprecated Swift-only capability | Not part of the Electron desktop release. |
-| WidgetKit account widgets and app group snapshots | Deprecated Swift-only capability | Not part of the Electron desktop release unless the product scope changes. |
+| CloudKit account sync | Removed Swift-only capability | Not part of the Electron desktop release. A cross-platform replacement needs a later approved design. |
+| CloudKit current selection sync and push notifications | Removed Swift-only capability | Not part of the Electron desktop release. |
+| WidgetKit account widgets and app group snapshots | Removed Swift-only capability | Not part of the Electron desktop release unless the product scope changes. |
 | Swift MenuBarExtra polish and Dockless accessory behavior | Replaced by Electron tray behavior | Pixel-identical native menu bar behavior is not required for the desktop release. |
 | macOS paths, launch at startup, Codex launch, editor restart, and clipboard utilities | Retained as Electron desktop workflows | Implemented in the Electron macOS adapter. |
 
-The Swift app itself is deprecated and no longer blocks Electron desktop release decisions.
+The removed Swift app no longer blocks Electron desktop release decisions.
 
 ## macOS Electron Checks
 

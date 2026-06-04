@@ -2,7 +2,7 @@
 
 Date: 2026-06-01
 
-This audit tracks the evidence for the desktop-mainline migration. The user has now approved deprecating the native Swift macOS app and using Electron as the macOS and Windows desktop release target.
+This audit tracks the evidence for the desktop-mainline migration. The user has now approved removing the native Swift macOS app and using Electron as the macOS and Windows desktop release target.
 
 ## Status Summary
 
@@ -14,9 +14,9 @@ This audit tracks the evidence for the desktop-mainline migration. The user has 
 | Electron macOS core workflows | Partially proven | `pnpm run smoke:macos-package` passes in smoke mode with account import/export, smoke OAuth, account switch, smart switch, proxy start/stop and routes, settings persistence, tray actions, and smoke-recorded Codex/editor/startup side effects. The package-smoke wrapper now independently validates `smoke-result.json` plus Accounts/Proxy/Settings screenshot artifacts before reporting success. `pnpm run verify:macos-real-data` passes against local account/settings/auth data without side effects. `pnpm run verify:macos-isolated-real-data` copies local data into a temp root and verifies account list, account transfer export/import, account switch, auth projection write, and settings persistence against that isolated copy. `pnpm run verify:macos-real-side-effects` now provides a default-dry-run executable verifier for the remaining real side-effect checks, with approved settings-write and OAuth account-import paths creating temporary 0600 backups before changing real settings or the account store. | Real OAuth browser login, real Codex launch, real editor restart, real login-item behavior, and real settings writes still require explicit approval before running. |
 | Platform adapter isolation | Proven with caveat | Platform-sensitive filesystem, launch-at-startup, Codex launch, editor restart, tray, lifecycle, smoke defaults, source device IDs, request headers, and window icon choices live behind `apps/desktop/src/main/platform`. Shared services receive platform-owned values through the app context. Linux now has an explicit unsupported placeholder instead of falling through to Windows behavior. Desktop contracts now scan production `src/main` and `src/shared` files outside `platform` for platform-specific integration strings. | `platform/command-runner.ts` remains a shared low-level helper with Windows path support by design; Linux release hardening is deferred. |
 | TypeScript as forward source of truth | Proven for shared desktop contracts | `apps/desktop/tests/desktop-contracts.test.ts` defines desktop behavior contracts for proxy models, endpoints, locales, and editor restart targets. Electron tests no longer read Swift source or Swift localization files as the source of truth. | Future shared behavior should add TypeScript desktop contracts directly instead of reviving Swift-source parity tests. |
-| Swift macOS policy | Deprecated by user decision | Swift CloudKit and WidgetKit code remains in place as legacy source only. | Later cleanup can remove Swift sources and legacy packaging scripts. |
+| Swift macOS policy | Removed by user decision | The Swift package, Xcode project, Swift sources/tests, XcodeGen project config, and legacy Swift packaging scripts have been removed. | None for the removal criterion. |
 | Documentation no longer treats Electron as only a Windows port | Proven with historical-context exception | Current release docs describe `apps/desktop` as the Electron desktop mainline. Remaining `apps/windows` references are in historical migration context, superseded Windows docs, or tests asserting the old renderer title is absent. | None for current-state documentation. |
-| macOS-only feature classification | Closed | `docs/release-desktop.md` classifies CloudKit, WidgetKit, and Swift menu bar behavior as deprecated Swift-only capabilities outside the Electron release. | Cross-platform replacements require later product decisions. |
+| macOS-only feature classification | Closed | `docs/release-desktop.md` classifies CloudKit, WidgetKit, and Swift menu bar behavior as removed Swift-only capabilities outside the Electron release. | Cross-platform replacements require later product decisions. |
 | macOS packaging and CI smoke | Locally proven, remote pending | `apps/desktop/assets/icon.icns`, `pnpm run verify:package-assets`, `pnpm run package:macos`, local `pnpm run smoke:macos-package`, packaged icon verification, and `.github/workflows/macos-desktop.yml` are present. Packaging contracts assert the macOS workflow uses desktop-mainline naming, Electron Forge Squirrel packaging remains Windows-only, and Electron Forge ZIP packaging is limited to `darwin` while Linux remains unsupported. `pnpm run collect:macos-ci-evidence` now provides a read-only remote evidence collector. | The new macOS GitHub Actions workflow has not yet been observed running remotely; current remote evidence is pending because the workflow is not on the remote default branch. macOS signing/notarization is out of scope until real side effects are verified. |
 
 ## macOS-Machine Phase Closure Decision
@@ -31,20 +31,28 @@ For the current Mac machine phase, the high-value work is already in place:
 - Windows assumptions for paths, Codex launch, editor restart, launch-at-startup, request headers, source device IDs, window icons, tray/lifecycle behavior, and smoke defaults are behind platform modules.
 - A macOS adapter exists for the Electron app, and local verification has proven read-only real-data parsing plus isolated account/settings/auth workflows on this Mac.
 - A packaged macOS smoke run has already proven the Electron app can execute the core UI/workflow surface against isolated data.
-- Swift remains present as legacy source only; the native macOS app is deprecated.
+- The native Swift macOS app has been removed; Electron remains the desktop mainline.
 
 The remaining gaps are approval-gated or intentionally deferred rather than implementation blockers for this Mac-machine migration phase:
 
 - Real OAuth browser login, real Codex launch, real editor restart, login-item behavior, and real settings writes require explicit operator approval because they touch the user's local system state.
 - Remote macOS CI evidence requires the local workflow to be committed/pushed before GitHub can run it.
 - Windows installed-app smoke remains a later Windows release pass, per the user's clarification.
-- The Swift app maintenance/deprecation policy is now decided: Electron is the release target and Swift is deprecated.
+- The Swift app policy is now decided: Electron is the release target and Swift has been removed.
 
 Stopping point for this phase: stop adding verifier hardening now, keep the current implementation and evidence, and decide separately whether to run targeted real macOS side-effect checks. The overall Goal remains active because the approval-gated and remote-evidence gates have not been completed.
 
 ## Recent Validation Evidence
 
-Closure validation after the macOS-machine scope correction:
+Current validation after Swift removal:
+
+- `pnpm exec vitest run tests/packaging-contracts.test.ts`: passed with 1 file and 15 tests, including the removed Swift app entrypoint guard.
+- `pnpm run typecheck`: passed.
+- `pnpm test`: passed with 16 files and 191 tests.
+- `git diff --check`: passed.
+- A residual file scan found no `.swift`, `Package.swift`, `.xcodeproj`, `.xcworkspace`, or `project.yml` files outside ignored dependency and Git directories.
+
+Earlier closure validation after the macOS-machine scope correction, before Swift removal:
 
 - Focused desktop/platform/packaging contracts: `pnpm exec vitest run tests/desktop-contracts.test.ts tests/platform-services.test.ts tests/packaging-contracts.test.ts` passed with 3 files and 44 tests.
 - `swift test --quiet`: passed with 94 XCTest tests and 4 Swift Testing tests.
@@ -52,7 +60,7 @@ Closure validation after the macOS-machine scope correction:
 - `pnpm run verify:macos-real-side-effects`: passed in default dry-run mode and performed no writes, launches, OAuth browser flow, editor restarts, or login-item changes.
 - `git diff --check`: passed.
 
-Latest local validation captured during active Goal turns:
+Earlier local validation captured during active Goal turns before Swift removal:
 
 - `pnpm run verify:package-assets`: passed.
 - `pnpm run verify:macos-real-data`: passed on this Mac; local account store had 4 accounts, settings/auth parsed, Codex CLI and `/Applications/Codex.app` were detected, 2 editor targets were detected, and the verifier reported no writes, launches, OAuth, editor restarts, or login-item changes.
@@ -81,8 +89,7 @@ The Goal should not be marked complete yet because current evidence is still mis
 - Real macOS launch-at-startup/login-item behavior.
 - Real macOS settings writes against the user's app data.
 - Remote GitHub Actions run evidence for the new macOS desktop workflow.
-- Later cleanup for Swift sources and legacy packaging scripts.
 
 ## Next Step
 
-Stop broad verifier hardening. The current Mac-machine implementation and automated/local-smoke phase is closed. Next work should be Electron macOS/Windows release packaging, remote CI evidence after commit/push, and later cleanup of deprecated Swift sources and legacy packaging scripts.
+Stop broad verifier hardening. The current Mac-machine implementation and automated/local-smoke phase is closed. Next work should be Electron macOS/Windows release packaging and remote CI evidence after commit/push.
