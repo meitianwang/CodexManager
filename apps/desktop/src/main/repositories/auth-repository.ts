@@ -143,18 +143,21 @@ export class AuthFileRepository {
     let email: string | undefined;
     let planType: string | undefined;
     let teamName: string | undefined;
-    let claims: JSONValue | undefined;
+    const idTokenClaims = decodeJwtPayloadOptional(idToken);
+    const accessTokenClaims = decodeJwtPayloadOptional(accessToken);
+    const claims = preferredClaims(idTokenClaims, accessTokenClaims);
 
-    try {
-      claims = decodeJwtPayload(idToken);
-      email = stringAtPath(["email"], claims);
-      accountId ??= stringAtPath(["https://api.openai.com/auth", "chatgpt_account_id"], claims);
-      principalId ??= resolvePrincipalID({ auth, claims, email, accountId });
-      planType = stringAtPath(["https://api.openai.com/auth", "chatgpt_plan_type"], claims);
-      teamName = extractTeamName(auth, claims, accountId);
-    } catch {
-      teamName = extractTeamName(auth, undefined, accountId);
-    }
+    email = firstStringAtPath(["email"], idTokenClaims, accessTokenClaims);
+    accountId ??= firstStringAtPath(
+      ["https://api.openai.com/auth", "chatgpt_account_id"],
+      idTokenClaims,
+      accessTokenClaims
+    );
+    principalId ??=
+      resolvePrincipalID({ auth, claims: idTokenClaims, email }) ??
+      resolvePrincipalID({ auth, claims: accessTokenClaims, email });
+    planType = firstStringAtPath(["https://api.openai.com/auth", "chatgpt_plan_type"], idTokenClaims, accessTokenClaims);
+    teamName = extractTeamName(auth, claims, accountId);
 
     if (!accountId) {
       throw new Error("auth JSON is missing chatgpt_account_id");
@@ -244,6 +247,49 @@ function stringValue(value: JSONValue | undefined, label: string): string {
 
 function optionalStringValue(value: JSONValue | undefined): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function decodeJwtPayloadOptional(token: string): JSONValue | undefined {
+  try {
+    return decodeJwtPayload(token);
+  } catch {
+    return undefined;
+  }
+}
+
+function firstStringAtPath(path: readonly string[], ...roots: readonly (JSONValue | undefined)[]): string | undefined {
+  for (const root of roots) {
+    const value = optionalStringValue(stringAtPath(path, root));
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function preferredClaims(primary: JSONValue | undefined, fallback: JSONValue | undefined): JSONValue | undefined {
+  if (primary === undefined) {
+    return fallback;
+  }
+  if (fallback === undefined) {
+    return primary;
+  }
+  if (!isJsonObject(primary) || !isJsonObject(fallback)) {
+    return primary;
+  }
+  return mergeJsonObjects(fallback, primary);
+}
+
+function mergeJsonObjects(
+  fallback: Record<string, JSONValue>,
+  primary: Record<string, JSONValue>
+): Record<string, JSONValue> {
+  const merged: Record<string, JSONValue> = { ...fallback };
+  for (const [key, value] of Object.entries(primary)) {
+    const fallbackValue = merged[key];
+    merged[key] = isJsonObject(value) && isJsonObject(fallbackValue) ? mergeJsonObjects(fallbackValue, value) : value;
+  }
+  return merged;
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

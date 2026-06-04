@@ -99,7 +99,7 @@ export class OpenAIChatGPTOAuthLoginService {
     ]);
 
     if (forcedWorkspaceId) {
-      const accountId = extractAccountIDFromIDToken(tokenResponse.idToken);
+      const accountId = extractAccountIDFromTokens(tokenResponse.idToken, tokenResponse.accessToken);
       if (accountId !== forcedWorkspaceId) {
         throw new UnauthorizedError(await this.message("workspaceMismatchFormat", forcedWorkspaceId));
       }
@@ -295,13 +295,20 @@ export function formEncodedBody(items: readonly (readonly [string, string])[]): 
   return items.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
 }
 
-export function extractAccountIDFromIDToken(idToken: string): string {
-  const payload = decodeJwtPayload(idToken);
-  const accountId = stringAtPath(["https://api.openai.com/auth", "chatgpt_account_id"], payload);
+export function extractAccountIDFromTokens(idToken: string, accessToken: string): string {
+  const accountId = accountIDFromToken(idToken) ?? accountIDFromToken(accessToken);
   if (!accountId) {
-    throw new Error("id_token is missing chatgpt_account_id");
+    throw new Error("tokens are missing chatgpt_account_id");
   }
   return accountId;
+}
+
+function accountIDFromToken(token: string): string | undefined {
+  try {
+    return stringAtPath(["https://api.openai.com/auth", "chatgpt_account_id"], decodeJwtPayload(token));
+  } catch {
+    return undefined;
+  }
 }
 
 function parseTokenExchangeResponse(value: unknown): TokenExchangeResponse {

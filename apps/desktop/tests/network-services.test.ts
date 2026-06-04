@@ -113,6 +113,50 @@ describe("OAuth helpers", () => {
     expect(fetchMock.calls[0]?.body).toContain("code_verifier=verifier");
   });
 
+  it("validates forced workspace from access token claims", async () => {
+    let openedURL: string | undefined;
+    const accessToken = makeJwt("acct-1", "user@example.com");
+    const idToken = makeJwtPayload({
+      email: "user@example.com",
+      sub: "user-principal"
+    });
+    const fetchMock = queuedFetch([
+      jsonResponse({
+        access_token: accessToken,
+        refresh_token: "refresh-token",
+        id_token: idToken
+      }),
+      jsonResponse({
+        access_token: "api-key"
+      })
+    ]);
+    const service = new OpenAIChatGPTOAuthLoginService(
+      { codexConfigPath: "/missing-config.toml" },
+      {
+        fetchImpl: fetchMock.fetchImpl,
+        openExternal: (url) => {
+          openedURL = url;
+          return true;
+        },
+        stateFactory: () => "state",
+        pkceFactory: () => ({ codeVerifier: "verifier", codeChallenge: "challenge" })
+      }
+    );
+
+    const signIn = service.signInWithChatGPT(2, "acct-1");
+    const callbackURL = await callbackURLFromOpenedAuthorizeURL(() => openedURL);
+    const response = await fetch(`${callbackURL}state=state&code=code`);
+    const tokens = await signIn;
+
+    expect(response.status).toBe(200);
+    expect(tokens).toEqual({
+      accessToken,
+      refreshToken: "refresh-token",
+      idToken,
+      apiKey: "api-key"
+    });
+  });
+
   it("rejects callback sign-in when state does not match", async () => {
     let openedURL: string | undefined;
     const service = new OpenAIChatGPTOAuthLoginService(
@@ -454,13 +498,15 @@ async function callbackURLFromOpenedAuthorizeURL(readOpenedURL: () => string | u
 }
 
 function makeJwt(accountId: string, email: string): string {
-  return `header.${Buffer.from(
-    JSON.stringify({
-      email,
-      "https://api.openai.com/auth": {
-        chatgpt_account_id: accountId,
-        chatgpt_plan_type: "plus"
-      }
-    })
-  ).toString("base64url")}.signature`;
+  return makeJwtPayload({
+    email,
+    "https://api.openai.com/auth": {
+      chatgpt_account_id: accountId,
+      chatgpt_plan_type: "plus"
+    }
+  });
+}
+
+function makeJwtPayload(payload: Record<string, unknown>): string {
+  return `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
 }

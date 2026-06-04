@@ -109,6 +109,21 @@ function Get-StringValue {
   return [string] $Value
 }
 
+function Get-FirstStringValue {
+  param(
+    [object[]] $Values
+  )
+
+  foreach ($value in $Values) {
+    $stringValue = Get-StringValue $value
+    if (-not [string]::IsNullOrWhiteSpace($stringValue)) {
+      return $stringValue
+    }
+  }
+
+  return $null
+}
+
 function Get-ArrayCount {
   param(
     [object] $Value
@@ -276,28 +291,38 @@ function Get-CodexAuthSummary {
   )
 
   $tokens = Get-PropertyValue $Auth "tokens"
+  $accessToken = Get-StringValue (Get-PropertyValue $tokens "access_token")
   $idToken = Get-StringValue (Get-PropertyValue $tokens "id_token")
   $claims = Decode-JwtPayload $idToken
+  $accessClaims = Decode-JwtPayload $accessToken
   $openAIClaims = Get-PropertyValue $claims "https://api.openai.com/auth"
+  $accessOpenAIClaims = Get-PropertyValue $accessClaims "https://api.openai.com/auth"
 
-  $accountId = Get-StringValue (Get-PropertyValue $tokens "account_id")
-  if ([string]::IsNullOrWhiteSpace($accountId)) {
-    $accountId = Get-StringValue (Get-PropertyValue $openAIClaims "chatgpt_account_id")
-  }
-
-  $principalId = Get-StringValue (Get-PropertyValue $tokens "principal_id")
-  if ([string]::IsNullOrWhiteSpace($principalId)) {
-    $principalId = Get-StringValue (Get-PropertyValue $claims "sub")
-  }
+  $accountId = Get-FirstStringValue @(
+    (Get-PropertyValue $tokens "account_id"),
+    (Get-PropertyValue $openAIClaims "chatgpt_account_id"),
+    (Get-PropertyValue $accessOpenAIClaims "chatgpt_account_id")
+  )
+  $principalId = Get-FirstStringValue @(
+    (Get-PropertyValue $tokens "principal_id"),
+    (Get-PropertyValue $claims "sub"),
+    (Get-PropertyValue $accessClaims "sub")
+  )
 
   return [ordered]@{
     authMode = Get-StringValue (Get-PropertyValue $Auth "auth_mode")
     accountId = $accountId
     principalId = $principalId
-    email = Get-StringValue (Get-PropertyValue $claims "email")
-    planType = Get-StringValue (Get-PropertyValue $openAIClaims "chatgpt_plan_type")
-    teamName = Get-StringValue (Get-PropertyValue $openAIClaims "chatgpt_team_name")
-    hasAccessToken = -not [string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $tokens "access_token")))
+    email = Get-FirstStringValue @((Get-PropertyValue $claims "email"), (Get-PropertyValue $accessClaims "email"))
+    planType = Get-FirstStringValue @(
+      (Get-PropertyValue $openAIClaims "chatgpt_plan_type"),
+      (Get-PropertyValue $accessOpenAIClaims "chatgpt_plan_type")
+    )
+    teamName = Get-FirstStringValue @(
+      (Get-PropertyValue $openAIClaims "chatgpt_team_name"),
+      (Get-PropertyValue $accessOpenAIClaims "chatgpt_team_name")
+    )
+    hasAccessToken = -not [string]::IsNullOrWhiteSpace($accessToken)
     hasRefreshToken = -not [string]::IsNullOrWhiteSpace((Get-StringValue (Get-PropertyValue $tokens "refresh_token")))
     hasIdToken = -not [string]::IsNullOrWhiteSpace($idToken)
     lastRefresh = Get-StringValue (Get-PropertyValue $Auth "last_refresh")

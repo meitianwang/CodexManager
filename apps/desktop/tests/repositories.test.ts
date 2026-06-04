@@ -179,6 +179,35 @@ describe("auth persistence", () => {
     expect(extracted.teamName).toBe("Platform");
     expect(extracted.principalId).toBe("user@example.com");
   });
+
+  it("extracts ChatGPT auth metadata from access token workspace claims", async () => {
+    const paths = await makeTempPaths();
+    const repository = new AuthFileRepository(paths);
+    const extracted = repository.extractAuth({
+      auth_mode: "chatgpt",
+      tokens: {
+        access_token: makeJwt({
+          "https://api.openai.com/auth": {
+            chatgpt_account_id: "acct-access",
+            chatgpt_plan_type: "team",
+            chatgpt_team_name: "Access Team"
+          }
+        }),
+        id_token: makeJwt({
+          email: "user@example.com",
+          sub: "user-principal"
+        }),
+        refresh_token: "refresh-token",
+        account_id: null
+      }
+    });
+
+    expect(extracted.accountId).toBe("acct-access");
+    expect(extracted.email).toBe("user@example.com");
+    expect(extracted.planType).toBe("team");
+    expect(extracted.teamName).toBe("Access Team");
+    expect(extracted.principalId).toBe("user-principal");
+  });
 });
 
 describe("settings helpers", () => {
