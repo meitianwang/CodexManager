@@ -24,6 +24,8 @@ if (started) {
   app.quit();
 }
 
+app.setName(appInfo.displayName);
+
 let mainWindow: BrowserWindow | null = null;
 let trayService: TrayService | undefined;
 let backgroundAccountMaintenanceService: BackgroundAccountMaintenanceService | undefined;
