@@ -60,6 +60,8 @@ describe("desktop renderer app", () => {
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("proxy");
     expect(screen.getByRole("heading", { level: 2, name: "Proxy" })).toBeTruthy();
     expect(screen.getByText("/v1/chat/completions")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Configure Codex.app" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Add or import an account before configuring Codex.app.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("settings");
@@ -487,6 +489,7 @@ describe("desktop renderer app", () => {
     expect(modelList.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5.5");
     expect(screen.getByRole("heading", { name: "Codex.app" })).toBeTruthy();
     expect(screen.getByText("Not configured")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Configure Codex.app" }) as HTMLButtonElement).disabled).toBe(false);
     expect(rendererStyles()).toContain("flex-wrap: wrap;");
     expect(rendererStyles()).not.toContain("grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));");
     expect(codeBlockCopyButtons()).toHaveLength(2);

@@ -639,6 +639,7 @@ function App(): ReactElement {
         {activePage === "proxy" && (
           <ProxyPage
             busyAction={busyAction}
+            hasAccounts={accounts.length > 0}
             onCopy={(text, success) =>
               runAction(
                 t("action.copy"),
@@ -1263,6 +1264,7 @@ function ResetRow({ locale, resetAt, t, title }: { locale: AppLocaleID; resetAt?
 interface ProxyPageProps {
   busyAction?: string;
   codexAppStatus: CodexAppIntegrationStatus;
+  hasAccounts: boolean;
   onConfigureCodexApp: () => void;
   onCopy: (text: string, success?: string) => void;
   onRegenerateApiKey: () => void;
@@ -1295,6 +1297,8 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
   const curlText = proxyCurlExample(props.proxyState.proxyURL, endpoint.id, props.selectedModel, apiKeyDisplay);
   const configText = proxyConfigText(props.proxyState.proxyURL, endpoint.id, apiKeyDisplay);
   const isBusy = Boolean(props.busyAction);
+  const codexAppConfigureDisabled = isBusy || !props.hasAccounts;
+  const codexAppHint = props.hasAccounts ? props.t("proxy.codex_app.restart_hint") : props.t("proxy.codex_app.no_accounts_hint");
 
   return (
     <div className="proxy-layout">
@@ -1399,30 +1403,34 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
       </section>
 
       <section className="proxy-section codex-app-section">
-        <div className="codex-app-heading-row">
-          <h3>{props.t("proxy.section.codex_app")}</h3>
-          <span className={`integration-status ${props.codexAppStatus.state}`}>
-            {codexAppStatusLabel(props.codexAppStatus.state, props.t)}
-          </span>
+        <div className="codex-app-summary">
+          <div className="codex-app-copy">
+            <div className="codex-app-title-row">
+              <h3>{props.t("proxy.section.codex_app")}</h3>
+              <span className={`integration-status ${props.codexAppStatus.state}`}>
+                {codexAppStatusLabel(props.codexAppStatus.state, props.t)}
+              </span>
+            </div>
+            <p className="codex-app-hint">{codexAppHint}</p>
+          </div>
+          <div className="codex-app-actions">
+            <button className="primary-action" type="button" disabled={codexAppConfigureDisabled} onClick={props.onConfigureCodexApp}>
+              {props.t("proxy.codex_app.configure")}
+            </button>
+            <button type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSafe}>
+              {props.t("proxy.codex_app.restore_safe")}
+            </button>
+            <button className="danger subtle-danger" type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSnapshot}>
+              {props.t("proxy.codex_app.restore_snapshot")}
+            </button>
+          </div>
         </div>
         <div className="codex-app-details">
           <span>{props.t("proxy.codex_app.provider_model_format", { provider: props.codexAppStatus.providerId, model: props.codexAppStatus.model })}</span>
           <span>{props.t("proxy.codex_app.config_path_format", { path: props.codexAppStatus.configPath })}</span>
           <span>{props.t("proxy.codex_app.proxy_format", { url: props.codexAppStatus.proxyURL })}</span>
-          {props.codexAppStatus.warning && <span className="integration-warning">{props.codexAppStatus.warning}</span>}
         </div>
-        <div className="codex-app-actions">
-          <button className="primary-action" type="button" disabled={isBusy} onClick={props.onConfigureCodexApp}>
-            {props.t("proxy.codex_app.configure")}
-          </button>
-          <button type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSafe}>
-            {props.t("proxy.codex_app.restore_safe")}
-          </button>
-          <button className="danger" type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSnapshot}>
-            {props.t("proxy.codex_app.restore_snapshot")}
-          </button>
-        </div>
-        <p className="codex-app-hint">{props.t("proxy.codex_app.restart_hint")}</p>
+        {props.codexAppStatus.warning && <p className="integration-warning">{props.codexAppStatus.warning}</p>}
       </section>
     </div>
   );

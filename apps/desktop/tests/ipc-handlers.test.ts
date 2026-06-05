@@ -27,6 +27,7 @@ describe("ipc handlers", () => {
   afterEach(async () => {
     await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
     vi.resetAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("publishes the latest accounts after account switching", async () => {
@@ -105,7 +106,9 @@ describe("ipc handlers", () => {
       proxyURL: "http://localhost:18317"
     };
     const context = appContext(
-      {},
+      {
+        listAccounts: vi.fn(async () => [accountSummary()])
+      },
       {
         codexAppIntegrationService: {
           configure: vi.fn(async () => codexAppStatus),
@@ -114,12 +117,14 @@ describe("ipc handlers", () => {
           status: vi.fn(async () => codexAppStatus)
         },
         proxyRuntimeService: {
-          getState: vi.fn(async () => proxyState)
+          getState: vi.fn(async () => proxyState),
+          start: vi.fn(async () => proxyState)
         }
       }
     );
     const ipcMain = new FakeIpcMain();
     const publishedProxyStates: unknown[] = [];
+    const fetchMock = stubCodexAppPreflight();
 
     registerIpcHandlers(ipcMain as unknown as IpcMain, context, {
       onProxyStateChanged(state) {
@@ -133,7 +138,136 @@ describe("ipc handlers", () => {
     await expect(ipcMain.invoke(ipcChannels.codexAppRestoreSnapshot)).resolves.toMatchObject({ state: "not_configured" });
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledTimes(1);
     expect(context.proxyRuntimeService.getState).toHaveBeenCalledTimes(1);
+    expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:18317/v1/responses",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
     expect(publishedProxyStates).toEqual([proxyState]);
+  });
+
+  it("starts the proxy before configuring Codex app when the proxy is stopped", async () => {
+    const codexAppStatus = {
+      configPath: "/Users/nik/.codex/config.toml",
+      hasBackup: true,
+      model: "gpt-5.5",
+      providerId: "codexmanager",
+      proxyURL: "http://127.0.0.1:18317",
+      state: "configured"
+    };
+    const stoppedProxyState = {
+      apiKey: "sk-local-test",
+      availableModels: ["gpt-5.5"],
+      isRunning: false,
+      port: 18_317,
+      proxyURL: "http://localhost:18317"
+    };
+    const runningProxyState = {
+      ...stoppedProxyState,
+      isRunning: true
+    };
+    const context = appContext(
+      {
+        listAccounts: vi.fn(async () => [accountSummary()])
+      },
+      {
+        codexAppIntegrationService: {
+          configure: vi.fn(async () => codexAppStatus)
+        },
+        proxyRuntimeService: {
+          getState: vi.fn(async () => stoppedProxyState),
+          start: vi.fn(async () => runningProxyState)
+        }
+      }
+    );
+    const ipcMain = new FakeIpcMain();
+    const publishedProxyStates: unknown[] = [];
+    stubCodexAppPreflight();
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context, {
+      onProxyStateChanged(state) {
+        publishedProxyStates.push(state);
+      }
+    });
+
+    await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).resolves.toEqual(codexAppStatus);
+
+    expect(context.proxyRuntimeService.start).toHaveBeenCalledWith(18_317, "sk-local-test");
+    expect(context.codexAppIntegrationService.configure).toHaveBeenCalledOnce();
+    expect(publishedProxyStates).toEqual([runningProxyState]);
+  });
+
+  it("does not write Codex app config when the local proxy preflight fails", async () => {
+    const codexAppStatus = {
+      configPath: "/Users/nik/.codex/config.toml",
+      hasBackup: true,
+      model: "gpt-5.5",
+      providerId: "codexmanager",
+      proxyURL: "http://127.0.0.1:18317",
+      state: "configured"
+    };
+    const proxyState = {
+      apiKey: "sk-local-test",
+      availableModels: ["gpt-5.5"],
+      isRunning: true,
+      port: 18_317,
+      proxyURL: "http://localhost:18317"
+    };
+    const context = appContext(
+      {
+        listAccounts: vi.fn(async () => [accountSummary()])
+      },
+      {
+        codexAppIntegrationService: {
+          configure: vi.fn(async () => codexAppStatus)
+        },
+        proxyRuntimeService: {
+          getState: vi.fn(async () => proxyState),
+          start: vi.fn(async () => proxyState)
+        }
+      }
+    );
+    const ipcMain = new FakeIpcMain();
+    stubCodexAppPreflight(429, {
+      error: {
+        message: "All accounts are unavailable: Account: model gpt-5.5 unavailable for pro",
+        type: "proxy_error"
+      }
+    });
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context);
+
+    await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).rejects.toThrow(
+      "Codex.app proxy preflight failed (429): All accounts are unavailable"
+    );
+    expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
+  });
+
+  it("rejects Codex app configuration before an account is available", async () => {
+    const context = appContext(
+      {
+        listAccounts: vi.fn(async () => [])
+      },
+      {
+        codexAppIntegrationService: {
+          configure: vi.fn(async () => ({ state: "configured" }))
+        },
+        proxyRuntimeService: {
+          getState: vi.fn(async () => undefined),
+          start: vi.fn(async () => undefined)
+        }
+      }
+    );
+    const ipcMain = new FakeIpcMain();
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context);
+
+    await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).rejects.toThrow("Add and authorize at least one account");
+    expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
+    expect(context.proxyRuntimeService.getState).not.toHaveBeenCalled();
+    expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
   });
 
   it("imports selected auth JSON files directly from the shared import file dialog", async () => {
@@ -237,6 +371,15 @@ class FakeIpcMain {
     }
     return handler({}, input);
   }
+}
+
+function stubCodexAppPreflight(status = 200, body: unknown = { id: "preflight", status: "completed" }): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json" },
+    status
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 function appContext(accountsCoordinator: Record<string, unknown>, patch: Record<string, unknown> = {}): DesktopAppContext {

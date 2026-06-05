@@ -12,6 +12,7 @@ import type {
 } from "../../shared/models/account-transfer";
 import { accountsTransferFormatIdentifier } from "../../shared/models/account-transfer";
 import type { AccountSummary } from "../../shared/models/accounts";
+import { codexAppDefaultModel } from "../../shared/models/codex-app-integration";
 import { parseJsonValue } from "../../shared/models/json-value";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import type { AppSettings } from "../../shared/models/settings";
@@ -27,6 +28,7 @@ import {
   switchAccountSchema
 } from "../../shared/ipc/schema";
 import { parseAccountsTransferPackage } from "../repositories/store-parsers";
+import { boundedResponseText } from "../services/bounded-response";
 import { validateAccountsTransferPackage } from "../services/accounts-coordinator";
 
 export interface IpcHandlerOptions {
@@ -36,6 +38,7 @@ export interface IpcHandlerOptions {
 }
 
 const maxAccountImportDrafts = 8;
+const codexAppPreflightTimeoutMs = 30_000;
 
 export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext, options: IpcHandlerOptions = {}): void {
   const accountImportDrafts = new Map<string, AccountsTransferPackage>();
@@ -159,8 +162,17 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext
 
   ipcMain.handle(ipcChannels.codexAppGetStatus, () => context.codexAppIntegrationService.status());
   ipcMain.handle(ipcChannels.codexAppConfigure, async () => {
+    const accounts = await context.accountsCoordinator.listAccounts();
+    if (accounts.length === 0) {
+      throw new Error("Add and authorize at least one account before configuring Codex.app.");
+    }
+    let proxyState = await context.proxyRuntimeService.getState();
+    if (!proxyState.isRunning) {
+      proxyState = await context.proxyRuntimeService.start(proxyState.port, proxyState.apiKey);
+    }
+    await verifyCodexAppProxyPreflight(proxyState);
     const status = await context.codexAppIntegrationService.configure();
-    options.onProxyStateChanged?.(await context.proxyRuntimeService.getState());
+    options.onProxyStateChanged?.(proxyState);
     return status;
   });
   ipcMain.handle(ipcChannels.codexAppRestoreSafe, () => context.codexAppIntegrationService.restoreSafe());
@@ -222,6 +234,51 @@ async function publishLatestAccounts(context: DesktopAppContext, options: IpcHan
   options.onAccountsChanged(await context.accountsCoordinator.listAccounts());
 }
 
+async function verifyCodexAppProxyPreflight(proxyState: ProxyRuntimeState): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), codexAppPreflightTimeoutMs);
+  try {
+    const response = await fetch(`${proxyState.proxyURL.replace("localhost", "127.0.0.1")}/v1/responses`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${proxyState.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        input: [{ role: "user", content: "Reply exactly: ok" }],
+        model: codexAppDefaultModel,
+        stream: false
+      }),
+      signal: controller.signal
+    });
+    if (response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return;
+    }
+    const text = await boundedResponseText(response);
+    throw new Error(`Codex.app proxy preflight failed (${response.status}): ${proxyErrorMessage(text)}`);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Codex.app proxy preflight timed out.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function proxyErrorMessage(text: string): string {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (isRecord(parsed) && isRecord(parsed.error) && typeof parsed.error.message === "string") {
+      return parsed.error.message;
+    }
+  } catch {
+    // Fall through to bounded raw text.
+  }
+  return text || "Unknown proxy error";
+}
+
 function accountTransferSelectableItem(account: AccountsTransferPackage["accounts"][number]): AccountTransferSelectableItem {
   const summary = toAccountSummary(account);
   return {
@@ -236,10 +293,9 @@ function accountTransferSelectableItem(account: AccountsTransferPackage["account
 }
 
 function isAccountsTransferPackageCandidate(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    (value as Record<string, unknown>).format === accountsTransferFormatIdentifier
-  );
+  return isRecord(value) && value.format === accountsTransferFormatIdentifier;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

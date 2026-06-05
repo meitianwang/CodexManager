@@ -2,12 +2,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo, Socket } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
 import { codexAppDefaultModel } from "../../shared/models/codex-app-integration";
-import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
+import type { AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import { appInfo } from "../../shared/app-info";
 import { accountSummaries } from "../../shared/domain/accounts-store";
 import { accountKeyForExtractedAuth, accountKeyForStoredAccount, normalizedAccountId } from "../../shared/domain/account-identity";
-import { effectivePlanType, preferredPlanType } from "../../shared/domain/account-plan-resolver";
+import { preferredPlanType } from "../../shared/domain/account-plan-resolver";
 import { remainingScore } from "../../shared/domain/account-ranking";
 import { resolveChatGPTBaseOrigin, removeSuffix } from "../services/chatgpt-base-origin";
 import type { AccountsStoreRepositoryLike, AuthRepositoryLike } from "../services/accounts-coordinator";
@@ -35,7 +35,6 @@ import {
   type CodexUpstreamResult,
   type CodexUpstreamStreamingResult
 } from "./upstream-client";
-import { modelCatalogPlanKey } from "../services/remote-model-catalog-service";
 import {
   collectCompletedResponseFromSSE,
   decodeTextLines,
@@ -548,7 +547,7 @@ export class ProxyCoordinator {
         continue;
       }
 
-      const unavailableReason = this.accountUnavailableReason(account, summary, model, now);
+      const unavailableReason = this.accountUnavailableReason(account, model, now);
       if (unavailableReason) {
         unavailableReasons.push(unavailableReason);
         continue;
@@ -572,7 +571,6 @@ export class ProxyCoordinator {
 
   private accountUnavailableReason(
     account: StoredAccount,
-    summary: AccountSummary,
     model: string,
     now: number
   ): string | undefined {
@@ -593,23 +591,7 @@ export class ProxyCoordinator {
       return `${account.label}: model ${model} cooling down until ${formatResetTime(modelCooldownUntil)}`;
     }
 
-    if (!this.modelIsSupported(model, account)) {
-      return `${account.label}: model ${model} unavailable for ${summary.effectivePlanType}`;
-    }
-
     return undefined;
-  }
-
-  private modelIsSupported(model: string, account: StoredAccount): boolean {
-    if (!model) {
-      return true;
-    }
-    const modelsByPlanKey = this.options.modelCatalogService?.cachedModelIDsByPlanKey();
-    if (!modelsByPlanKey || modelsByPlanKey.size === 0) {
-      return true;
-    }
-    const planKey = modelCatalogPlanKey(effectivePlanType(account.planType, account.usage?.planType));
-    return modelsByPlanKey.get(planKey)?.has(model) === true;
   }
 
   private async currentAuthAccountKey(): Promise<string | undefined> {

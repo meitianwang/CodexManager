@@ -1097,8 +1097,8 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-b", "acct-b", "acct-a"]);
   });
 
-  it("skips accounts whose plan does not support the requested catalog model", async () => {
-    const upstream = new FakeUpstreamClient([successResult({ id: "resp-pro" })]);
+  it("does not reject accounts only because the catalog omits the requested model", async () => {
+    const upstream = new FakeUpstreamClient([successResult({ id: "resp-plus" })]);
     const context = await makeProxyContext({
       modelCatalogService: new FakeModelCatalogService({
         "codex-plus": ["plus-model"],
@@ -1120,7 +1120,7 @@ describe("local proxy", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-pro"]);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-plus"]);
   });
 });
 

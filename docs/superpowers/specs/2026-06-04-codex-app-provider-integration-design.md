@@ -4,7 +4,7 @@ Date: 2026-06-04
 
 ## Decision
 
-CodexManager will provide first-class Codex.app provider integration: one action configures the local Codex app and CLI to use the CodexManager proxy, and restore actions can either safely undo only CodexManager-managed changes or restore the full pre-configuration file snapshot.
+CodexManager will provide first-class Codex.app provider integration: one action enables the CodexManager proxy as Codex.app's active provider, and restore actions can either safely undo only CodexManager-managed changes or restore the full pre-configuration file snapshot.
 
 The feature writes user-level Codex configuration at `~/.codex/config.toml` through the Electron main process. Renderer code must not perform direct filesystem writes or shell environment mutation.
 
@@ -23,7 +23,7 @@ Codex's current configuration documentation supports custom model providers with
 
 ## Goals
 
-- Add a one-click Codex.app configuration action.
+- Add a one-click Codex.app proxy-mode configuration action.
 - Add a default safe restore action that preserves user edits made after CodexManager integration.
 - Add a full snapshot restore action for exact rollback when the user wants it.
 - Configure Codex to use the CodexManager proxy through the Responses API.
@@ -60,9 +60,11 @@ stream_max_retries = 1
 stream_idle_timeout_ms = 300000
 ```
 
-The model default should be `gpt-5.5`, because real upstream testing showed that older examples such as `gpt-5` and `gpt-5-codex` are rejected for Codex with a ChatGPT account.
+The model default should be `gpt-5.5`, because local preflight against ChatGPT account-backed Codex responses currently accepts it for the managed Codex.app provider.
 
 The provider must use `env_key` instead of `requires_openai_auth = true`, because Codex.app should authenticate to the local proxy with the CodexManager API key. CodexManager then authenticates upstream using the selected stored ChatGPT account.
+
+Codex.app defaults thread history listing to the active provider. Because proxy mode must force root-level `model_provider = "codexmanager"`, CodexManager must also make existing OpenAI-backed local history visible under the managed provider. It does this by updating only the first `session_meta` line in local rollout JSONL files and recording the previous provider for safe restore.
 
 ## Architecture
 
@@ -105,6 +107,7 @@ The metadata records:
 - configured config hash;
 - previous root `model` value when present;
 - previous root `model_provider` value when present;
+- per-history-file provider patches for `~/.codex/sessions` and `~/.codex/archived_sessions`;
 - proxy URL and environment variable name used for the integration;
 - timestamp of the latest configure action.
 
@@ -119,7 +122,8 @@ Use conservative text transforms with a managed provider block:
 3. Replace or insert root-level `model` and `model_provider` assignments.
 4. Remove any existing `[model_providers.codexmanager]` table and its direct child tables.
 5. Append a fresh CodexManager provider block.
-6. Write atomically with private permissions.
+6. Sync local rollout history metadata so existing OpenAI sessions are visible when Codex.app filters by `codexmanager`.
+7. Write atomically with private permissions.
 
 Safe restore:
 
@@ -127,14 +131,16 @@ Safe restore:
 2. Remove the CodexManager provider block.
 3. Restore previous root `model` and `model_provider` values from metadata.
 4. If a previous root key did not exist, remove the key only when it still has the CodexManager-managed value.
-5. Preserve unrelated lines and user edits made after configuration.
-6. Clear active restore metadata after success, while keeping the backup file for manual inspection.
+5. Restore any rollout history provider patches recorded in metadata.
+6. Preserve unrelated lines and user edits made after configuration.
+7. Clear active restore metadata after success, while keeping the backup file for manual inspection.
 
 Full snapshot restore:
 
 1. Read the backup file referenced by metadata.
 2. Replace `~/.codex/config.toml` with the snapshot bytes.
-3. Clear active restore metadata after success.
+3. Restore any rollout history provider patches recorded in metadata.
+4. Clear active restore metadata after success.
 
 Repeated configure must be idempotent: it updates the managed provider block and proxy URL/key environment, but does not create a new backup every time unless there is no active metadata.
 
@@ -215,7 +221,8 @@ End-to-end validation should use an isolated temp Codex config and a Codex CLI a
 
 ## Acceptance Criteria
 
-- A user can configure Codex.app from CodexManager with one action.
+- A user can enable CodexManager proxy mode in Codex.app from CodexManager with one action.
+- Existing OpenAI-backed Codex local history remains visible in Codex.app while proxy mode is active.
 - A user can safely restore without losing unrelated post-configuration edits.
 - A user can fully restore the exact pre-configuration file snapshot.
 - The feature never exposes or logs the proxy API key in UI status or test failure summaries.

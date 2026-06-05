@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import {
   codexAppDefaultModel,
   codexAppProviderId,
@@ -26,12 +26,20 @@ interface CodexAppIntegrationManifest {
   configuredAt: number;
   configuredConfigHash: string;
   envVarName: string;
+  historyPatches?: CodexAppHistoryPatch[];
+  historySyncedAt?: number;
   originalConfigExisted: boolean;
   originalConfigHash: string;
   previousRootModelLine?: string;
   previousRootModelProviderLine?: string;
   proxyURL: string;
   version: 1;
+}
+
+interface CodexAppHistoryPatch {
+  appliedProvider: string;
+  path: string;
+  previousProvider: string | null;
 }
 
 interface ConfigReadResult {
@@ -90,12 +98,18 @@ export class CodexAppIntegrationService {
     );
 
     await writeFileAtomically(configured, this.paths.codexConfigPath);
+    const historySync = await syncCodexHistoryProviders(
+      this.paths.codexConfigPath,
+      existingManifest?.historyPatches ?? []
+    );
 
     const manifest: CodexAppIntegrationManifest = {
       backupPath,
       configuredAt: this.unixSecondsNow(),
       configuredConfigHash: sha256(configured),
       envVarName: codexAppProxyApiKeyEnvironmentVariable,
+      historyPatches: historySync.patches,
+      historySyncedAt: this.unixSecondsNow(),
       originalConfigExisted,
       originalConfigHash,
       previousRootModelLine: existingManifest?.previousRootModelLine ?? previousRoot.model?.line,
@@ -115,7 +129,9 @@ export class CodexAppIntegrationService {
 
     return {
       ...this.statusFor(configured, manifest, proxyURL),
-      warning: warning ?? "Restart Codex.app so GUI sessions inherit the updated provider key."
+      warning: [warning, ...historySync.warnings, "Restart Codex.app so GUI sessions inherit the updated provider key."]
+        .filter(Boolean)
+        .join(" ")
     };
   }
 
@@ -126,9 +142,10 @@ export class CodexAppIntegrationService {
     const config = await this.readConfig();
     const withoutManagedBlock = removeManagedProviderBlock(config.raw);
     const { raw: restored, warning } = restoreManagedRootAssignments(withoutManagedBlock, manifest);
+    const historyRestore = await restoreCodexHistoryProviders(manifest.historyPatches ?? []);
     await writeFileAtomically(restored, this.paths.codexConfigPath);
     await this.clearManifest();
-    return this.statusFor(restored, undefined, proxyURL, warning);
+    return this.statusFor(restored, undefined, proxyURL, [warning, ...historyRestore.warnings].filter(Boolean).join(" "));
   }
 
   async restoreSnapshot(): Promise<CodexAppIntegrationStatus> {
@@ -140,9 +157,10 @@ export class CodexAppIntegrationService {
     } else {
       await rm(this.paths.codexConfigPath, { force: true });
     }
+    const historyRestore = await restoreCodexHistoryProviders(manifest.historyPatches ?? []);
     await this.clearManifest();
     const config = await this.readConfig();
-    return this.statusFor(config.raw, undefined, proxyURL);
+    return this.statusFor(config.raw, undefined, proxyURL, historyRestore.warnings.join(" "));
   }
 
   private async readConfig(): Promise<ConfigReadResult> {
@@ -263,7 +281,28 @@ function parseManifest(value: unknown): CodexAppIntegrationManifest {
   if (typeof value.previousRootModelProviderLine === "string") {
     manifest.previousRootModelProviderLine = value.previousRootModelProviderLine;
   }
+  if (Array.isArray(value.historyPatches)) {
+    manifest.historyPatches = value.historyPatches.map(parseHistoryPatch);
+  }
+  if (typeof value.historySyncedAt === "number") {
+    manifest.historySyncedAt = value.historySyncedAt;
+  }
   return manifest;
+}
+
+function parseHistoryPatch(value: unknown): CodexAppHistoryPatch {
+  if (!isRecord(value)) {
+    throw new Error("Invalid Codex.app integration metadata: historyPatches item must be an object.");
+  }
+  const previousProvider = value.previousProvider;
+  if (previousProvider !== null && typeof previousProvider !== "string") {
+    throw new Error("Invalid Codex.app integration metadata: historyPatches.previousProvider must be a string or null.");
+  }
+  return {
+    appliedProvider: requiredString(value.appliedProvider, "historyPatches.appliedProvider"),
+    path: requiredString(value.path, "historyPatches.path"),
+    previousProvider
+  };
 }
 
 function previousRootAssignments(raw: string): { model?: RootAssignment; modelProvider?: RootAssignment } {
@@ -460,6 +499,147 @@ function trimTrailingBlankLines(lines: readonly string[]): string[] {
     next.pop();
   }
   return next;
+}
+
+async function syncCodexHistoryProviders(
+  codexConfigPath: string,
+  existingPatches: readonly CodexAppHistoryPatch[]
+): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
+  const existingPatchByPath = new Map(existingPatches.map((patch) => [patch.path, patch]));
+  const patches = new Map(existingPatchByPath);
+  const warnings: string[] = [];
+  const rolloutPaths = await listRolloutFiles(codexConfigPath);
+
+  for (const path of rolloutPaths) {
+    try {
+      const patch = await syncRolloutFileProvider(path, existingPatchByPath.get(path));
+      if (patch) {
+        patches.set(path, patch);
+      }
+    } catch (error) {
+      warnings.push(`Skipped Codex history provider sync for ${path}: ${errorMessage(error)}.`);
+    }
+  }
+
+  return {
+    patches: [...patches.values()].sort((left, right) => left.path.localeCompare(right.path)),
+    warnings
+  };
+}
+
+async function restoreCodexHistoryProviders(
+  patches: readonly CodexAppHistoryPatch[]
+): Promise<{ warnings: string[] }> {
+  const warnings: string[] = [];
+  for (const patch of patches) {
+    try {
+      await restoreRolloutFileProvider(patch);
+    } catch (error) {
+      warnings.push(`Skipped Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
+    }
+  }
+  return { warnings };
+}
+
+async function listRolloutFiles(codexConfigPath: string): Promise<string[]> {
+  const codexHome = dirname(codexConfigPath);
+  const roots = [join(codexHome, "sessions"), join(codexHome, "archived_sessions")];
+  const results: string[] = [];
+  for (const root of roots) {
+    await collectRolloutFiles(root, results);
+  }
+  return results.sort((left, right) => left.localeCompare(right));
+}
+
+async function collectRolloutFiles(directory: string, results: string[]): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collectRolloutFiles(path, results);
+    } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+      results.push(path);
+    }
+  }
+}
+
+async function syncRolloutFileProvider(
+  path: string,
+  existingPatch: CodexAppHistoryPatch | undefined
+): Promise<CodexAppHistoryPatch | undefined> {
+  const rollout = parseRolloutHead(await readTextFile(path));
+  if (!rollout) {
+    return existingPatch;
+  }
+  const currentProvider = rollout.provider;
+  if (currentProvider === codexAppProviderId) {
+    return existingPatch;
+  }
+  if (currentProvider !== null && currentProvider !== "openai") {
+    return existingPatch;
+  }
+  const patch: CodexAppHistoryPatch = {
+    appliedProvider: codexAppProviderId,
+    path,
+    previousProvider: existingPatch ? existingPatch.previousProvider : currentProvider
+  };
+  rollout.payload.model_provider = codexAppProviderId;
+  await writeFileAtomically(renderRolloutHead(rollout), path);
+  return patch;
+}
+
+async function restoreRolloutFileProvider(patch: CodexAppHistoryPatch): Promise<void> {
+  const rollout = parseRolloutHead(await readTextFile(patch.path));
+  if (!rollout || rollout.provider !== patch.appliedProvider) {
+    return;
+  }
+  if (patch.previousProvider === null) {
+    delete rollout.payload.model_provider;
+  } else {
+    rollout.payload.model_provider = patch.previousProvider;
+  }
+  await writeFileAtomically(renderRolloutHead(rollout), patch.path);
+}
+
+interface ParsedRolloutHead {
+  firstLine: Record<string, unknown>;
+  payload: Record<string, unknown>;
+  provider: string | null;
+  rest: string;
+}
+
+function parseRolloutHead(raw: string): ParsedRolloutHead | undefined {
+  const newlineIndex = raw.indexOf("\n");
+  const firstLineRaw = newlineIndex >= 0 ? raw.slice(0, newlineIndex) : raw;
+  const rest = newlineIndex >= 0 ? raw.slice(newlineIndex) : "";
+  if (!firstLineRaw.trim()) {
+    return undefined;
+  }
+
+  const firstLine = JSON.parse(firstLineRaw) as unknown;
+  if (!isRecord(firstLine) || firstLine.type !== "session_meta" || !isRecord(firstLine.payload)) {
+    return undefined;
+  }
+
+  return {
+    firstLine,
+    payload: firstLine.payload,
+    provider: typeof firstLine.payload.model_provider === "string" ? firstLine.payload.model_provider : null,
+    rest
+  };
+}
+
+function renderRolloutHead(rollout: ParsedRolloutHead): string {
+  return `${JSON.stringify(rollout.firstLine)}${rollout.rest || "\n"}`;
 }
 
 function parseTomlScalar(rawValue: string): string | undefined {

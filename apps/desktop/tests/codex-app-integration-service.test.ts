@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { codexAppProxyApiKeyEnvironmentVariable } from "../src/shared/models/codex-app-integration";
 import type { FileSystemPaths } from "../src/main/repositories/file-system-paths";
@@ -29,6 +29,46 @@ describe("Codex app integration service", () => {
     expect(config).toContain('base_url = "http://127.0.0.1:18317/v1"');
     expect(guiEnvironment.values).toEqual([{ name: codexAppProxyApiKeyEnvironmentVariable, value: "sk-local-test" }]);
     expect(JSON.stringify(manifest)).not.toContain("sk-local-test");
+  });
+
+  it("enables proxy mode and makes OpenAI history visible under the managed provider", async () => {
+    const paths = await makeTempPaths();
+    const historyPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-test.jsonl");
+    const otherProviderHistoryPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-ollama.jsonl");
+    await writeFile(
+      paths.codexConfigPath,
+      [
+        'model = "gpt-5.5"',
+        'model_provider = "openai"',
+        "",
+        "[projects.example]",
+        'trust_level = "trusted"',
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+    await writeRollout(historyPath, "openai");
+    await writeRollout(otherProviderHistoryPath, "ollama");
+    const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
+
+    const status = await service.configure();
+    const config = await readFile(paths.codexConfigPath, "utf8");
+    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as {
+      historyPatches?: Array<{ appliedProvider: string; path: string; previousProvider: string | null }>;
+    };
+
+    expect(status).toMatchObject({ state: "configured", model: "gpt-5.5", providerId: "codexmanager" });
+    expect(config).toContain('model = "gpt-5.5"');
+    expect(config).toContain('model_provider = "codexmanager"');
+    expect(config).toContain("[projects.example]");
+    expect(config).toContain("[model_providers.codexmanager]");
+    await expect(readRolloutProvider(historyPath)).resolves.toBe("codexmanager");
+    await expect(readRolloutProvider(otherProviderHistoryPath)).resolves.toBe("ollama");
+    expect(manifest.historyPatches).toEqual([{ appliedProvider: "codexmanager", path: historyPath, previousProvider: "openai" }]);
+
+    await service.restoreSafe();
+
+    await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
   });
 
   it("safe-restores managed keys while preserving unrelated user edits", async () => {
@@ -101,10 +141,36 @@ describe("Codex app integration service", () => {
 
     await expect(service.configure()).resolves.toMatchObject({
       state: "configured",
-      warning: "launchctl failed"
+      warning: expect.stringContaining("launchctl failed") as string
     });
   });
 });
+
+async function writeRollout(path: string, provider: string | undefined): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const payload: Record<string, unknown> = {
+    id: "019e94fd-0000-7000-8000-000000000001",
+    timestamp: "2026-06-05T00:00:00.000Z",
+    cwd: "/tmp/project",
+    originator: "Codex Desktop",
+    cli_version: "0.0.0",
+    source: "app"
+  };
+  if (provider !== undefined) {
+    payload.model_provider = provider;
+  }
+  await writeFile(
+    path,
+    `${JSON.stringify({ timestamp: "2026-06-05T00:00:01.000Z", type: "session_meta", payload })}\n{"type":"noop"}\n`,
+    "utf8"
+  );
+}
+
+async function readRolloutProvider(path: string): Promise<unknown> {
+  const [firstLine] = (await readFile(path, "utf8")).split("\n");
+  const parsed = JSON.parse(firstLine ?? "") as { payload?: { model_provider?: unknown } };
+  return parsed.payload?.model_provider;
+}
 
 class RecordingGUIEnvironment {
   readonly values: Array<{ name: string; value: string }> = [];
