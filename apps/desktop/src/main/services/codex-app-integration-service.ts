@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
@@ -39,6 +40,7 @@ interface CodexAppIntegrationManifest {
 interface CodexAppHistoryPatch {
   appliedProvider: string;
   path: string;
+  previousDatabaseProvider?: string;
   previousProvider: string | null;
 }
 
@@ -60,6 +62,8 @@ const expectedWireAPI = "responses";
 const expectedRequestMaxRetries = "1";
 const expectedStreamMaxRetries = "1";
 const expectedStreamIdleTimeoutMs = "300000";
+const maxSQLiteOutputBytes = 64 * 1024;
+const sqlitePathChunkSize = 200;
 
 export class CodexAppIntegrationService {
   private readonly unixSecondsNow: () => number;
@@ -298,9 +302,14 @@ function parseHistoryPatch(value: unknown): CodexAppHistoryPatch {
   if (previousProvider !== null && typeof previousProvider !== "string") {
     throw new Error("Invalid Codex.app integration metadata: historyPatches.previousProvider must be a string or null.");
   }
+  const previousDatabaseProvider = value.previousDatabaseProvider;
+  if (previousDatabaseProvider !== undefined && typeof previousDatabaseProvider !== "string") {
+    throw new Error("Invalid Codex.app integration metadata: historyPatches.previousDatabaseProvider must be a string.");
+  }
   return {
     appliedProvider: requiredString(value.appliedProvider, "historyPatches.appliedProvider"),
     path: requiredString(value.path, "historyPatches.path"),
+    previousDatabaseProvider,
     previousProvider
   };
 }
@@ -521,8 +530,11 @@ async function syncCodexHistoryProviders(
     }
   }
 
+  const databaseSync = await syncHistoryDatabaseProviders(codexConfigPath, [...patches.values()]);
+  warnings.push(...databaseSync.warnings);
+
   return {
-    patches: [...patches.values()].sort((left, right) => left.path.localeCompare(right.path)),
+    patches: databaseSync.patches.sort((left, right) => left.path.localeCompare(right.path)),
     warnings
   };
 }
@@ -538,6 +550,7 @@ async function restoreCodexHistoryProviders(
       warnings.push(`Skipped Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
     }
   }
+  warnings.push(...(await restoreHistoryDatabaseProviders(patches)).warnings);
   return { warnings };
 }
 
@@ -570,6 +583,156 @@ async function collectRolloutFiles(directory: string, results: string[]): Promis
       results.push(path);
     }
   }
+}
+
+async function syncHistoryDatabaseProviders(
+  codexConfigPath: string,
+  patches: readonly CodexAppHistoryPatch[]
+): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
+  const databasePaths = await listCodexStateDatabases(codexConfigPath);
+  const openAIHistoryPatches = patches.filter((patch) => patch.previousDatabaseProvider === "openai" || patch.previousProvider === "openai");
+  if (databasePaths.length === 0 || openAIHistoryPatches.length === 0) {
+    return { patches: [...patches], warnings: [] };
+  }
+
+  const warnings: string[] = [];
+  const script = sqliteUpdateScript(openAIHistoryPatches.map((patch) => patch.path), "openai", codexAppProviderId);
+  for (const databasePath of databasePaths) {
+    try {
+      await runSQLiteScript(databasePath, script);
+    } catch (error) {
+      warnings.push(`Skipped Codex history database provider sync for ${databasePath}: ${errorMessage(error)}.`);
+    }
+  }
+
+  return {
+    patches: patches.map((patch) =>
+      patch.previousDatabaseProvider === undefined && patch.previousProvider === "openai"
+        ? { ...patch, previousDatabaseProvider: "openai" }
+        : patch
+    ),
+    warnings
+  };
+}
+
+async function restoreHistoryDatabaseProviders(patches: readonly CodexAppHistoryPatch[]): Promise<{ warnings: string[] }> {
+  if (patches.length === 0) {
+    return { warnings: [] };
+  }
+  const databasePaths = await listCodexStateDatabases(patches[0]?.path ?? "");
+  if (databasePaths.length === 0) {
+    return { warnings: [] };
+  }
+
+  const warnings: string[] = [];
+  const patchesByPreviousProvider = new Map<string, CodexAppHistoryPatch[]>();
+  for (const patch of patches) {
+    const previousProvider = patch.previousDatabaseProvider ?? (patch.previousProvider === "openai" ? "openai" : undefined);
+    if (!previousProvider) {
+      continue;
+    }
+    const providerPatches = patchesByPreviousProvider.get(previousProvider) ?? [];
+    providerPatches.push(patch);
+    patchesByPreviousProvider.set(previousProvider, providerPatches);
+  }
+
+  for (const [previousProvider, providerPatches] of patchesByPreviousProvider) {
+    const script = sqliteUpdateScript(providerPatches.map((patch) => patch.path), codexAppProviderId, previousProvider);
+    for (const databasePath of databasePaths) {
+      try {
+        await runSQLiteScript(databasePath, script);
+      } catch (error) {
+        warnings.push(`Skipped Codex history database provider restore for ${databasePath}: ${errorMessage(error)}.`);
+      }
+    }
+  }
+
+  return { warnings };
+}
+
+async function listCodexStateDatabases(pathInsideCodexHome: string): Promise<string[]> {
+  const codexHome = codexHomeFromPath(pathInsideCodexHome);
+  let entries;
+  try {
+    entries = await readdir(codexHome, { withFileTypes: true });
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return [];
+    }
+    throw error;
+  }
+  return entries
+    .filter((entry) => entry.isFile() && /^state_\d+\.sqlite$/.test(entry.name))
+    .map((entry) => join(codexHome, entry.name))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function codexHomeFromPath(pathInsideCodexHome: string): string {
+  const codexHomeName = ".codex";
+  const parts = pathInsideCodexHome.split("/");
+  const index = parts.lastIndexOf(codexHomeName);
+  return index >= 0 ? parts.slice(0, index + 1).join("/") || "/" : dirname(pathInsideCodexHome);
+}
+
+function sqliteUpdateScript(paths: readonly string[], currentProvider: string, nextProvider: string): string {
+  const statements = ["BEGIN;"];
+  for (const chunk of chunks(paths, sqlitePathChunkSize)) {
+    if (chunk.length === 0) {
+      continue;
+    }
+    statements.push(
+      `UPDATE threads SET model_provider = ${sqliteString(nextProvider)} WHERE model_provider = ${sqliteString(currentProvider)} AND rollout_path IN (${chunk.map(sqliteString).join(", ")});`
+    );
+  }
+  statements.push("COMMIT;");
+  return statements.join("\n");
+}
+
+function chunks<T>(values: readonly T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
+}
+
+function sqliteString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+async function runSQLiteScript(databasePath: string, script: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("sqlite3", [databasePath], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    const appendStdout = (chunk: Buffer) => {
+      stdout = appendBounded(stdout, chunk.toString("utf8"), maxSQLiteOutputBytes);
+    };
+    const appendStderr = (chunk: Buffer) => {
+      stderr = appendBounded(stderr, chunk.toString("utf8"), maxSQLiteOutputBytes);
+    };
+
+    child.stdout?.on("data", appendStdout);
+    child.stderr?.on("data", appendStderr);
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`sqlite3 exited with ${code ?? "unknown"}${stderr ? `: ${stderr.trim()}` : ""}${stdout ? ` stdout: ${stdout.trim()}` : ""}`));
+    });
+    child.stdin?.end(script);
+  });
+}
+
+function appendBounded(current: string, next: string, maxBytes: number): string {
+  const combined = `${current}${next}`;
+  if (Buffer.byteLength(combined, "utf8") <= maxBytes) {
+    return combined;
+  }
+  return combined.slice(-maxBytes);
 }
 
 async function syncRolloutFileProvider(

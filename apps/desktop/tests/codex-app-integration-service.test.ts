@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,6 +8,8 @@ import type { FileSystemPaths } from "../src/main/repositories/file-system-paths
 import { CodexAppIntegrationService } from "../src/main/services/codex-app-integration-service";
 
 const tempRoots: string[] = [];
+const sqlite3Available = spawnSync("sqlite3", ["--version"], { encoding: "utf8" }).status === 0;
+const sqliteIt = sqlite3Available ? it : it.skip;
 
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -69,6 +72,37 @@ describe("Codex app integration service", () => {
     await service.restoreSafe();
 
     await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
+  });
+
+  sqliteIt("syncs OpenAI history provider in the Codex rollout database", async () => {
+    const paths = await makeTempPaths();
+    const historyPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-test.jsonl");
+    const otherProviderHistoryPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-ollama.jsonl");
+    const stateDatabasePath = join(dirname(paths.codexConfigPath), "state_5.sqlite");
+    await writeFile(paths.codexConfigPath, "", "utf8");
+    await writeRollout(historyPath, "openai");
+    await writeRollout(otherProviderHistoryPath, "ollama");
+    await createStateDatabase(stateDatabasePath, [
+      { id: "thread-openai", path: historyPath, provider: "openai" },
+      { id: "thread-ollama", path: otherProviderHistoryPath, provider: "ollama" }
+    ]);
+    const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
+
+    await service.configure();
+    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as {
+      historyPatches?: Array<{ appliedProvider: string; path: string; previousDatabaseProvider?: string; previousProvider: string | null }>;
+    };
+
+    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("codexmanager");
+    await expect(readThreadProvider(stateDatabasePath, otherProviderHistoryPath)).resolves.toBe("ollama");
+    expect(manifest.historyPatches).toEqual([
+      { appliedProvider: "codexmanager", path: historyPath, previousDatabaseProvider: "openai", previousProvider: "openai" }
+    ]);
+
+    await service.restoreSafe();
+
+    await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
+    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("openai");
   });
 
   it("safe-restores managed keys while preserving unrelated user edits", async () => {
@@ -170,6 +204,42 @@ async function readRolloutProvider(path: string): Promise<unknown> {
   const [firstLine] = (await readFile(path, "utf8")).split("\n");
   const parsed = JSON.parse(firstLine ?? "") as { payload?: { model_provider?: unknown } };
   return parsed.payload?.model_provider;
+}
+
+async function createStateDatabase(
+  path: string,
+  rows: Array<{ id: string; path: string; provider: string }>
+): Promise<void> {
+  await runSQLite(
+    path,
+    [
+      "CREATE TABLE threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL, model_provider TEXT NOT NULL);",
+      ...rows.map(
+        (row) =>
+          `INSERT INTO threads (id, rollout_path, model_provider) VALUES (${sqliteString(row.id)}, ${sqliteString(row.path)}, ${sqliteString(row.provider)});`
+      )
+    ].join("\n")
+  );
+}
+
+async function readThreadProvider(databasePath: string, rolloutPath: string): Promise<string> {
+  return (await runSQLite(databasePath, `SELECT model_provider FROM threads WHERE rollout_path = ${sqliteString(rolloutPath)};`)).trim();
+}
+
+async function runSQLite(databasePath: string, script: string): Promise<string> {
+  const result = spawnSync("sqlite3", [databasePath], {
+    encoding: "utf8",
+    input: script,
+    maxBuffer: 1024 * 1024
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `sqlite3 exited with ${result.status ?? "unknown"}`);
+  }
+  return result.stdout;
+}
+
+function sqliteString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 class RecordingGUIEnvironment {

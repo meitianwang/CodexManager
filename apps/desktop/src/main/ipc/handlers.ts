@@ -12,7 +12,6 @@ import type {
 } from "../../shared/models/account-transfer";
 import { accountsTransferFormatIdentifier } from "../../shared/models/account-transfer";
 import type { AccountSummary } from "../../shared/models/accounts";
-import { codexAppDefaultModel } from "../../shared/models/codex-app-integration";
 import { parseJsonValue } from "../../shared/models/json-value";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import type { AppSettings } from "../../shared/models/settings";
@@ -38,7 +37,7 @@ export interface IpcHandlerOptions {
 }
 
 const maxAccountImportDrafts = 8;
-const codexAppPreflightTimeoutMs = 30_000;
+const codexAppProxyHealthTimeoutMs = 30_000;
 
 export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext, options: IpcHandlerOptions = {}): void {
   const accountImportDrafts = new Map<string, AccountsTransferPackage>();
@@ -170,7 +169,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext
     if (!proxyState.isRunning) {
       proxyState = await context.proxyRuntimeService.start(proxyState.port, proxyState.apiKey);
     }
-    await verifyCodexAppProxyPreflight(proxyState);
+    await verifyCodexAppProxyHealth(proxyState);
     const status = await context.codexAppIntegrationService.configure();
     options.onProxyStateChanged?.(proxyState);
     return status;
@@ -234,21 +233,12 @@ async function publishLatestAccounts(context: DesktopAppContext, options: IpcHan
   options.onAccountsChanged(await context.accountsCoordinator.listAccounts());
 }
 
-async function verifyCodexAppProxyPreflight(proxyState: ProxyRuntimeState): Promise<void> {
+async function verifyCodexAppProxyHealth(proxyState: ProxyRuntimeState): Promise<void> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), codexAppPreflightTimeoutMs);
+  const timeout = setTimeout(() => controller.abort(), codexAppProxyHealthTimeoutMs);
   try {
-    const response = await fetch(`${proxyState.proxyURL.replace("localhost", "127.0.0.1")}/v1/responses`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${proxyState.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        input: [{ role: "user", content: "Reply exactly: ok" }],
-        model: codexAppDefaultModel,
-        stream: false
-      }),
+    const response = await fetch(`${proxyState.proxyURL.replace("localhost", "127.0.0.1")}/health`, {
+      method: "GET",
       signal: controller.signal
     });
     if (response.ok) {
@@ -256,10 +246,10 @@ async function verifyCodexAppProxyPreflight(proxyState: ProxyRuntimeState): Prom
       return;
     }
     const text = await boundedResponseText(response);
-    throw new Error(`Codex.app proxy preflight failed (${response.status}): ${proxyErrorMessage(text)}`);
+    throw new Error(`Codex.app proxy health check failed (${response.status}): ${proxyErrorMessage(text)}`);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Codex.app proxy preflight timed out.");
+      throw new Error("Codex.app proxy health check timed out.");
     }
     throw error;
   } finally {

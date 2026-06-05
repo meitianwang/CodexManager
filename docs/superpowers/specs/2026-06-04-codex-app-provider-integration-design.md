@@ -60,7 +60,7 @@ stream_max_retries = 1
 stream_idle_timeout_ms = 300000
 ```
 
-The model default should be `gpt-5.5`, because local preflight against ChatGPT account-backed Codex responses currently accepts it for the managed Codex.app provider.
+The model default should be `gpt-5.5`. Configuration should only health-check the local proxy process; it must not send a real account-backed `/v1/responses` request before writing Codex.app config, because quota or model-rate failures must not leave the root provider half-configured.
 
 The provider must use `env_key` instead of `requires_openai_auth = true`, because Codex.app should authenticate to the local proxy with the CodexManager API key. CodexManager then authenticates upstream using the selected stored ChatGPT account.
 

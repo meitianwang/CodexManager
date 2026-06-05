@@ -124,7 +124,7 @@ describe("ipc handlers", () => {
     );
     const ipcMain = new FakeIpcMain();
     const publishedProxyStates: unknown[] = [];
-    const fetchMock = stubCodexAppPreflight();
+    const fetchMock = stubCodexAppProxyHealth();
 
     registerIpcHandlers(ipcMain as unknown as IpcMain, context, {
       onProxyStateChanged(state) {
@@ -140,9 +140,9 @@ describe("ipc handlers", () => {
     expect(context.proxyRuntimeService.getState).toHaveBeenCalledTimes(1);
     expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:18317/v1/responses",
+      "http://127.0.0.1:18317/health",
       expect.objectContaining({
-        method: "POST"
+        method: "GET"
       })
     );
     expect(publishedProxyStates).toEqual([proxyState]);
@@ -184,7 +184,7 @@ describe("ipc handlers", () => {
     );
     const ipcMain = new FakeIpcMain();
     const publishedProxyStates: unknown[] = [];
-    stubCodexAppPreflight();
+    stubCodexAppProxyHealth();
 
     registerIpcHandlers(ipcMain as unknown as IpcMain, context, {
       onProxyStateChanged(state) {
@@ -199,7 +199,7 @@ describe("ipc handlers", () => {
     expect(publishedProxyStates).toEqual([runningProxyState]);
   });
 
-  it("does not write Codex app config when the local proxy preflight fails", async () => {
+  it("does not write Codex app config when the local proxy health check fails", async () => {
     const codexAppStatus = {
       configPath: "/Users/nik/.codex/config.toml",
       hasBackup: true,
@@ -230,9 +230,9 @@ describe("ipc handlers", () => {
       }
     );
     const ipcMain = new FakeIpcMain();
-    stubCodexAppPreflight(429, {
+    stubCodexAppProxyHealth(503, {
       error: {
-        message: "All accounts are unavailable: Account: model gpt-5.5 unavailable for pro",
+        message: "Proxy is unavailable",
         type: "proxy_error"
       }
     });
@@ -240,7 +240,7 @@ describe("ipc handlers", () => {
     registerIpcHandlers(ipcMain as unknown as IpcMain, context);
 
     await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).rejects.toThrow(
-      "Codex.app proxy preflight failed (429): All accounts are unavailable"
+      "Codex.app proxy health check failed (503): Proxy is unavailable"
     );
     expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
   });
@@ -373,7 +373,7 @@ class FakeIpcMain {
   }
 }
 
-function stubCodexAppPreflight(status = 200, body: unknown = { id: "preflight", status: "completed" }): ReturnType<typeof vi.fn> {
+function stubCodexAppProxyHealth(status = 200, body: unknown = { status: "ok" }): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
     status
