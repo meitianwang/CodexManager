@@ -484,7 +484,9 @@ describe("desktop renderer app", () => {
     const modelList = document.querySelector(".model-list") as HTMLElement;
     const modelChips = Array.from(modelList.querySelectorAll(".model-chip"));
     expect(modelChips).toHaveLength(proxyAvailableModels.length);
-    expect(modelList.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5");
+    expect(modelList.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5.5");
+    expect(screen.getByRole("heading", { name: "Codex.app" })).toBeTruthy();
+    expect(screen.getByText("Not configured")).toBeTruthy();
     expect(rendererStyles()).toContain("flex-wrap: wrap;");
     expect(rendererStyles()).not.toContain("grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));");
     expect(codeBlockCopyButtons()).toHaveLength(2);
@@ -539,7 +541,7 @@ describe("desktop renderer app", () => {
     expect(await screen.findByText("Proxy stopped", { selector: ".notice-text" })).toBeTruthy();
     expect(directProxyControlButtonText()).toEqual(["Start"]);
     expect(proxyUsageText()).toContain("sk-local-...");
-    await waitFor(() => expect(document.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5"));
+    await waitFor(() => expect(document.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5.5"));
 
     fireEvent.click(await screen.findByRole("button", { name: "Regenerate API Key" }));
     await waitFor(() => expect(api.proxy.regenerateApiKey).toHaveBeenCalledOnce());
@@ -740,6 +742,12 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
     clipboard: {
       writeText: vi.fn(async () => undefined)
     },
+    codexApp: {
+      configure: vi.fn(async () => makeCodexAppStatus(proxyState, "configured", true)),
+      getStatus: vi.fn(async () => makeCodexAppStatus(proxyState)),
+      restoreSafe: vi.fn(async () => makeCodexAppStatus(proxyState, "not_configured")),
+      restoreSnapshot: vi.fn(async () => makeCodexAppStatus(proxyState, "not_configured"))
+    },
     proxy: {
       getState: vi.fn(async () => proxyState),
       regenerateApiKey: vi.fn(async () => {
@@ -772,6 +780,21 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
 
   window.codexManager = api;
   return api;
+}
+
+function makeCodexAppStatus(
+  proxyState: ProxyRuntimeState,
+  state: "not_configured" | "configured" | "drifted" | "restorable" = "not_configured",
+  hasBackup = false
+) {
+  return {
+    configPath: "/Users/nik/.codex/config.toml",
+    hasBackup,
+    model: "gpt-5.5",
+    providerId: "codexmanager",
+    proxyURL: proxyState.proxyURL.replace("localhost", "127.0.0.1"),
+    state
+  };
 }
 
 function appendAccount(accounts: AccountSummary[], id: string, label: string): AccountSummary {

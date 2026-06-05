@@ -163,7 +163,7 @@ ANTHROPIC_API_KEY=sk-local-xxxx
 curl http://localhost:18317/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-local-xxxx" \
-  -d '{"model":"gpt-5","messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
 ## Architecture / 架构

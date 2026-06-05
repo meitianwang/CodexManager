@@ -806,7 +806,7 @@ async function verifySmokeWorkflows(context: DesktopAppContext, browserWindow: B
     }
 
     const unauthorizedResponse = await fetch(`${proxyState.proxyURL}/v1/responses`, {
-      body: JSON.stringify({ input: [], model: "gpt-5" }),
+      body: JSON.stringify({ input: [], model: "gpt-5.5" }),
       headers: {
         "Content-Type": "application/json"
       },
@@ -817,7 +817,7 @@ async function verifySmokeWorkflows(context: DesktopAppContext, browserWindow: B
     }
     await unauthorizedResponse.arrayBuffer();
     const wrongApiKeyResponse = await fetch(`${proxyState.proxyURL}/v1/responses`, {
-      body: JSON.stringify({ input: [], model: "gpt-5" }),
+      body: JSON.stringify({ input: [], model: "gpt-5.5" }),
       headers: {
         Authorization: "Bearer sk-local-wrong",
         "Content-Type": "application/json"
@@ -885,7 +885,7 @@ async function verifySmokeProxyRoutes(
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
         stream: false
       })
@@ -893,13 +893,13 @@ async function verifySmokeProxyRoutes(
     responsesStatus: await smokeProxyStatus("responsesStatus", proxyURL, "/v1/responses", {
       method: "POST",
       headers: commonHeaders,
-      body: JSON.stringify({ model: "gpt-5-codex", input: "Reply with exactly: ok", stream: false })
+      body: JSON.stringify({ model: "gpt-5.5", input: "Reply with exactly: ok", stream: false })
     }),
     responsesCompactStatus: await smokeProxyStatus("responsesCompactStatus", proxyURL, "/v1/responses/compact", {
       method: "POST",
       headers: commonHeaders,
       body: JSON.stringify({
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         stream: false,
         input: [{ role: "user", content: "compact this" }],
         tools: [],
@@ -909,7 +909,7 @@ async function verifySmokeProxyRoutes(
     memoriesTraceSummarizeStatus: await smokeProxyStatus("memoriesTraceSummarizeStatus", proxyURL, "/v1/memories/trace_summarize", {
       method: "POST",
       headers: commonHeaders,
-      body: JSON.stringify({ model: "gpt-5-codex", traces: [], reasoning: { effort: "low" } })
+      body: JSON.stringify({ model: "gpt-5.5", traces: [], reasoning: { effort: "low" } })
     }),
     alphaSearchStatus: await smokeProxyStatus("alphaSearchStatus", proxyURL, "/v1/alpha/search", {
       method: "POST",
@@ -920,7 +920,7 @@ async function verifySmokeProxyRoutes(
       method: "POST",
       headers: anthropicHeaders,
       body: JSON.stringify({
-        model: "gpt-5-codex",
+        model: "gpt-5.5",
         max_tokens: 16,
         messages: [{ role: "user", content: "Reply with exactly: ok" }],
         stream: false

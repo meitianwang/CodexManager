@@ -157,6 +157,15 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext
     return settings;
   });
 
+  ipcMain.handle(ipcChannels.codexAppGetStatus, () => context.codexAppIntegrationService.status());
+  ipcMain.handle(ipcChannels.codexAppConfigure, async () => {
+    const status = await context.codexAppIntegrationService.configure();
+    options.onProxyStateChanged?.(await context.proxyRuntimeService.getState());
+    return status;
+  });
+  ipcMain.handle(ipcChannels.codexAppRestoreSafe, () => context.codexAppIntegrationService.restoreSafe());
+  ipcMain.handle(ipcChannels.codexAppRestoreSnapshot, () => context.codexAppIntegrationService.restoreSnapshot());
+
   ipcMain.handle(ipcChannels.proxyGetState, () => context.proxyRuntimeService.getState());
   ipcMain.handle(ipcChannels.proxyRegenerateApiKey, () => context.proxyRuntimeService.regenerateApiKey());
   ipcMain.handle(ipcChannels.proxyStart, async (_event, input: unknown) => {

@@ -35,9 +35,10 @@ const platformBoundaryPatterns = [
 describe("desktop behavior contract", () => {
   it("exposes the stable proxy model set used by the desktop proxy UI and runtime", () => {
     expect(proxyAvailableModels).toEqual([
-      "gpt-5",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
       "gpt-5-mini",
-      "gpt-5-4",
       "o3",
       "o3-pro",
       "o4-mini",

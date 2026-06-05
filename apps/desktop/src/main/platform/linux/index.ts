@@ -4,6 +4,7 @@ import type {
   CodexLauncherLike,
   DesktopPlatform,
   EditorAppServiceLike,
+  GUIEnvironmentServiceLike,
   LaunchAtStartupServiceLike
 } from "../types";
 import type { TrayAdapter } from "../tray-service";
@@ -56,6 +57,15 @@ export function createLinuxDesktopPlatform(_electronApp: App): DesktopPlatform {
         },
         restartSelectedApps() {
           return unsupported("editor restart");
+        }
+      };
+    },
+    guiEnvironment(): GUIEnvironmentServiceLike {
+      return {
+        async setEnvironmentVariable(name: string, _value: string): Promise<{ warning: string }> {
+          return {
+            warning: `${name} was not persisted for Linux GUI applications. Start Codex from an environment that exports the variable.`
+          };
         }
       };
     }

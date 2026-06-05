@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import type { AppSettings } from "../../shared/models/settings";
+import { codexAppDefaultModel } from "../../shared/models/codex-app-integration";
 import type { AccountSummary, AccountsStore, StoredAccount } from "../../shared/models/accounts";
 import type { ChatGPTOAuthTokens, ExtractedAuth } from "../../shared/models/auth";
 import { appInfo } from "../../shared/app-info";
@@ -411,7 +412,7 @@ export class ProxyCoordinator {
     normalizedPath: string,
     body: Buffer,
     json: Record<string, unknown>,
-    defaultModel = "gpt-5"
+    defaultModel = codexAppDefaultModel
   ): Promise<void> {
     const model = readOptionalString(json.model) ?? defaultModel;
     const result = await this.forwardProxyRequest(

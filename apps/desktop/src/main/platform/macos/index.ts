@@ -5,6 +5,7 @@ import type { DesktopPlatform } from "../types";
 import { MacOSCodexCLIService } from "./codex-cli-service";
 import { MacOSEditorAppService } from "./editor-app-service";
 import { resolveMacOSFileSystemPaths, type MacOSPathEnvironment } from "./file-system-paths";
+import { MacOSGUIEnvironmentService } from "./gui-environment-service";
 
 export interface MacOSDesktopPlatformOptions {
   environment?: NodeJS.ProcessEnv & MacOSPathEnvironment;
@@ -41,6 +42,9 @@ export function createMacOSDesktopPlatform(electronApp: App, options: MacOSDeskt
     },
     editorApps() {
       return new MacOSEditorAppService({ environment });
+    },
+    guiEnvironment() {
+      return new MacOSGUIEnvironmentService();
     }
   };
 }

@@ -88,6 +88,54 @@ describe("ipc handlers", () => {
     });
   });
 
+  it("routes Codex app integration actions through the main service", async () => {
+    const codexAppStatus = {
+      configPath: "/Users/nik/.codex/config.toml",
+      hasBackup: true,
+      model: "gpt-5.5",
+      providerId: "codexmanager",
+      proxyURL: "http://127.0.0.1:18317",
+      state: "configured"
+    };
+    const proxyState = {
+      apiKey: "sk-local-test",
+      availableModels: ["gpt-5.5"],
+      isRunning: true,
+      port: 18_317,
+      proxyURL: "http://localhost:18317"
+    };
+    const context = appContext(
+      {},
+      {
+        codexAppIntegrationService: {
+          configure: vi.fn(async () => codexAppStatus),
+          restoreSafe: vi.fn(async () => ({ ...codexAppStatus, state: "not_configured" })),
+          restoreSnapshot: vi.fn(async () => ({ ...codexAppStatus, state: "not_configured" })),
+          status: vi.fn(async () => codexAppStatus)
+        },
+        proxyRuntimeService: {
+          getState: vi.fn(async () => proxyState)
+        }
+      }
+    );
+    const ipcMain = new FakeIpcMain();
+    const publishedProxyStates: unknown[] = [];
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context, {
+      onProxyStateChanged(state) {
+        publishedProxyStates.push(state);
+      }
+    });
+
+    await expect(ipcMain.invoke(ipcChannels.codexAppGetStatus)).resolves.toEqual(codexAppStatus);
+    await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).resolves.toEqual(codexAppStatus);
+    await expect(ipcMain.invoke(ipcChannels.codexAppRestoreSafe)).resolves.toMatchObject({ state: "not_configured" });
+    await expect(ipcMain.invoke(ipcChannels.codexAppRestoreSnapshot)).resolves.toMatchObject({ state: "not_configured" });
+    expect(context.codexAppIntegrationService.configure).toHaveBeenCalledTimes(1);
+    expect(context.proxyRuntimeService.getState).toHaveBeenCalledTimes(1);
+    expect(publishedProxyStates).toEqual([proxyState]);
+  });
+
   it("imports selected auth JSON files directly from the shared import file dialog", async () => {
     const root = await makeTempRoot();
     const authPath = join(root, "auth.json");
@@ -191,12 +239,13 @@ class FakeIpcMain {
   }
 }
 
-function appContext(accountsCoordinator: Record<string, unknown>): DesktopAppContext {
+function appContext(accountsCoordinator: Record<string, unknown>, patch: Record<string, unknown> = {}): DesktopAppContext {
   return {
     accountsCoordinator,
     editorAppService: {},
     proxyRuntimeService: {},
-    settingsCoordinator: {}
+    settingsCoordinator: {},
+    ...patch
   } as unknown as DesktopAppContext;
 }
 

@@ -5,6 +5,7 @@ import type { AccountSummary, WeeklyQuotaWarmupResult } from "../shared/models/a
 import type { InstalledEditorApp, SmartSwitchResult, SwitchAccountExecutionResult } from "../shared/models/app";
 import type { AppSettings, AppSettingsPatch } from "../shared/models/settings";
 import type { ProxyRuntimeState } from "../shared/models/proxy";
+import type { CodexAppIntegrationStatus } from "../shared/models/codex-app-integration";
 
 const ipcChannels = {
   appInfo: "app:info",
@@ -24,6 +25,10 @@ const ipcChannels = {
   accountsSwitch: "accounts:switch",
   accountsWarmUpWeeklyQuota: "accounts:warmUpWeeklyQuota",
   clipboardWriteText: "clipboard:writeText",
+  codexAppConfigure: "codexApp:configure",
+  codexAppGetStatus: "codexApp:getStatus",
+  codexAppRestoreSafe: "codexApp:restoreSafe",
+  codexAppRestoreSnapshot: "codexApp:restoreSnapshot",
   proxyGetState: "proxy:getState",
   proxyRegenerateApiKey: "proxy:regenerateApiKey",
   proxyStart: "proxy:start",
@@ -56,6 +61,12 @@ export interface CodexManagerAPI {
   };
   clipboard: {
     writeText: (text: string) => Promise<void>;
+  };
+  codexApp: {
+    configure: () => Promise<CodexAppIntegrationStatus>;
+    getStatus: () => Promise<CodexAppIntegrationStatus>;
+    restoreSafe: () => Promise<CodexAppIntegrationStatus>;
+    restoreSnapshot: () => Promise<CodexAppIntegrationStatus>;
   };
   proxy: {
     getState: () => Promise<ProxyRuntimeState>;
@@ -101,6 +112,12 @@ const api: CodexManagerAPI = {
   },
   clipboard: {
     writeText: (text) => invoke<void>(ipcChannels.clipboardWriteText, { text })
+  },
+  codexApp: {
+    configure: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppConfigure),
+    getStatus: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppGetStatus),
+    restoreSafe: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppRestoreSafe),
+    restoreSnapshot: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppRestoreSnapshot)
   },
   proxy: {
     getState: () => invoke<ProxyRuntimeState>(ipcChannels.proxyGetState),

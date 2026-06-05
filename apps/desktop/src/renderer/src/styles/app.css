@@ -1481,6 +1481,85 @@ button.danger {
   line-height: 1.45;
 }
 
+.codex-app-section {
+  gap: 10px;
+}
+
+.codex-app-heading-row,
+.codex-app-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.codex-app-heading-row {
+  justify-content: space-between;
+}
+
+.integration-status {
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: rgba(138, 140, 150, 0.12);
+  color: #575963;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.integration-status.configured {
+  background: rgba(26, 156, 71, 0.12);
+  color: #127a33;
+}
+
+.integration-status.drifted {
+  background: rgba(232, 43, 46, 0.1);
+  color: #c71f25;
+}
+
+.integration-status.restorable {
+  background: rgba(89, 51, 214, 0.1);
+  color: #4521ba;
+}
+
+.codex-app-details {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #575963;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.codex-app-details span {
+  overflow-wrap: anywhere;
+}
+
+.integration-warning {
+  color: #9b5f00;
+  font-weight: 650;
+}
+
+.codex-app-actions {
+  flex-wrap: wrap;
+}
+
+.codex-app-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.codex-app-hint {
+  margin: 0;
+  color: #575963;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .settings-layout {
   max-width: 760px;
 }

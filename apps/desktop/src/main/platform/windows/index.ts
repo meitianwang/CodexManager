@@ -55,6 +55,15 @@ export function createWindowsDesktopPlatform(
     },
     editorApps() {
       return new EditorAppService({ environment });
+    },
+    guiEnvironment() {
+      return {
+        async setEnvironmentVariable(name: string, _value: string): Promise<{ warning: string }> {
+          return {
+            warning: `${name} was not persisted for Windows GUI applications. Restart Codex from a shell that exports the variable or configure Windows environment variables manually.`
+          };
+        }
+      };
     }
   };
 }

@@ -18,6 +18,7 @@ import { DefaultUsageService } from "./services/usage-service";
 import { DefaultWeeklyQuotaWarmupService } from "./services/weekly-quota-warmup-service";
 import { DefaultWorkspaceMetadataService } from "./services/workspace-metadata-service";
 import { RemoteModelCatalogService } from "./services/remote-model-catalog-service";
+import { CodexAppIntegrationService } from "./services/codex-app-integration-service";
 import { createDesktopPlatform } from "./platform";
 import type { DesktopPlatform, EditorAppServiceLike } from "./platform/types";
 import type { ChatGPTOAuthTokens } from "../shared/models/auth";
@@ -54,6 +55,7 @@ export interface SmokePlatformSideEffects {
 export interface DesktopAppContext {
   accountsCoordinator: AccountsCoordinator;
   authRepository: AuthFileRepository;
+  codexAppIntegrationService: CodexAppIntegrationService;
   editorAppService: EditorAppServiceLike;
   paths: FileSystemPaths;
   platform: DesktopPlatform;
@@ -125,6 +127,11 @@ export async function createDesktopAppContext(
     settingsCoordinator,
     { modelCatalogService: remoteModelCatalogService }
   );
+  const codexAppIntegrationService = new CodexAppIntegrationService(
+    paths,
+    proxyRuntimeService,
+    platform.guiEnvironment()
+  );
 
   await settingsCoordinator.syncLaunchAtStartupFromStore();
   const settings = await settingsCoordinator.currentSettings();
@@ -139,6 +146,7 @@ export async function createDesktopAppContext(
   return {
     accountsCoordinator,
     authRepository,
+    codexAppIntegrationService,
     editorAppService,
     paths,
     platform,
@@ -183,7 +191,7 @@ function createSmokePlatformSideEffects():
     startupSetEnabledValues: [],
     startupSyncValues: []
   };
-  const smokeModels = ["gpt-5-codex", "gpt-5", "gpt-5-mini"];
+  const smokeModels = ["gpt-5.5", "gpt-5.4-mini", "gpt-5-mini"];
   const smokeModelsByPlanKey = new Map(
     ["codex-free", "codex-plus", "codex-pro", "codex-team"].map((planKey) => [planKey, new Set(smokeModels)])
   );

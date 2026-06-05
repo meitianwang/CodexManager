@@ -5,6 +5,8 @@ import { sortByRemaining, sortForDisplay } from "@shared/domain/account-ranking"
 import type { AccountsImportDraftDescriptor, AccountTransferSelectableItem } from "@shared/models/account-transfer";
 import type { AccountSummary, WeeklyQuotaWarmupResult } from "@shared/models/accounts";
 import type { InstalledEditorApp, SwitchAccountExecutionResult } from "@shared/models/app";
+import type { CodexAppIntegrationStatus } from "@shared/models/codex-app-integration";
+import { codexAppDefaultModel, codexAppProviderId } from "@shared/models/codex-app-integration";
 import {
   appLocales,
   defaultAppSettings,
@@ -255,8 +257,9 @@ function App(): ReactElement {
   const [settings, setSettings] = useState<AppSettings>(() => defaultAppSettings());
   const [installedEditors, setInstalledEditors] = useState<InstalledEditorApp[]>([]);
   const [proxyState, setProxyState] = useState<ProxyRuntimeState>(() => fallbackProxyState(settings));
+  const [codexAppStatus, setCodexAppStatus] = useState<CodexAppIntegrationStatus>(() => fallbackCodexAppStatus(proxyState));
   const [selectedEndpoint, setSelectedEndpoint] = useState<ProxyEndpointID>("chatCompletions");
-  const [selectedModel, setSelectedModel] = useState<string>("gpt-5");
+  const [selectedModel, setSelectedModel] = useState<string>(codexAppDefaultModel);
   const [notice, setNotice] = useState<Notice | undefined>();
   const [busyAction, setBusyAction] = useState<string | undefined>();
   const [accountToolbarBusyAction, setAccountToolbarBusyAction] = useState<AccountToolbarBusyAction | undefined>();
@@ -311,18 +314,20 @@ function App(): ReactElement {
       return;
     }
     setAccountsContentState({ status: "loading" });
-    const [nextInfo, nextAccounts, nextSettings, nextEditors, nextProxy] = await Promise.all([
+    const [nextInfo, nextAccounts, nextSettings, nextEditors, nextProxy, nextCodexAppStatus] = await Promise.all([
       api.getAppInfo(),
       api.accounts.list(),
       api.settings.get(),
       api.settings.listEditors(),
-      api.proxy.getState()
+      api.proxy.getState(),
+      api.codexApp.getStatus()
     ]);
     setAppInfo(nextInfo);
     setAccounts(nextAccounts);
     setSettings(nextSettings);
     setInstalledEditors(nextEditors);
     setProxyState(nextProxy);
+    setCodexAppStatus(nextCodexAppStatus);
     setSelectedModel((current) => (nextProxy.availableModels.includes(current) ? current : nextProxy.availableModels[0] ?? current));
     setAccountsContentState({ status: "ready" });
   }, [api]);
@@ -657,6 +662,7 @@ function App(): ReactElement {
                     return;
                   }
                   setProxyState(await api.proxy.regenerateApiKey());
+                  setCodexAppStatus(await api.codexApp.getStatus());
                 },
                 { silentSuccess: true }
               )
@@ -674,6 +680,7 @@ function App(): ReactElement {
                     return;
                   }
                   setProxyState(await api.proxy.start(port, apiKey));
+                  setCodexAppStatus(await api.codexApp.getStatus());
                 },
                 { success: t("proxy.notice.started") }
               )
@@ -688,9 +695,56 @@ function App(): ReactElement {
                     return;
                   }
                   setProxyState(await api.proxy.stop());
+                  setCodexAppStatus(await api.codexApp.getStatus());
                   setSelectedModel(proxyAvailableModels[0] ?? selectedModel);
                 },
                 { success: t("proxy.notice.stopped") }
+              )
+            }
+            codexAppStatus={codexAppStatus}
+            onConfigureCodexApp={() =>
+              runAction(
+                t("proxy.codex_app.configure"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const status = await api.codexApp.configure();
+                  setCodexAppStatus(status);
+                  setProxyState(await api.proxy.getState());
+                  setNotice({
+                    tone: status.warning ? "info" : "success",
+                    text: status.warning ?? t("notice.action_complete", { action: t("proxy.codex_app.configure") })
+                  });
+                },
+                { silentSuccess: true }
+              )
+            }
+            onRestoreCodexAppSafe={() =>
+              runAction(
+                t("proxy.codex_app.restore_safe"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const status = await api.codexApp.restoreSafe();
+                  setCodexAppStatus(status);
+                  setNotice({ tone: status.warning ? "info" : "success", text: status.warning ?? t("notice.action_complete", { action: t("proxy.codex_app.restore_safe") }) });
+                },
+                { silentSuccess: true }
+              )
+            }
+            onRestoreCodexAppSnapshot={() =>
+              runAction(
+                t("proxy.codex_app.restore_snapshot"),
+                async () => {
+                  if (!api) {
+                    throw new Error(t("error.ipc_bridge_unavailable"));
+                  }
+                  const status = await api.codexApp.restoreSnapshot();
+                  setCodexAppStatus(status);
+                },
+                { success: t("notice.action_complete", { action: t("proxy.codex_app.restore_snapshot") }) }
               )
             }
             proxyState={proxyState}
@@ -1208,8 +1262,12 @@ function ResetRow({ locale, resetAt, t, title }: { locale: AppLocaleID; resetAt?
 
 interface ProxyPageProps {
   busyAction?: string;
+  codexAppStatus: CodexAppIntegrationStatus;
+  onConfigureCodexApp: () => void;
   onCopy: (text: string, success?: string) => void;
   onRegenerateApiKey: () => void;
+  onRestoreCodexAppSafe: () => void;
+  onRestoreCodexAppSnapshot: () => void;
   onStart: (port: string, apiKey: string) => void;
   onStop: () => void;
   proxyState: ProxyRuntimeState;
@@ -1338,6 +1396,33 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
         <h3>{props.t("proxy.section.usage")}</h3>
         <CodeBlock label={props.t("proxy.usage.curl_example")} text={curlText} onCopy={() => props.onCopy(curlText)} t={props.t} />
         <CodeBlock label={props.t("proxy.usage.config_hint")} text={configText} onCopy={() => props.onCopy(configText)} t={props.t} />
+      </section>
+
+      <section className="proxy-section codex-app-section">
+        <div className="codex-app-heading-row">
+          <h3>{props.t("proxy.section.codex_app")}</h3>
+          <span className={`integration-status ${props.codexAppStatus.state}`}>
+            {codexAppStatusLabel(props.codexAppStatus.state, props.t)}
+          </span>
+        </div>
+        <div className="codex-app-details">
+          <span>{props.t("proxy.codex_app.provider_model_format", { provider: props.codexAppStatus.providerId, model: props.codexAppStatus.model })}</span>
+          <span>{props.t("proxy.codex_app.config_path_format", { path: props.codexAppStatus.configPath })}</span>
+          <span>{props.t("proxy.codex_app.proxy_format", { url: props.codexAppStatus.proxyURL })}</span>
+          {props.codexAppStatus.warning && <span className="integration-warning">{props.codexAppStatus.warning}</span>}
+        </div>
+        <div className="codex-app-actions">
+          <button className="primary-action" type="button" disabled={isBusy} onClick={props.onConfigureCodexApp}>
+            {props.t("proxy.codex_app.configure")}
+          </button>
+          <button type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSafe}>
+            {props.t("proxy.codex_app.restore_safe")}
+          </button>
+          <button className="danger" type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSnapshot}>
+            {props.t("proxy.codex_app.restore_snapshot")}
+          </button>
+        </div>
+        <p className="codex-app-hint">{props.t("proxy.codex_app.restart_hint")}</p>
       </section>
     </div>
   );
@@ -1483,6 +1568,30 @@ function fallbackProxyState(settings: AppSettings): ProxyRuntimeState {
     port: settings.proxyPort,
     proxyURL: `http://localhost:${settings.proxyPort}`
   };
+}
+
+function fallbackCodexAppStatus(proxyState: ProxyRuntimeState): CodexAppIntegrationStatus {
+  return {
+    configPath: "~/.codex/config.toml",
+    hasBackup: false,
+    model: codexAppDefaultModel,
+    providerId: codexAppProviderId,
+    proxyURL: proxyState.proxyURL.replace("localhost", "127.0.0.1"),
+    state: "not_configured"
+  };
+}
+
+function codexAppStatusLabel(state: CodexAppIntegrationStatus["state"], t: Translator): string {
+  switch (state) {
+    case "configured":
+      return t("proxy.codex_app.status_configured");
+    case "drifted":
+      return t("proxy.codex_app.status_drifted");
+    case "restorable":
+      return t("proxy.codex_app.status_restorable");
+    case "not_configured":
+      return t("proxy.codex_app.status_not_configured");
+  }
 }
 
 function accountSummaryToTransferSelectableItem(account: AccountSummary): AccountTransferSelectableItem {

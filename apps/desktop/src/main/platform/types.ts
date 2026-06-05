@@ -21,6 +21,10 @@ export interface LaunchAtStartupServiceLike {
   syncWithStoreValue(enabled: boolean): void;
 }
 
+export interface GUIEnvironmentServiceLike {
+  setEnvironmentVariable(name: string, value: string): Promise<{ warning?: string }>;
+}
+
 export interface DesktopPlatformRequestHeaders {
   readonly codexToolsUserAgent: string;
   readonly codexUpstreamUserAgent: string;
@@ -48,6 +52,7 @@ export interface DesktopPlatform {
   codexLauncher(): CodexLauncherLike;
   createTrayAdapter(): TrayAdapter;
   editorApps(): EditorAppServiceLike;
+  guiEnvironment(): GUIEnvironmentServiceLike;
   launchAtStartupService(): LaunchAtStartupServiceLike;
   paths(): FileSystemPaths;
 }
