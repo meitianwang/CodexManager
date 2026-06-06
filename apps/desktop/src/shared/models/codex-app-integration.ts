@@ -7,8 +7,8 @@ export const codexAppIntegrationStates = ["not_configured", "configured", "drift
 export type CodexAppIntegrationState = (typeof codexAppIntegrationStates)[number];
 
 export interface CodexAppIntegrationStatus {
+  canRestore: boolean;
   configPath: string;
-  hasBackup: boolean;
   model: string;
   providerId: string;
   proxyURL: string;

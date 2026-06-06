@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { readFile, readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   codexAppDefaultModel,
@@ -23,21 +23,17 @@ export interface CodexAppIntegrationServiceOptions {
 }
 
 interface CodexAppIntegrationManifest {
-  backupPath: string;
   configuredAt: number;
   configuredConfigHash: string;
   envVarName: string;
-  historyPatches?: CodexAppHistoryPatch[];
-  historySyncedAt?: number;
-  originalConfigExisted: boolean;
-  originalConfigHash: string;
+  historyPatches?: LegacyCodexAppHistoryPatch[];
   previousRootModelLine?: string;
   previousRootModelProviderLine?: string;
   proxyURL: string;
   version: 1;
 }
 
-interface CodexAppHistoryPatch {
+interface LegacyCodexAppHistoryPatch {
   appliedProvider: string;
   path: string;
   previousDatabaseProvider?: string;
@@ -45,7 +41,6 @@ interface CodexAppHistoryPatch {
 }
 
 interface ConfigReadResult {
-  existed: boolean;
   raw: string;
 }
 
@@ -56,11 +51,10 @@ interface RootAssignment {
 }
 
 const manifestFileName = "codex-app-integration.json";
-const backupDirectoryName = "codex-config-backups";
 const expectedProviderName = "CodexManager Proxy";
 const expectedWireAPI = "responses";
-const expectedRequestMaxRetries = "1";
-const expectedStreamMaxRetries = "1";
+const expectedRequestMaxRetries = "4";
+const expectedStreamMaxRetries = "5";
 const expectedStreamIdleTimeoutMs = "300000";
 const maxSQLiteOutputBytes = 64 * 1024;
 const sqlitePathChunkSize = 200;
@@ -92,9 +86,6 @@ export class CodexAppIntegrationService {
     const config = await this.readConfig();
     const existingManifest = await this.readManifestOptional();
     const previousRoot = previousRootAssignments(config.raw);
-    const backupPath = existingManifest?.backupPath ?? (await this.writeBackup(config.raw));
-    const originalConfigExisted = existingManifest?.originalConfigExisted ?? config.existed;
-    const originalConfigHash = existingManifest?.originalConfigHash ?? sha256(config.raw);
     const withoutManagedBlock = removeManagedProviderBlock(config.raw);
     const configured = appendManagedProviderBlock(
       setManagedRootAssignments(withoutManagedBlock),
@@ -102,20 +93,12 @@ export class CodexAppIntegrationService {
     );
 
     await writeFileAtomically(configured, this.paths.codexConfigPath);
-    const historySync = await syncCodexHistoryProviders(
-      this.paths.codexConfigPath,
-      existingManifest?.historyPatches ?? []
-    );
 
     const manifest: CodexAppIntegrationManifest = {
-      backupPath,
       configuredAt: this.unixSecondsNow(),
       configuredConfigHash: sha256(configured),
       envVarName: codexAppProxyApiKeyEnvironmentVariable,
-      historyPatches: historySync.patches,
-      historySyncedAt: this.unixSecondsNow(),
-      originalConfigExisted,
-      originalConfigHash,
+      ...(existingManifest?.historyPatches ? { historyPatches: existingManifest.historyPatches } : {}),
       previousRootModelLine: existingManifest?.previousRootModelLine ?? previousRoot.model?.line,
       previousRootModelProviderLine:
         existingManifest?.previousRootModelProviderLine ?? previousRoot.modelProvider?.line,
@@ -133,57 +116,34 @@ export class CodexAppIntegrationService {
 
     return {
       ...this.statusFor(configured, manifest, proxyURL),
-      warning: [warning, ...historySync.warnings, "Restart Codex.app so GUI sessions inherit the updated provider key."]
-        .filter(Boolean)
-        .join(" ")
+      ...(warning ? { warning } : {})
     };
   }
 
-  async restoreSafe(): Promise<CodexAppIntegrationStatus> {
-    const manifest = await this.readManifestRequired();
+  async restore(): Promise<CodexAppIntegrationStatus> {
+    const manifest = await this.readManifestOptional();
     const proxy = await this.proxyRuntimeService.getState();
     const proxyURL = this.proxyBaseURL(proxy.port);
     const config = await this.readConfig();
     const withoutManagedBlock = removeManagedProviderBlock(config.raw);
     const { raw: restored, warning } = restoreManagedRootAssignments(withoutManagedBlock, manifest);
-    const historyRestore = await restoreCodexHistoryProviders(manifest.historyPatches ?? []);
-    await writeFileAtomically(restored, this.paths.codexConfigPath);
-    await this.clearManifest();
-    return this.statusFor(restored, undefined, proxyURL, [warning, ...historyRestore.warnings].filter(Boolean).join(" "));
-  }
-
-  async restoreSnapshot(): Promise<CodexAppIntegrationStatus> {
-    const manifest = await this.readManifestRequired();
-    const proxy = await this.proxyRuntimeService.getState();
-    const proxyURL = this.proxyBaseURL(proxy.port);
-    if (manifest.originalConfigExisted) {
-      await writeFileAtomically(await readTextFile(manifest.backupPath), this.paths.codexConfigPath);
-    } else {
-      await rm(this.paths.codexConfigPath, { force: true });
+    const historyRestore = await restoreLegacyCodexHistoryProviders(manifest?.historyPatches ?? []);
+    if (restored !== config.raw || manifest !== undefined) {
+      await writeFileAtomically(restored, this.paths.codexConfigPath);
+      await this.clearManifest();
     }
-    const historyRestore = await restoreCodexHistoryProviders(manifest.historyPatches ?? []);
-    await this.clearManifest();
-    const config = await this.readConfig();
-    return this.statusFor(config.raw, undefined, proxyURL, historyRestore.warnings.join(" "));
+    return this.statusFor(restored, undefined, proxyURL, [warning, ...historyRestore.warnings].filter(Boolean).join(" "));
   }
 
   private async readConfig(): Promise<ConfigReadResult> {
     try {
-      return { existed: true, raw: await readTextFile(this.paths.codexConfigPath) };
+      return { raw: await readTextFile(this.paths.codexConfigPath) };
     } catch (error) {
       if (isNodeErrorCode(error, "ENOENT")) {
-        return { existed: false, raw: "" };
+        return { raw: "" };
       }
       throw error;
     }
-  }
-
-  private async writeBackup(raw: string): Promise<string> {
-    const backupDirectory = join(this.paths.applicationSupportDirectory, backupDirectoryName);
-    await mkdir(backupDirectory, { recursive: true });
-    const backupPath = join(backupDirectory, `config-${this.unixSecondsNow()}.toml`);
-    await writeFileAtomically(raw, backupPath);
-    return backupPath;
   }
 
   private manifestPath(): string {
@@ -199,14 +159,6 @@ export class CodexAppIntegrationService {
       }
       throw error;
     }
-  }
-
-  private async readManifestRequired(): Promise<CodexAppIntegrationManifest> {
-    const manifest = await this.readManifestOptional();
-    if (!manifest) {
-      throw new Error("Codex.app integration has no restore metadata.");
-    }
-    return manifest;
   }
 
   private async writeManifest(manifest: CodexAppIntegrationManifest): Promise<void> {
@@ -236,22 +188,23 @@ export class CodexAppIntegrationService {
       providerValues.stream_idle_timeout_ms === expectedStreamIdleTimeoutMs;
     const hasRootSelection =
       root.model?.value === codexAppDefaultModel && root.modelProvider?.value === codexAppProviderId;
-    const hasBackup = manifest?.backupPath !== undefined;
+    const hasManagedConfig = providerValues.__present === "true" || root.modelProvider?.value === codexAppProviderId;
+    const canRestore = manifest !== undefined || hasManagedConfig;
 
     let state: CodexAppIntegrationStatus["state"];
     if (hasExpectedProvider && hasRootSelection) {
       state = "configured";
-    } else if (manifest && (providerValues.__present === "true" || root.modelProvider?.value === codexAppProviderId)) {
+    } else if (canRestore && hasManagedConfig) {
       state = "drifted";
-    } else if (manifest && hasBackup) {
+    } else if (canRestore) {
       state = "restorable";
     } else {
       state = "not_configured";
     }
 
     return {
+      canRestore,
       configPath: this.paths.codexConfigPath,
-      hasBackup,
       model: root.model?.value ?? codexAppDefaultModel,
       providerId: root.modelProvider?.value ?? codexAppProviderId,
       proxyURL,
@@ -270,12 +223,9 @@ function parseManifest(value: unknown): CodexAppIntegrationManifest {
     throw new Error("Invalid Codex.app integration metadata.");
   }
   const manifest: CodexAppIntegrationManifest = {
-    backupPath: requiredString(value.backupPath, "backupPath"),
     configuredAt: requiredNumber(value.configuredAt, "configuredAt"),
     configuredConfigHash: requiredString(value.configuredConfigHash, "configuredConfigHash"),
     envVarName: requiredString(value.envVarName, "envVarName"),
-    originalConfigExisted: requiredBoolean(value.originalConfigExisted, "originalConfigExisted"),
-    originalConfigHash: requiredString(value.originalConfigHash, "originalConfigHash"),
     proxyURL: requiredString(value.proxyURL, "proxyURL"),
     version: 1
   };
@@ -286,15 +236,12 @@ function parseManifest(value: unknown): CodexAppIntegrationManifest {
     manifest.previousRootModelProviderLine = value.previousRootModelProviderLine;
   }
   if (Array.isArray(value.historyPatches)) {
-    manifest.historyPatches = value.historyPatches.map(parseHistoryPatch);
-  }
-  if (typeof value.historySyncedAt === "number") {
-    manifest.historySyncedAt = value.historySyncedAt;
+    manifest.historyPatches = value.historyPatches.map(parseLegacyHistoryPatch);
   }
   return manifest;
 }
 
-function parseHistoryPatch(value: unknown): CodexAppHistoryPatch {
+function parseLegacyHistoryPatch(value: unknown): LegacyCodexAppHistoryPatch {
   if (!isRecord(value)) {
     throw new Error("Invalid Codex.app integration metadata: historyPatches item must be an object.");
   }
@@ -339,13 +286,19 @@ function setManagedRootAssignments(raw: string): string {
 
 function restoreManagedRootAssignments(
   raw: string,
-  manifest: CodexAppIntegrationManifest
+  manifest: CodexAppIntegrationManifest | undefined
 ): { raw: string; warning?: string } {
   const split = splitConfig(raw);
   const warnings: string[] = [];
   const lines = [...split.lines];
-  restoreRootLine(lines, "model", codexAppDefaultModel, manifest.previousRootModelLine, warnings);
-  restoreRootLine(lines, "model_provider", codexAppProviderId, manifest.previousRootModelProviderLine, warnings);
+  const provider = rootAssignment(lines, "model_provider");
+  if (provider?.value !== codexAppProviderId) {
+    return {
+      raw: joinConfig(lines, split.newline)
+    };
+  }
+  restoreRootLine(lines, "model", codexAppDefaultModel, manifest?.previousRootModelLine, warnings);
+  restoreRootLine(lines, "model_provider", codexAppProviderId, manifest?.previousRootModelProviderLine, warnings);
   return {
     raw: joinConfig(lines, split.newline),
     warning: warnings.length > 0 ? warnings.join(" ") : undefined
@@ -510,122 +463,47 @@ function trimTrailingBlankLines(lines: readonly string[]): string[] {
   return next;
 }
 
-async function syncCodexHistoryProviders(
-  codexConfigPath: string,
-  existingPatches: readonly CodexAppHistoryPatch[]
-): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
-  const existingPatchByPath = new Map(existingPatches.map((patch) => [patch.path, patch]));
-  const patches = new Map(existingPatchByPath);
-  const warnings: string[] = [];
-  const rolloutPaths = await listRolloutFiles(codexConfigPath);
-
-  for (const path of rolloutPaths) {
-    try {
-      const patch = await syncRolloutFileProvider(path, existingPatchByPath.get(path));
-      if (patch) {
-        patches.set(path, patch);
-      }
-    } catch (error) {
-      warnings.push(`Skipped Codex history provider sync for ${path}: ${errorMessage(error)}.`);
-    }
-  }
-
-  const databaseSync = await syncHistoryDatabaseProviders(codexConfigPath, [...patches.values()]);
-  warnings.push(...databaseSync.warnings);
-
-  return {
-    patches: databaseSync.patches.sort((left, right) => left.path.localeCompare(right.path)),
-    warnings
-  };
-}
-
-async function restoreCodexHistoryProviders(
-  patches: readonly CodexAppHistoryPatch[]
+async function restoreLegacyCodexHistoryProviders(
+  patches: readonly LegacyCodexAppHistoryPatch[]
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = [];
   for (const patch of patches) {
     try {
-      await restoreRolloutFileProvider(patch);
+      await restoreLegacyRolloutFileProvider(patch);
     } catch (error) {
-      warnings.push(`Skipped Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
+      warnings.push(`Skipped legacy Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
     }
   }
-  warnings.push(...(await restoreHistoryDatabaseProviders(patches)).warnings);
+  warnings.push(...(await restoreLegacyHistoryDatabaseProviders(patches)).warnings);
   return { warnings };
 }
 
-async function listRolloutFiles(codexConfigPath: string): Promise<string[]> {
-  const codexHome = dirname(codexConfigPath);
-  const roots = [join(codexHome, "sessions"), join(codexHome, "archived_sessions")];
-  const results: string[] = [];
-  for (const root of roots) {
-    await collectRolloutFiles(root, results);
+async function restoreLegacyRolloutFileProvider(patch: LegacyCodexAppHistoryPatch): Promise<void> {
+  const rollout = parseLegacyRolloutHead(await readTextFile(patch.path));
+  if (!rollout || rollout.provider !== patch.appliedProvider) {
+    return;
   }
-  return results.sort((left, right) => left.localeCompare(right));
+  if (patch.previousProvider === null) {
+    delete rollout.payload.model_provider;
+  } else {
+    rollout.payload.model_provider = patch.previousProvider;
+  }
+  await writeFileAtomically(renderLegacyRolloutHead(rollout), patch.path);
 }
 
-async function collectRolloutFiles(directory: string, results: string[]): Promise<void> {
-  let entries;
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if (isNodeErrorCode(error, "ENOENT")) {
-      return;
-    }
-    throw error;
-  }
-
-  for (const entry of entries) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      await collectRolloutFiles(path, results);
-    } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
-      results.push(path);
-    }
-  }
-}
-
-async function syncHistoryDatabaseProviders(
-  codexConfigPath: string,
-  patches: readonly CodexAppHistoryPatch[]
-): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
-  const databasePaths = await listCodexStateDatabases(codexConfigPath);
-  const openAIHistoryPatches = patches.filter((patch) => patch.previousDatabaseProvider === "openai" || patch.previousProvider === "openai");
-  if (databasePaths.length === 0 || openAIHistoryPatches.length === 0) {
-    return { patches: [...patches], warnings: [] };
-  }
-
-  const warnings: string[] = [];
-  const script = sqliteUpdateScript(openAIHistoryPatches.map((patch) => patch.path), "openai", codexAppProviderId);
-  for (const databasePath of databasePaths) {
-    try {
-      await runSQLiteScript(databasePath, script);
-    } catch (error) {
-      warnings.push(`Skipped Codex history database provider sync for ${databasePath}: ${errorMessage(error)}.`);
-    }
-  }
-
-  return {
-    patches: patches.map((patch) =>
-      patch.previousDatabaseProvider === undefined && patch.previousProvider === "openai"
-        ? { ...patch, previousDatabaseProvider: "openai" }
-        : patch
-    ),
-    warnings
-  };
-}
-
-async function restoreHistoryDatabaseProviders(patches: readonly CodexAppHistoryPatch[]): Promise<{ warnings: string[] }> {
+async function restoreLegacyHistoryDatabaseProviders(
+  patches: readonly LegacyCodexAppHistoryPatch[]
+): Promise<{ warnings: string[] }> {
   if (patches.length === 0) {
     return { warnings: [] };
   }
-  const databasePaths = await listCodexStateDatabases(patches[0]?.path ?? "");
+  const databasePaths = await listLegacyCodexStateDatabases(patches.map((patch) => patch.path));
   if (databasePaths.length === 0) {
     return { warnings: [] };
   }
 
   const warnings: string[] = [];
-  const patchesByPreviousProvider = new Map<string, CodexAppHistoryPatch[]>();
+  const patchesByPreviousProvider = new Map<string, LegacyCodexAppHistoryPatch[]>();
   for (const patch of patches) {
     const previousProvider = patch.previousDatabaseProvider ?? (patch.previousProvider === "openai" ? "openai" : undefined);
     if (!previousProvider) {
@@ -642,7 +520,7 @@ async function restoreHistoryDatabaseProviders(patches: readonly CodexAppHistory
       try {
         await runSQLiteScript(databasePath, script);
       } catch (error) {
-        warnings.push(`Skipped Codex history database provider restore for ${databasePath}: ${errorMessage(error)}.`);
+        warnings.push(`Skipped legacy Codex history database provider restore for ${databasePath}: ${errorMessage(error)}.`);
       }
     }
   }
@@ -650,21 +528,26 @@ async function restoreHistoryDatabaseProviders(patches: readonly CodexAppHistory
   return { warnings };
 }
 
-async function listCodexStateDatabases(pathInsideCodexHome: string): Promise<string[]> {
-  const codexHome = codexHomeFromPath(pathInsideCodexHome);
-  let entries;
-  try {
-    entries = await readdir(codexHome, { withFileTypes: true });
-  } catch (error) {
-    if (isNodeErrorCode(error, "ENOENT")) {
-      return [];
+async function listLegacyCodexStateDatabases(pathsInsideCodexHome: readonly string[]): Promise<string[]> {
+  const codexHomes = [...new Set(pathsInsideCodexHome.map(codexHomeFromPath))];
+  const databasePaths: string[] = [];
+  for (const codexHome of codexHomes) {
+    let entries;
+    try {
+      entries = await readdir(codexHome, { withFileTypes: true });
+    } catch (error) {
+      if (isNodeErrorCode(error, "ENOENT")) {
+        continue;
+      }
+      throw error;
     }
-    throw error;
+    databasePaths.push(
+      ...entries
+        .filter((entry) => entry.isFile() && /^state_\d+\.sqlite$/.test(entry.name))
+        .map((entry) => join(codexHome, entry.name))
+    );
   }
-  return entries
-    .filter((entry) => entry.isFile() && /^state_\d+\.sqlite$/.test(entry.name))
-    .map((entry) => join(codexHome, entry.name))
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(databasePaths)].sort((left, right) => left.localeCompare(right));
 }
 
 function codexHomeFromPath(pathInsideCodexHome: string): string {
@@ -735,52 +618,14 @@ function appendBounded(current: string, next: string, maxBytes: number): string 
   return combined.slice(-maxBytes);
 }
 
-async function syncRolloutFileProvider(
-  path: string,
-  existingPatch: CodexAppHistoryPatch | undefined
-): Promise<CodexAppHistoryPatch | undefined> {
-  const rollout = parseRolloutHead(await readTextFile(path));
-  if (!rollout) {
-    return existingPatch;
-  }
-  const currentProvider = rollout.provider;
-  if (currentProvider === codexAppProviderId) {
-    return existingPatch;
-  }
-  if (currentProvider !== null && currentProvider !== "openai") {
-    return existingPatch;
-  }
-  const patch: CodexAppHistoryPatch = {
-    appliedProvider: codexAppProviderId,
-    path,
-    previousProvider: existingPatch ? existingPatch.previousProvider : currentProvider
-  };
-  rollout.payload.model_provider = codexAppProviderId;
-  await writeFileAtomically(renderRolloutHead(rollout), path);
-  return patch;
-}
-
-async function restoreRolloutFileProvider(patch: CodexAppHistoryPatch): Promise<void> {
-  const rollout = parseRolloutHead(await readTextFile(patch.path));
-  if (!rollout || rollout.provider !== patch.appliedProvider) {
-    return;
-  }
-  if (patch.previousProvider === null) {
-    delete rollout.payload.model_provider;
-  } else {
-    rollout.payload.model_provider = patch.previousProvider;
-  }
-  await writeFileAtomically(renderRolloutHead(rollout), patch.path);
-}
-
-interface ParsedRolloutHead {
+interface LegacyParsedRolloutHead {
   firstLine: Record<string, unknown>;
   payload: Record<string, unknown>;
   provider: string | null;
   rest: string;
 }
 
-function parseRolloutHead(raw: string): ParsedRolloutHead | undefined {
+function parseLegacyRolloutHead(raw: string): LegacyParsedRolloutHead | undefined {
   const newlineIndex = raw.indexOf("\n");
   const firstLineRaw = newlineIndex >= 0 ? raw.slice(0, newlineIndex) : raw;
   const rest = newlineIndex >= 0 ? raw.slice(newlineIndex) : "";
@@ -801,7 +646,7 @@ function parseRolloutHead(raw: string): ParsedRolloutHead | undefined {
   };
 }
 
-function renderRolloutHead(rollout: ParsedRolloutHead): string {
+function renderLegacyRolloutHead(rollout: LegacyParsedRolloutHead): string {
   return `${JSON.stringify(rollout.firstLine)}${rollout.rest || "\n"}`;
 }
 
@@ -838,13 +683,6 @@ function requiredString(value: unknown, key: string): string {
 function requiredNumber(value: unknown, key: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`Invalid Codex.app integration metadata: ${key} must be a number.`);
-  }
-  return value;
-}
-
-function requiredBoolean(value: unknown, key: string): boolean {
-  if (typeof value !== "boolean") {
-    throw new Error(`Invalid Codex.app integration metadata: ${key} must be a boolean.`);
   }
   return value;
 }

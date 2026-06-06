@@ -91,8 +91,8 @@ describe("ipc handlers", () => {
 
   it("routes Codex app integration actions through the main service", async () => {
     const codexAppStatus = {
+      canRestore: true,
       configPath: "/Users/nik/.codex/config.toml",
-      hasBackup: true,
       model: "gpt-5.5",
       providerId: "codexmanager",
       proxyURL: "http://127.0.0.1:18317",
@@ -112,8 +112,7 @@ describe("ipc handlers", () => {
       {
         codexAppIntegrationService: {
           configure: vi.fn(async () => codexAppStatus),
-          restoreSafe: vi.fn(async () => ({ ...codexAppStatus, state: "not_configured" })),
-          restoreSnapshot: vi.fn(async () => ({ ...codexAppStatus, state: "not_configured" })),
+          restore: vi.fn(async () => ({ ...codexAppStatus, state: "not_configured" })),
           status: vi.fn(async () => codexAppStatus)
         },
         proxyRuntimeService: {
@@ -134,9 +133,10 @@ describe("ipc handlers", () => {
 
     await expect(ipcMain.invoke(ipcChannels.codexAppGetStatus)).resolves.toEqual(codexAppStatus);
     await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).resolves.toEqual(codexAppStatus);
-    await expect(ipcMain.invoke(ipcChannels.codexAppRestoreSafe)).resolves.toMatchObject({ state: "not_configured" });
-    await expect(ipcMain.invoke(ipcChannels.codexAppRestoreSnapshot)).resolves.toMatchObject({ state: "not_configured" });
+    await expect(ipcMain.invoke(ipcChannels.codexAppRestore)).resolves.toMatchObject({ state: "not_configured" });
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledTimes(1);
+    expect(context.codexAppIntegrationService.restore).toHaveBeenCalledTimes(1);
+    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
     expect(context.proxyRuntimeService.getState).toHaveBeenCalledTimes(1);
     expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -150,8 +150,8 @@ describe("ipc handlers", () => {
 
   it("starts the proxy before configuring Codex app when the proxy is stopped", async () => {
     const codexAppStatus = {
+      canRestore: true,
       configPath: "/Users/nik/.codex/config.toml",
-      hasBackup: true,
       model: "gpt-5.5",
       providerId: "codexmanager",
       proxyURL: "http://127.0.0.1:18317",
@@ -196,13 +196,62 @@ describe("ipc handlers", () => {
 
     expect(context.proxyRuntimeService.start).toHaveBeenCalledWith(18_317, "sk-local-test");
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledOnce();
+    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
     expect(publishedProxyStates).toEqual([runningProxyState]);
+  });
+
+  it("keeps Codex app configuration successful when launching Codex app reports a warning", async () => {
+    const codexAppStatus = {
+      canRestore: true,
+      configPath: "/Users/nik/.codex/config.toml",
+      model: "gpt-5.5",
+      providerId: "codexmanager",
+      proxyURL: "http://127.0.0.1:18317",
+      state: "configured"
+    };
+    const proxyState = {
+      apiKey: "sk-local-test",
+      availableModels: ["gpt-5.5"],
+      isRunning: true,
+      port: 18_317,
+      proxyURL: "http://localhost:18317"
+    };
+    const context = appContext(
+      {
+        listAccounts: vi.fn(async () => [accountSummary()])
+      },
+      {
+        codexAppIntegrationService: {
+          configure: vi.fn(async () => codexAppStatus)
+        },
+        codexCLIService: {
+          launchApp: vi.fn(async () => {
+            throw new Error("open failed");
+          })
+        },
+        proxyRuntimeService: {
+          getState: vi.fn(async () => proxyState),
+          start: vi.fn(async () => proxyState)
+        }
+      }
+    );
+    const ipcMain = new FakeIpcMain();
+    stubCodexAppProxyHealth();
+
+    registerIpcHandlers(ipcMain as unknown as IpcMain, context);
+
+    await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).resolves.toMatchObject({
+      state: "configured",
+      warning: "Codex.app configuration was saved, but Codex.app could not be opened: open failed"
+    });
+    expect(context.codexAppIntegrationService.configure).toHaveBeenCalledOnce();
+    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
   });
 
   it("does not write Codex app config when the local proxy health check fails", async () => {
     const codexAppStatus = {
+      canRestore: true,
       configPath: "/Users/nik/.codex/config.toml",
-      hasBackup: true,
       model: "gpt-5.5",
       providerId: "codexmanager",
       proxyURL: "http://127.0.0.1:18317",
@@ -243,6 +292,7 @@ describe("ipc handlers", () => {
       "Codex.app proxy health check failed (503): Proxy is unavailable"
     );
     expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
+    expect(context.codexCLIService.launchApp).not.toHaveBeenCalled();
   });
 
   it("rejects Codex app configuration before an account is available", async () => {
@@ -266,6 +316,7 @@ describe("ipc handlers", () => {
 
     await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).rejects.toThrow("Add and authorize at least one account");
     expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
+    expect(context.codexCLIService.launchApp).not.toHaveBeenCalled();
     expect(context.proxyRuntimeService.getState).not.toHaveBeenCalled();
     expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
   });
@@ -385,6 +436,7 @@ function stubCodexAppProxyHealth(status = 200, body: unknown = { status: "ok" })
 function appContext(accountsCoordinator: Record<string, unknown>, patch: Record<string, unknown> = {}): DesktopAppContext {
   return {
     accountsCoordinator,
+    codexCLIService: { launchApp: vi.fn(async () => false) },
     editorAppService: {},
     proxyRuntimeService: {},
     settingsCoordinator: {},

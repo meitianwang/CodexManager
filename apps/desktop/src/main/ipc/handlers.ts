@@ -13,6 +13,7 @@ import type {
 import { accountsTransferFormatIdentifier } from "../../shared/models/account-transfer";
 import type { AccountSummary } from "../../shared/models/accounts";
 import { parseJsonValue } from "../../shared/models/json-value";
+import type { CodexAppIntegrationStatus } from "../../shared/models/codex-app-integration";
 import type { ProxyRuntimeState } from "../../shared/models/proxy";
 import type { AppSettings } from "../../shared/models/settings";
 import {
@@ -170,12 +171,11 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext
       proxyState = await context.proxyRuntimeService.start(proxyState.port, proxyState.apiKey);
     }
     await verifyCodexAppProxyHealth(proxyState);
-    const status = await context.codexAppIntegrationService.configure();
+    const status = await launchCodexAppAfterConfigure(context, await context.codexAppIntegrationService.configure());
     options.onProxyStateChanged?.(proxyState);
     return status;
   });
-  ipcMain.handle(ipcChannels.codexAppRestoreSafe, () => context.codexAppIntegrationService.restoreSafe());
-  ipcMain.handle(ipcChannels.codexAppRestoreSnapshot, () => context.codexAppIntegrationService.restoreSnapshot());
+  ipcMain.handle(ipcChannels.codexAppRestore, () => context.codexAppIntegrationService.restore());
 
   ipcMain.handle(ipcChannels.proxyGetState, () => context.proxyRuntimeService.getState());
   ipcMain.handle(ipcChannels.proxyRegenerateApiKey, () => context.proxyRuntimeService.regenerateApiKey());
@@ -267,6 +267,32 @@ function proxyErrorMessage(text: string): string {
     // Fall through to bounded raw text.
   }
   return text || "Unknown proxy error";
+}
+
+async function launchCodexAppAfterConfigure(
+  context: DesktopAppContext,
+  status: CodexAppIntegrationStatus
+): Promise<CodexAppIntegrationStatus> {
+  try {
+    await context.codexCLIService.launchApp();
+    return status;
+  } catch (error) {
+    return {
+      ...status,
+      warning: appendWarning(
+        status.warning,
+        `Codex.app configuration was saved, but Codex.app could not be opened: ${errorMessage(error)}`
+      )
+    };
+  }
+}
+
+function appendWarning(existing: string | undefined, next: string): string {
+  return [existing, next].filter(Boolean).join(" ");
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function accountTransferSelectableItem(account: AccountsTransferPackage["accounts"][number]): AccountTransferSelectableItem {

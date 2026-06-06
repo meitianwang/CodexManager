@@ -721,31 +721,18 @@ function App(): ReactElement {
                 { silentSuccess: true }
               )
             }
-            onRestoreCodexAppSafe={() =>
+            onRestoreCodexApp={() =>
               runAction(
-                t("proxy.codex_app.restore_safe"),
+                t("proxy.codex_app.restore"),
                 async () => {
                   if (!api) {
                     throw new Error(t("error.ipc_bridge_unavailable"));
                   }
-                  const status = await api.codexApp.restoreSafe();
+                  const status = await api.codexApp.restore();
                   setCodexAppStatus(status);
-                  setNotice({ tone: status.warning ? "info" : "success", text: status.warning ?? t("notice.action_complete", { action: t("proxy.codex_app.restore_safe") }) });
+                  setNotice({ tone: status.warning ? "info" : "success", text: status.warning ?? t("notice.action_complete", { action: t("proxy.codex_app.restore") }) });
                 },
                 { silentSuccess: true }
-              )
-            }
-            onRestoreCodexAppSnapshot={() =>
-              runAction(
-                t("proxy.codex_app.restore_snapshot"),
-                async () => {
-                  if (!api) {
-                    throw new Error(t("error.ipc_bridge_unavailable"));
-                  }
-                  const status = await api.codexApp.restoreSnapshot();
-                  setCodexAppStatus(status);
-                },
-                { success: t("notice.action_complete", { action: t("proxy.codex_app.restore_snapshot") }) }
               )
             }
             proxyState={proxyState}
@@ -1268,8 +1255,7 @@ interface ProxyPageProps {
   onConfigureCodexApp: () => void;
   onCopy: (text: string, success?: string) => void;
   onRegenerateApiKey: () => void;
-  onRestoreCodexAppSafe: () => void;
-  onRestoreCodexAppSnapshot: () => void;
+  onRestoreCodexApp: () => void;
   onStart: (port: string, apiKey: string) => void;
   onStop: () => void;
   proxyState: ProxyRuntimeState;
@@ -1417,11 +1403,8 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
             <button className="primary-action" type="button" disabled={codexAppConfigureDisabled} onClick={props.onConfigureCodexApp}>
               {props.t("proxy.codex_app.configure")}
             </button>
-            <button type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSafe}>
-              {props.t("proxy.codex_app.restore_safe")}
-            </button>
-            <button className="danger subtle-danger" type="button" disabled={isBusy || !props.codexAppStatus.hasBackup} onClick={props.onRestoreCodexAppSnapshot}>
-              {props.t("proxy.codex_app.restore_snapshot")}
+            <button type="button" disabled={isBusy || !props.codexAppStatus.canRestore} onClick={props.onRestoreCodexApp}>
+              {props.t("proxy.codex_app.restore")}
             </button>
           </div>
         </div>
@@ -1581,8 +1564,8 @@ function fallbackProxyState(settings: AppSettings): ProxyRuntimeState {
 function fallbackCodexAppStatus(proxyState: ProxyRuntimeState): CodexAppIntegrationStatus {
   return {
     configPath: "~/.codex/config.toml",
-    hasBackup: false,
     model: codexAppDefaultModel,
+    canRestore: false,
     providerId: codexAppProviderId,
     proxyURL: proxyState.proxyURL.replace("localhost", "127.0.0.1"),
     state: "not_configured"

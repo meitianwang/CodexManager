@@ -27,8 +27,7 @@ const ipcChannels = {
   clipboardWriteText: "clipboard:writeText",
   codexAppConfigure: "codexApp:configure",
   codexAppGetStatus: "codexApp:getStatus",
-  codexAppRestoreSafe: "codexApp:restoreSafe",
-  codexAppRestoreSnapshot: "codexApp:restoreSnapshot",
+  codexAppRestore: "codexApp:restore",
   proxyGetState: "proxy:getState",
   proxyRegenerateApiKey: "proxy:regenerateApiKey",
   proxyStart: "proxy:start",
@@ -65,8 +64,7 @@ export interface CodexManagerAPI {
   codexApp: {
     configure: () => Promise<CodexAppIntegrationStatus>;
     getStatus: () => Promise<CodexAppIntegrationStatus>;
-    restoreSafe: () => Promise<CodexAppIntegrationStatus>;
-    restoreSnapshot: () => Promise<CodexAppIntegrationStatus>;
+    restore: () => Promise<CodexAppIntegrationStatus>;
   };
   proxy: {
     getState: () => Promise<ProxyRuntimeState>;
@@ -116,8 +114,7 @@ const api: CodexManagerAPI = {
   codexApp: {
     configure: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppConfigure),
     getStatus: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppGetStatus),
-    restoreSafe: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppRestoreSafe),
-    restoreSnapshot: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppRestoreSnapshot)
+    restore: () => invoke<CodexAppIntegrationStatus>(ipcChannels.codexAppRestore)
   },
   proxy: {
     getState: () => invoke<ProxyRuntimeState>(ipcChannels.proxyGetState),

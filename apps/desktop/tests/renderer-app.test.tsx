@@ -490,6 +490,9 @@ describe("desktop renderer app", () => {
     expect(screen.getByRole("heading", { name: "Codex.app" })).toBeTruthy();
     expect(screen.getByText("Not configured")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Configure Codex.app" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Restore config" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Safe restore" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Full restore" })).toBeNull();
     expect(rendererStyles()).toContain("flex-wrap: wrap;");
     expect(rendererStyles()).not.toContain("grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));");
     expect(codeBlockCopyButtons()).toHaveLength(2);
@@ -748,8 +751,7 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
     codexApp: {
       configure: vi.fn(async () => makeCodexAppStatus(proxyState, "configured", true)),
       getStatus: vi.fn(async () => makeCodexAppStatus(proxyState)),
-      restoreSafe: vi.fn(async () => makeCodexAppStatus(proxyState, "not_configured")),
-      restoreSnapshot: vi.fn(async () => makeCodexAppStatus(proxyState, "not_configured"))
+      restore: vi.fn(async () => makeCodexAppStatus(proxyState, "not_configured"))
     },
     proxy: {
       getState: vi.fn(async () => proxyState),
@@ -788,11 +790,10 @@ function installMockAPI(options: { accounts?: AccountSummary[]; installedEditors
 function makeCodexAppStatus(
   proxyState: ProxyRuntimeState,
   state: "not_configured" | "configured" | "drifted" | "restorable" = "not_configured",
-  hasBackup = false
+  canRestore = false
 ) {
   return {
     configPath: "/Users/nik/.codex/config.toml",
-    hasBackup,
     model: "gpt-5.5",
     providerId: "codexmanager",
     proxyURL: proxyState.proxyURL.replace("localhost", "127.0.0.1"),
@@ -800,6 +801,7 @@ function makeCodexAppStatus(
   };
 }
 
+    canRestore,
 function appendAccount(accounts: AccountSummary[], id: string, label: string): AccountSummary {
   const account = makeAccount(id, label);
   accounts.push(account);

@@ -20,7 +20,7 @@ import { DefaultWorkspaceMetadataService } from "./services/workspace-metadata-s
 import { RemoteModelCatalogService } from "./services/remote-model-catalog-service";
 import { CodexAppIntegrationService } from "./services/codex-app-integration-service";
 import { createDesktopPlatform } from "./platform";
-import type { DesktopPlatform, EditorAppServiceLike } from "./platform/types";
+import type { CodexLauncherLike, DesktopPlatform, EditorAppServiceLike } from "./platform/types";
 import type { ChatGPTOAuthTokens } from "../shared/models/auth";
 import type { EditorAppID } from "../shared/models/settings";
 
@@ -55,6 +55,7 @@ export interface SmokePlatformSideEffects {
 export interface DesktopAppContext {
   accountsCoordinator: AccountsCoordinator;
   authRepository: AuthFileRepository;
+  codexCLIService: CodexLauncherLike;
   codexAppIntegrationService: CodexAppIntegrationService;
   editorAppService: EditorAppServiceLike;
   paths: FileSystemPaths;
@@ -80,6 +81,7 @@ export async function createDesktopAppContext(
   const authRepository = new AuthFileRepository(paths);
   const smokePlatformSideEffects = createSmokePlatformSideEffects();
   const editorAppService = platform.editorApps();
+  const codexCLIService = smokePlatformSideEffects?.codexCLIService ?? platform.codexLauncher();
   const settingsCoordinator = new SettingsCoordinator(
     settingsRepository,
     smokePlatformSideEffects?.launchAtStartupService ?? platform.launchAtStartupService()
@@ -106,7 +108,7 @@ export async function createDesktopAppContext(
     weeklyQuotaWarmupService,
     workspaceMetadataService,
     chatGPTOAuthLoginService,
-    codexCLIService: smokePlatformSideEffects?.codexCLIService ?? platform.codexLauncher(),
+    codexCLIService,
     editorAppService: smokePlatformSideEffects?.editorAppService ?? editorAppService,
     sourceDeviceID: platform.sourceDeviceID
   });
@@ -146,6 +148,7 @@ export async function createDesktopAppContext(
   return {
     accountsCoordinator,
     authRepository,
+    codexCLIService,
     codexAppIntegrationService,
     editorAppService,
     paths,
