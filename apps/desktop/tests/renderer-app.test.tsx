@@ -611,6 +611,15 @@ describe("desktop renderer app", () => {
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ restartEditorTargets: ["vscode"] }));
     expect(await screen.findByText("Editor restart target updated")).toBeTruthy();
 
+    fireEvent.change(await screen.findByLabelText("Editor restart target"), { target: { value: "" } });
+    await waitFor(() =>
+      expect(api.settings.update).toHaveBeenCalledWith({
+        restartEditorsOnSwitch: false,
+        restartEditorTargets: []
+      })
+    );
+    expect(await screen.findByText("Settings updated")).toBeTruthy();
+
     fireEvent.change(screen.getByLabelText("Language"), { target: { value: "zh-Hans" } });
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ locale: "zh-Hans" }));
     expect(await screen.findByRole("heading", { name: "设置" })).toBeTruthy();
@@ -793,6 +802,7 @@ function makeCodexAppStatus(
   canRestore = false
 ) {
   return {
+    canRestore,
     configPath: "/Users/nik/.codex/config.toml",
     model: "gpt-5.5",
     providerId: "codexmanager",
@@ -801,7 +811,6 @@ function makeCodexAppStatus(
   };
 }
 
-    canRestore,
 function appendAccount(accounts: AccountSummary[], id: string, label: string): AccountSummary {
   const account = makeAccount(id, label);
   accounts.push(account);

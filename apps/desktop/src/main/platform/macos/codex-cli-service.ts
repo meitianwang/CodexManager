@@ -55,13 +55,11 @@ export class MacOSCodexCLIService {
   }
 
   async launchApp(workspacePath?: string): Promise<boolean> {
-    await this.forceStopRunningCodex();
-
     let appLaunchError: string | undefined;
     const appPath = await this.findCodexAppPath();
     if (appPath) {
       try {
-        await runCheckedWithRunner(this.runCommand, "/usr/bin/open", ["-na", appPath, ...workspaceArguments(workspacePath)], {
+        await runCheckedWithRunner(this.runCommand, "/usr/bin/open", ["-a", appPath, ...workspaceArguments(workspacePath)], {
           errorPrefix: "Failed to launch Codex desktop app",
           timeoutMs: 5_000
         });
@@ -114,19 +112,6 @@ export class MacOSCodexCLIService {
     }
 
     return (await this.findAppWithSpotlight("Codex.app")) ?? (await this.findAppWithSpotlight("Codex Desktop.app"));
-  }
-
-  private async forceStopRunningCodex(): Promise<void> {
-    await Promise.all(
-      codexProcessNames.map(async (processName) => {
-        try {
-          await this.runCommand("/usr/bin/pkill", ["-9", "-x", processName], { timeoutMs: 1_500 });
-        } catch {
-          // pkill exits non-zero when the process is absent; startup should continue.
-        }
-      })
-    );
-    await this.sleep(220);
   }
 
   private async waitForCodexProcess(timeoutMs: number): Promise<boolean> {

@@ -199,14 +199,19 @@ export class EditorAppService {
   private async forceKillProcesses(processNames: readonly string[]): Promise<void> {
     await Promise.all(
       processNames.map(async (processName) => {
-        try {
-          await this.runCommand("taskkill", ["/IM", processName, "/F", "/T"], { timeoutMs: 1_500 });
-        } catch {
-          // taskkill exits non-zero when the editor is not running; restart can continue.
+        const result = await this.runCommand("taskkill", ["/IM", processName, "/F", "/T"], { timeoutMs: 1_500 });
+        if (result.status === 0 || isTaskkillProcessAbsent(result)) {
+          return;
         }
+        throw new Error(`Failed to stop editor process ${processName}: ${commandResultDetails(result)}`);
       })
     );
   }
+}
+
+function isTaskkillProcessAbsent(result: CommandResult): boolean {
+  const details = `${result.stdout} ${result.stderr}`.toLowerCase();
+  return result.status === 128 || details.includes("not found") || details.includes("no tasks are running");
 }
 
 function defaultExecutableExists(path: string): boolean {
@@ -223,4 +228,8 @@ function defaultSleep(milliseconds: number): Promise<void> {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function commandResultDetails(result: CommandResult): string {
+  return (result.stderr || result.stdout).trim() || `exit status ${result.status}`;
 }

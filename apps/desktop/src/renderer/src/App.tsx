@@ -1453,7 +1453,7 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
 
     const firstInstalledEditor = installedEditors[0]?.id;
     onUpdateSettings({
-      restartEditorsOnSwitch: true,
+      restartEditorsOnSwitch: firstInstalledEditor !== undefined,
       restartEditorTargets: firstInstalledEditor ? [firstInstalledEditor] : []
     });
   };
@@ -1499,11 +1499,14 @@ function SettingsPage({ installedEditors, onOpenRepository, onQuit, onUpdateSett
             aria-label={t("settings.editor_restart_target")}
             disabled={!settings.restartEditorsOnSwitch || installedEditors.length === 0}
             value={selectedRestartEditorTarget}
-            onChange={(event) =>
-              onUpdateSettings({
-                restartEditorTargets: event.target.value ? [event.target.value as EditorAppID] : []
-              })
-            }
+            onChange={(event) => {
+              const selectedTarget = event.target.value as EditorAppID | "";
+              onUpdateSettings(
+                selectedTarget
+                  ? { restartEditorTargets: [selectedTarget] }
+                  : { restartEditorsOnSwitch: false, restartEditorTargets: [] }
+              );
+            }}
           >
             <option value="">{t("common.none")}</option>
             {installedEditors.map((editor) => (
@@ -1563,9 +1566,9 @@ function fallbackProxyState(settings: AppSettings): ProxyRuntimeState {
 
 function fallbackCodexAppStatus(proxyState: ProxyRuntimeState): CodexAppIntegrationStatus {
   return {
+    canRestore: false,
     configPath: "~/.codex/config.toml",
     model: codexAppDefaultModel,
-    canRestore: false,
     providerId: codexAppProviderId,
     proxyURL: proxyState.proxyURL.replace("localhost", "127.0.0.1"),
     state: "not_configured"

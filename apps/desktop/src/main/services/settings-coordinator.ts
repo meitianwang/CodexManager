@@ -40,6 +40,9 @@ export class SettingsCoordinator {
     if (patch.restartEditorTargets !== undefined) {
       settings.restartEditorTargets = normalizeEditorAppIDs(patch.restartEditorTargets);
     }
+    if (settings.restartEditorsOnSwitch && settings.restartEditorTargets.length === 0) {
+      settings.restartEditorsOnSwitch = false;
+    }
     if (patch.locale !== undefined) {
       settings.locale = resolveAppLocale(patch.locale);
     }

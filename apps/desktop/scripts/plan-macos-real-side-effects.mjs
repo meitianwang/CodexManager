@@ -27,8 +27,8 @@ const plannedChecks = [
     requirement: "Verify real Codex app or CLI launch after switching accounts.",
     approvalRequired: true,
     sideEffectsIfExecuted: [
-      "terminates existing Codex desktop processes before relaunch",
-      "launches Codex.app or the Codex CLI detached process",
+      "opens or focuses Codex.app without terminating existing Codex desktop processes",
+      "launches the Codex CLI detached process only when the desktop app path is unavailable or failed to appear",
       "passes the selected workspace path when configured"
     ],
     evidenceToCapture: [

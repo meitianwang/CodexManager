@@ -23,6 +23,20 @@ describe("settings coordinator", () => {
     expect(repository.settings).toEqual(settings);
     expect(launchAtStartup.enabledValues).toEqual([true]);
   });
+
+  it("turns off editor restart when the selected targets are empty", async () => {
+    const repository = new MemorySettingsRepository({
+      ...defaultAppSettings(),
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: ["cursor"]
+    });
+    const coordinator = new SettingsCoordinator(repository, new RecordingLaunchAtStartupService());
+
+    const settings = await coordinator.updateSettings({ restartEditorTargets: [] });
+
+    expect(settings.restartEditorsOnSwitch).toBe(false);
+    expect(settings.restartEditorTargets).toEqual([]);
+  });
 });
 
 class MemorySettingsRepository implements SettingsRepositoryLike {

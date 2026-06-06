@@ -163,11 +163,11 @@ export class MacOSEditorAppService {
   private async forceKillProcesses(processNames: readonly string[]): Promise<void> {
     await Promise.all(
       processNames.map(async (processName) => {
-        try {
-          await this.runCommand("/usr/bin/pkill", ["-9", "-x", processName], { timeoutMs: 1_500 });
-        } catch {
-          // pkill exits non-zero when the editor is not running; restart can continue.
+        const result = await this.runCommand("/usr/bin/pkill", ["-9", "-x", processName], { timeoutMs: 1_500 });
+        if (result.status === 0 || result.status === 1) {
+          return;
         }
+        throw new Error(`Failed to stop editor process ${processName}: ${commandResultDetails(result)}`);
       })
     );
   }
@@ -208,4 +208,8 @@ function defaultSleep(milliseconds: number): Promise<void> {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function commandResultDetails(result: CommandResult): string {
+  return (result.stderr || result.stdout).trim() || `exit status ${result.status}`;
 }

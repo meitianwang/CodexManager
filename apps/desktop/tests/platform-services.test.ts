@@ -108,6 +108,7 @@ describe("Codex CLI service", () => {
       }
     ]);
     expect(commands.some((command) => command.launchPath === "tasklist")).toBe(true);
+    expect(commands.some((command) => command.launchPath === "taskkill")).toBe(false);
   });
 
   it("falls back to codex app when the desktop process does not appear after launch", async () => {
@@ -187,9 +188,10 @@ describe("macOS Codex CLI service", () => {
     expect(launched).toEqual([]);
     expect(commands).toContainEqual({
       launchPath: "/usr/bin/open",
-      argumentsList: ["-na", "/Applications/Codex.app", "/workspaces/demo"]
+      argumentsList: ["-a", "/Applications/Codex.app", "/workspaces/demo"]
     });
     expect(commands.some((command) => command.launchPath === "/usr/bin/pgrep")).toBe(true);
+    expect(commands.some((command) => command.launchPath === "/usr/bin/pkill")).toBe(false);
   });
 
   it("falls back to codex app through the CLI when the macOS app bundle is unavailable", async () => {
@@ -266,6 +268,32 @@ describe("editor app service", () => {
     ]);
   });
 
+  it("does not relaunch a Windows editor when taskkill fails for a real error", async () => {
+    const cursorPath = String.raw`C:\Users\me\AppData\Local\Programs\Cursor\Cursor.exe`;
+    const commands: CommandCall[] = [];
+    const launched: DetachedLaunchCall[] = [];
+    const service = new EditorAppService({
+      environment: {
+        LOCALAPPDATA: String.raw`C:\Users\me\AppData\Local`,
+        PATH: ""
+      },
+      executableExists: existingPathSet([cursorPath]),
+      launchDetached: recordingLauncher(launched),
+      runCommand: async (launchPath: string, argumentsList: readonly string[] = []) => {
+        commands.push({ launchPath, argumentsList: [...argumentsList] });
+        return { status: 5, stdout: "", stderr: "Access is denied." };
+      },
+      sleep: async () => undefined
+    });
+
+    await expect(service.restartSelectedApps(["cursor"])).resolves.toEqual({
+      restarted: [],
+      error: "Cursor: Failed to stop editor process Cursor.exe: Access is denied."
+    });
+    expect(commands).toEqual([{ launchPath: "taskkill", argumentsList: ["/IM", "Cursor.exe", "/F", "/T"] }]);
+    expect(launched).toEqual([]);
+  });
+
   it("reports an error when no restart targets are selected", async () => {
     const service = new EditorAppService();
 
@@ -310,6 +338,27 @@ describe("macOS editor app service", () => {
       { launchPath: "/usr/bin/pkill", argumentsList: ["-9", "-x", "Cursor"] },
       { launchPath: "/usr/bin/open", argumentsList: ["-na", "/Users/me/Applications/Cursor.app"] }
     ]);
+  });
+
+  it("does not relaunch a macOS editor when pkill fails for a real error", async () => {
+    const commands: CommandCall[] = [];
+    const service = new MacOSEditorAppService({
+      bundleExists: existingPathSet(["/Users/me/Applications/Cursor.app"]),
+      environment: {
+        HOME: "/Users/me"
+      },
+      runCommand: async (launchPath: string, argumentsList: readonly string[] = []) => {
+        commands.push({ launchPath, argumentsList: [...argumentsList] });
+        return { status: launchPath === "/usr/bin/pkill" ? 3 : 0, stdout: "", stderr: "operation not permitted" };
+      },
+      sleep: async () => undefined
+    });
+
+    await expect(service.restartSelectedApps(["cursor"])).resolves.toEqual({
+      restarted: [],
+      error: "Cursor: Failed to stop editor process Cursor: operation not permitted"
+    });
+    expect(commands).toEqual([{ launchPath: "/usr/bin/pkill", argumentsList: ["-9", "-x", "Cursor"] }]);
   });
 });
 

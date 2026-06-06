@@ -528,7 +528,7 @@ export class AccountsCoordinator {
   ): Promise<SwitchAccountExecutionResult> {
     const result: SwitchAccountExecutionResult = { ...idleSwitchAccountExecutionResult };
 
-    if (settings.restartEditorsOnSwitch && this.editorAppService) {
+    if (settings.restartEditorsOnSwitch && settings.restartEditorTargets.length > 0 && this.editorAppService) {
       const restart = await this.editorAppService.restartSelectedApps(settings.restartEditorTargets);
       result.restartedEditorApps = restart.restarted;
       result.editorRestartError = restart.error;

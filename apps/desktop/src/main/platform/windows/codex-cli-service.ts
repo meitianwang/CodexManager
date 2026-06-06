@@ -58,8 +58,6 @@ export class CodexCLIService {
   }
 
   async launchApp(workspacePath?: string): Promise<boolean> {
-    await this.forceStopRunningCodex();
-
     let appLaunchError: string | undefined;
     const appPath = this.findCodexAppPath();
     if (appPath) {
@@ -118,19 +116,6 @@ export class CodexCLIService {
     }
 
     return this.codexAppCandidatePaths().find(this.executableExists);
-  }
-
-  private async forceStopRunningCodex(): Promise<void> {
-    await Promise.all(
-      codexProcessNames.map(async (processName) => {
-        try {
-          await this.runCommand("taskkill", ["/IM", processName, "/F", "/T"], { timeoutMs: 1_500 });
-        } catch {
-          // taskkill exits non-zero when the process is absent; startup should continue.
-        }
-      })
-    );
-    await this.sleep(220);
   }
 
   private async waitForCodexProcess(timeoutMs: number): Promise<boolean> {

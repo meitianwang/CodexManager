@@ -393,6 +393,42 @@ describe("accounts coordinator", () => {
     expect(authRepository.currentAuth).toEqual(account.authJson);
   });
 
+  it("does not report an editor restart error when restart is enabled without targets", async () => {
+    const account = makeStoredAccount({ id: "b", accountId: "acct-b", email: "b@example.com" });
+    const storeRepository = new MemoryStoreRepository({
+      version: 1,
+      accounts: [account]
+    });
+    const authRepository = new FakeAuthRepository(undefined);
+    const settingsRepository = new FakeSettingsRepository({
+      ...defaultAppSettings(),
+      restartEditorsOnSwitch: true,
+      restartEditorTargets: []
+    });
+    let restartCalled = false;
+    const coordinator = new AccountsCoordinator({
+      storeRepository,
+      authRepository,
+      settingsRepository,
+      editorAppService: {
+        async restartSelectedApps() {
+          restartCalled = true;
+          return { restarted: [], error: "should not be called" };
+        }
+      } satisfies EditorAppServiceLike,
+      dateProvider: fixedDateProvider()
+    });
+
+    const execution = await coordinator.switchAccountAndApplySettings("b");
+
+    expect(execution).toEqual({
+      usedFallbackCLI: false,
+      restartedEditorApps: []
+    });
+    expect(restartCalled).toBe(false);
+    expect(authRepository.currentAuth).toEqual(account.authJson);
+  });
+
   it("does not smart-switch when the current account is already best", async () => {
     const current = makeStoredAccount({
       id: "current",
