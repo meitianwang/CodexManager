@@ -1039,6 +1039,64 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
   });
 
+  it("treats usage-limit 429s with retry wording as quota cooldowns", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(429, "HTTP 429", "You've reached your usage limit, try again later."),
+      successResult({ id: "resp-b" }),
+      successResult({ id: "resp-b-again" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+  });
+
+  it("does not cool down transient high-load 429s so Codex provider retries can reattempt", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(429, "HTTP 429", "model is currently experiencing high load"),
+      successResult({ id: "resp-retry" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [makeAccount("a", "acct-a", "access-a", 1)]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(first.status).toBe(502);
+    await expect(second.json()).resolves.toMatchObject({ id: "resp-retry" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-a"]);
+  });
+
   it("uses the mac-compatible short cooldown for exhausted accounts with unknown reset time", async () => {
     let now = 1_780_000_000;
     const accountA = makeAccount("a", "acct-a", "access-a", 1);

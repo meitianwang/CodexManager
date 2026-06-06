@@ -673,7 +673,13 @@ export class ProxyCoordinator {
       return;
     }
     if (isRateLimited(error)) {
-      this.accountCooldowns.set(accountKey, quotaRetryCooldown(account.usage, now));
+      if (isQuotaRateLimit(error)) {
+        this.accountCooldowns.set(accountKey, quotaRetryCooldown(account.usage, now));
+        return;
+      }
+      if (!isTransientCapacityFailure(error)) {
+        this.accountCooldowns.set(accountKey, now + shortCooldownSeconds);
+      }
       return;
     }
     if (isModelRestriction(error) && model) {
@@ -1205,9 +1211,29 @@ function isRateLimited(error: CodexUpstreamError): boolean {
   return error.statusCode === 429;
 }
 
+function isTransientCapacityFailure(error: CodexUpstreamError): boolean {
+  const text = upstreamErrorText(error);
+  return (
+    text.includes("high load") ||
+    text.includes("overload") ||
+    text.includes("capacity") ||
+    text.includes("busy") ||
+    text.includes("temporarily unavailable")
+  );
+}
+
+function isQuotaRateLimit(error: CodexUpstreamError): boolean {
+  const text = upstreamErrorText(error);
+  return text.includes("quota") || text.includes("usage limit") || text.includes("usage_limit") || text.includes("billing");
+}
+
 function isModelRestriction(error: CodexUpstreamError): boolean {
   const body = error.body.toLowerCase();
   return error.statusCode === 403 && (body.includes("model_restricted") || body.includes("model_not_found"));
+}
+
+function upstreamErrorText(error: CodexUpstreamError): string {
+  return `${error.message} ${error.body}`.toLowerCase();
 }
 
 function exhaustedQuotaResetTime(usage: StoredAccount["usage"], now: number): number | undefined {
