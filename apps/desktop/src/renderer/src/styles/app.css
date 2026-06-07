@@ -166,18 +166,19 @@ svg.symbol-icon::after {
 
 .brand-mark {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  border: 1px solid rgba(11, 140, 136, 0.18);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--accent);
+  overflow: hidden;
+  border-radius: 9px;
+  background: transparent;
 }
 
 .brand-mark-icon {
-  width: 21px;
-  height: 21px;
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 
 .brand-block h1,

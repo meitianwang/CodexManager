@@ -1,7 +1,7 @@
 {
   "name": "codex-manager-desktop",
   "productName": "CodexManager",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Desktop app for managing Codex / ChatGPT accounts and the local Codex proxy.",
   "author": "NikMei",
   "license": "UNLICENSED",

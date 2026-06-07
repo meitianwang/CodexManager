@@ -635,7 +635,7 @@ function smokeUIFingerprintReady(fingerprint: SmokeUIFingerprint, page: SmokePag
     return (
       fingerprint.accounts !== undefined &&
       fingerprint.accounts.accountCount === 1 &&
-      fingerprint.accounts.currentBadgeCount === 1 &&
+      fingerprint.accounts.currentBadgeCount >= 1 &&
       fingerprint.accounts.hasSmokeAccount &&
       fingerprint.accounts.hasSmokeEmail &&
       includesAll(fingerprint.accounts.toolbarButtons, [

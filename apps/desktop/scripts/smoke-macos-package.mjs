@@ -29,7 +29,8 @@ const childResult = await runPackagedSmoke(appExecutable, {
   CODEX_MANAGER_ELECTRON_SMOKE_ROOT: smokeRoot,
   CODEX_MANAGER_ELECTRON_SMOKE_SCREENSHOT_DIR: screenshotDirectory,
   CODEX_MANAGER_ELECTRON_SMOKE_TEST: "1",
-  CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS: String(smokeTimeoutMs)
+  CODEX_MANAGER_ELECTRON_SMOKE_TIMEOUT_MS: String(smokeTimeoutMs),
+  VITE_DEV_SERVER_URL: ""
 });
 
 const smokeResult = readSmokeResult(resultPath);

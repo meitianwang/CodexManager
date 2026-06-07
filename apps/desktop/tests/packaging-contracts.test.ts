@@ -72,14 +72,14 @@ describe("desktop packaging contracts", () => {
   });
 
   it("keeps package icon assets available for Windows and macOS", () => {
-    const svg = readAppFile("assets/icon.svg").toString("utf8");
+    const png = readAppFile("assets/icon.png");
     const ico = readAppFile("assets/icon.ico");
     const icns = readAppFile("assets/icon.icns");
 
-    expect(svg).toContain("<svg");
-    expect(svg).toContain("CodexManager");
+    expect(Array.from(png.subarray(0, 4))).toEqual([0x89, 0x50, 0x4e, 0x47]);
     expect(Array.from(ico.subarray(0, 4))).toEqual([0x00, 0x00, 0x01, 0x00]);
     expect(icns.subarray(0, 4).toString("ascii")).toBe("icns");
+    expect(statSync(resolve(appRoot, "assets/icon.png")).size).toBeGreaterThan(1024);
     expect(statSync(resolve(appRoot, "assets/icon.icns")).size).toBeGreaterThan(1024);
   });
 

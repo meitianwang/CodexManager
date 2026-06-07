@@ -136,5 +136,5 @@ Add `-ExpectedCurrentAccountId "<account-id-after-switch>"` when you know the se
 
 ## Notes
 
-- `apps/desktop/assets/icon.svg` is the source icon. `apps/desktop/assets/icon.ico` is the multi-size Windows icon wired into Electron Forge `packagerConfig.icon`, BrowserWindow, and the Squirrel setup executable.
+- `apps/desktop/assets/icon.png` is the source icon. `apps/desktop/assets/icon.ico` is the multi-size Windows icon wired into Electron Forge `packagerConfig.icon`, BrowserWindow, and the Squirrel setup executable.
 - Signing and auto-update publishing are intentionally not configured yet. Add them only after a Windows CI runner and certificate strategy are selected.

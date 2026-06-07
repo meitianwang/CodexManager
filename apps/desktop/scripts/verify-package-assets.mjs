@@ -30,11 +30,7 @@ function assertMagic(relativePath, expected) {
   }
 }
 
-const svg = readAsset("assets/icon.svg").toString("utf8");
-if (!svg.includes("<svg") || !svg.includes("CodexManager")) {
-  throw new Error("Package asset assets/icon.svg is not the CodexManager source SVG.");
-}
-
+assertMagic("assets/icon.png", [0x89, 0x50, 0x4e, 0x47]);
 assertMagic("assets/icon.ico", [0x00, 0x00, 0x01, 0x00]);
 assertMagic("assets/icon.icns", Buffer.from("icns", "ascii"));
 
@@ -57,7 +53,7 @@ if (zipPlatforms.includes("linux")) {
   throw new Error("Electron Forge must not expose Linux ZIP packaging while Linux is unsupported.");
 }
 
-console.log("Desktop package assets verified: icon.svg, icon.ico, icon.icns");
+console.log("Desktop package assets verified: icon.png, icon.ico, icon.icns");
 
 function makerConfig(forgeConfig, makerName) {
   return findMaker(forgeConfig, makerName)?.configOrConfigFetcher;

@@ -21,13 +21,14 @@ import { proxyAvailableModels, proxyEndpoints, type ProxyEndpointID, type ProxyR
 import { createTranslator, languageNameKey, type Translator } from "./i18n";
 import "./styles/app.css";
 
+const brandLogoURL = new URL("../../../assets/icon.png", import.meta.url).href;
+
 type PageID = "accounts" | "proxy" | "settings";
 type AccountViewMode = "grid" | "list";
 type AccountsContentState = { status: "error"; message: string } | { status: "loading" } | { status: "ready" };
 type AccountToolbarBusyAction = "add" | "export" | "importCurrent" | "importPackage" | "refreshAll" | "warmUpWeeklyQuota";
 type NoticeTone = "success" | "error" | "info";
 type SymbolIconName =
-  | "code"
   | "flame"
   | "gearshape"
   | "grid"
@@ -90,14 +91,6 @@ function SymbolIcon({
   };
 
   switch (name) {
-    case "code":
-      return (
-        <svg {...strokeProps}>
-          <path d="m8.2 6-5 6 5 6" />
-          <path d="m15.8 6 5 6-5 6" />
-          <path d="m14 4-4 16" />
-        </svg>
-      );
     case "flame":
       return (
         <svg {...strokeProps}>
@@ -438,7 +431,7 @@ function App(): ReactElement {
       <aside className="sidebar" aria-label={t("aria.primary")}>
         <div className="brand-block">
           <div className="brand-mark" aria-hidden="true">
-            <SymbolIcon className="brand-mark-icon" name="code" size={22} strokeWidth={2.6} />
+            <img className="brand-mark-icon" src={brandLogoURL} alt="" />
           </div>
           <h1>{appInfo.displayName}</h1>
         </div>
