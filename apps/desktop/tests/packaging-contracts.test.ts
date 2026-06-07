@@ -317,12 +317,16 @@ describe("desktop packaging contracts", () => {
     expect(packageJson.scripts["verify:macos-real-side-effects"]).toBe(
       "pnpm run build:main && node scripts/verify-macos-real-side-effects.mjs"
     );
-    expect(report.status).toBe("approval-required");
-    expect(report.executionMode).toBe("dry-run-verifier");
-    expect(report.approvalGate).toMatchObject({
-      required: true,
-      env: "CODEX_MANAGER_ALLOW_REAL_MACOS_SIDE_EFFECTS"
-    });
+    if (process.platform === "darwin") {
+      expect(report.status).toBe("approval-required");
+      expect(report.executionMode).toBe("dry-run-verifier");
+      expect(report.approvalGate).toMatchObject({
+        required: true,
+        env: "CODEX_MANAGER_ALLOW_REAL_MACOS_SIDE_EFFECTS"
+      });
+    } else {
+      expect(report.status).toBe("skipped");
+    }
     expect(report.sideEffects).toEqual({
       writes: false,
       codexLaunched: false,

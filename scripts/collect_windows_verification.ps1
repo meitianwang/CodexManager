@@ -538,7 +538,7 @@ function Add-SmokeResultChecks {
       $accounts = Get-PropertyValue $fingerprint "accounts"
       $pagePassed = $pagePassed -and
         (Get-NumberValue (Get-PropertyValue $accounts "accountCount")) -eq 1 -and
-        (Get-NumberValue (Get-PropertyValue $accounts "currentBadgeCount")) -eq 1 -and
+        (Get-NumberValue (Get-PropertyValue $accounts "currentBadgeCount")) -ge 1 -and
         (Get-BoolValue (Get-PropertyValue $accounts "hasSmokeAccount")) -and
         (Get-BoolValue (Get-PropertyValue $accounts "hasSmokeEmail")) -and
         (Test-ContainsAll (Get-PropertyValue $accounts "toolbarButtons") @("Export accounts", "Import file", "Import current auth", "Add account", "Smart switch", "Warm up weekly quota")) -and

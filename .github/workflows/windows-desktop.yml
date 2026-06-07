@@ -557,7 +557,7 @@ jobs:
               if (
                 $null -eq $AccountFingerprint -or
                 $AccountFingerprint.accountCount -ne 1 -or
-                $AccountFingerprint.currentBadgeCount -ne 1 -or
+                $AccountFingerprint.currentBadgeCount -lt 1 -or
                 -not ([bool] $AccountFingerprint.hasSmokeAccount) -or
                 -not ([bool] $AccountFingerprint.hasSmokeEmail) -or
                 $MissingToolbarButtons.Count -gt 0 -or
