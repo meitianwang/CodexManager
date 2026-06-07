@@ -111,6 +111,37 @@ describe("local proxy", () => {
     expect(upstream.requests).toEqual([]);
   });
 
+  it("accepts Codex-compatible Responses path aliases", async () => {
+    const upstream = new FakeUpstreamClient([
+      completedResponseResult({ id: "resp-bare" }),
+      completedResponseResult({ id: "resp-double-v1" }),
+      completedResponseResult({ id: "resp-codex-prefix" })
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const bare = await authorizedFetch(context.port, "/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const doubleV1 = await authorizedFetch(context.port, "/v1/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const codexPrefix = await authorizedFetch(context.port, "/codex/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+
+    expect(bare.status).toBe(200);
+    expect(doubleV1.status).toBe(200);
+    expect(codexPrefix.status).toBe(200);
+    expect(upstream.requests.map((request) => request.url)).toEqual([
+      "https://chatgpt.com/backend-api/codex/responses",
+      "https://chatgpt.com/backend-api/codex/responses",
+      "https://chatgpt.com/backend-api/codex/responses"
+    ]);
+  });
+
   it("returns the mac-compatible no-account status before forwarding", async () => {
     const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
     const context = await makeProxyContext({
@@ -128,7 +159,7 @@ describe("local proxy", () => {
     expect(upstream.requests).toEqual([]);
   });
 
-  it("returns unavailable-account reasons when all stored accounts are filtered out", async () => {
+  it("does not reject accounts only because cached usage says quota is exhausted", async () => {
     const upstream = new FakeUpstreamClient([successResult({ id: "unused" })]);
     const exhausted = makeAccount("exhausted", "acct-exhausted", "access-exhausted", 1);
     exhausted.usage = {
@@ -147,12 +178,11 @@ describe("local proxy", () => {
       model: "gpt-5-codex",
       input: []
     });
-    const body = await response.json() as { error?: { message?: string } };
+    const body = await response.json() as { id?: string };
 
-    expect(response.status).toBe(429);
-    expect(body.error?.message).toContain("All accounts are unavailable");
-    expect(body.error?.message).toContain("exhausted: quota resets");
-    expect(upstream.requests).toEqual([]);
+    expect(response.status).toBe(200);
+    expect(body.id).toBe("unused");
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-exhausted"]);
   });
 
   it("forwards Responses requests through the selected account and cleans headers", async () => {
@@ -214,6 +244,301 @@ describe("local proxy", () => {
       gate.resolve();
       await reader?.cancel().catch(() => undefined);
     }
+  });
+
+  it("strips upstream encoding headers from Responses passthrough streams", async () => {
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "plain" }));
+        yield Buffer.from(sseDataLine({ type: "response.completed", response: { id: "resp-stream" } }));
+      }(), {
+        "content-encoding": "br",
+        "content-length": "999",
+        "connection": "close"
+      })
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(response.headers.get("content-length")).toBeNull();
+    await expect(response.text()).resolves.toContain("plain");
+  });
+
+  it("waits for the first upstream chunk before opening a Responses passthrough stream", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        await gate.promise;
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "late" }));
+        yield Buffer.from(sseDataLine({ type: "response.completed", response: { id: "resp-stream" } }));
+      }())
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const responsePromise = authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    await expect(withTimeout(responsePromise, 500, "stream headers")).rejects.toThrow("Timed out waiting for stream headers");
+
+    gate.resolve();
+    const response = await responsePromise;
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    try {
+      expect(response.status).toBe(200);
+      const text = await readUntilText(reader!, "late");
+      expect(text).toContain("response.output_text.delta");
+    } finally {
+      await reader?.cancel().catch(() => undefined);
+    }
+  });
+
+  it("interrupts Codex passthrough streams instead of forwarding midstream quota 429 errors", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early quota" }));
+        await gate.promise;
+        yield Buffer.from(sseDataLine({
+          type: "response.failed",
+          response: {
+            error: {
+              code: "insufficient_quota",
+              message: "You exceeded your current quota.",
+              status: 429
+            }
+          }
+        }));
+      }()),
+      completedResponseResult({ id: "resp-b" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    expect(response.status).toBe(200);
+    const firstChunk = await readUntilText(reader!, "early quota");
+    expect(firstChunk).toContain("response.output_text.delta");
+    gate.resolve();
+    const rest = await readRemainingStream(reader!);
+    expect(rest.text).not.toContain("response.failed");
+    expect(rest.errored).toBe(true);
+
+    const retry = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+    await expect(retry.json()).resolves.toMatchObject({ id: "resp-b" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
+  });
+
+  it("rotates accounts after hidden midstream high-demand SSE errors", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.output_text.delta", delta: "early load" }));
+        await gate.promise;
+        yield Buffer.from(sseDataLine({
+          type: "response.failed",
+          response: {
+            error: {
+              code: "server_overloaded",
+              message: "We're currently experiencing high demand, which may cause temporary errors.",
+              status: 503
+            }
+          }
+        }));
+      }()),
+      completedResponseResult({ id: "resp-b" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    expect(response.status).toBe(200);
+    const firstChunk = await readUntilText(reader!, "early load");
+    expect(firstChunk).toContain("response.output_text.delta");
+    gate.resolve();
+    const rest = await readRemainingStream(reader!);
+    expect(rest.text).not.toContain("server_overloaded");
+    expect(rest.errored).toBe(true);
+
+    const retry = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+    await expect(retry.json()).resolves.toMatchObject({ id: "resp-b" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
+  });
+
+  it("maps non-streaming Codex passthrough SSE quota errors to retryable 5xx responses", async () => {
+    const upstream = new FakeUpstreamClient([
+      {
+        statusCode: 200,
+        headers: {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        body: Buffer.from([
+          sseDataLine({ type: "response.output_text.delta", delta: "partial" }),
+          sseDataLine({
+            type: "response.failed",
+            response: {
+              error: {
+                code: "insufficient_quota",
+                message: "You exceeded your current quota.",
+                status: 429
+              }
+            }
+          })
+        ].join(""))
+      }
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+    const body = await response.json() as { error?: { message?: string; type?: string } };
+
+    expect(response.status).toBe(503);
+    expect(body.error).toMatchObject({
+      message: "You exceeded your current quota.",
+      type: "proxy_error"
+    });
+  });
+
+  it("rotates accounts after hidden pre-output high-demand SSE errors", async () => {
+    const gate = deferred();
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        yield Buffer.from(sseDataLine({ type: "response.created", response: { id: "resp-a" } }));
+        await gate.promise;
+        yield Buffer.from(sseDataLine({
+          type: "response.output_item.added",
+          output_index: 0,
+          item: { id: "msg-a", type: "message", role: "assistant", content: [] }
+        }));
+        yield Buffer.from(sseDataLine({
+          type: "response.failed",
+          response: {
+            error: {
+              code: "server_overloaded",
+              message: "We're currently experiencing high demand, which may cause temporary errors.",
+              status: 503
+            }
+          }
+        }));
+      }()),
+      completedResponseResult({ id: "resp-b" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+
+    expect(response.status).toBe(200);
+    const firstChunk = await readUntilText(reader!, "response.created");
+    expect(firstChunk).toContain("response.created");
+    gate.resolve();
+    const rest = await readRemainingStream(reader!);
+    expect(rest.text).not.toContain("server_overloaded");
+    expect(rest.errored).toBe(true);
+
+    const retry = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+    await expect(retry.json()).resolves.toMatchObject({ id: "resp-b" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
+  });
+
+  it("rotates accounts when a streaming Responses passthrough ends before a ready event", async () => {
+    const upstream = new FakeUpstreamClient([
+      streamingSSEResult(async function* () {
+        return;
+      }()),
+      completedResponseResult({ id: "resp-b" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const response = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: true,
+      input: []
+    });
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(text).toContain("resp-b");
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
 
   it("aborts upstream streams when the downstream client disconnects", async () => {
@@ -365,6 +690,34 @@ describe("local proxy", () => {
 
     expect(response.status).toBe(200);
     expect(upstream.requests[0]?.url).toBe("https://chatgpt.com/backend-api/codex/models?client_version=9.9.9");
+  });
+
+  it("accepts Codex-compatible Models path aliases", async () => {
+    const upstream = new FakeUpstreamClient([
+      successResult({ data: [] }),
+      successResult({ data: [] }),
+      successResult({ data: [] })
+    ]);
+    const context = await makeProxyContext({ upstream });
+
+    const bare = await fetch(`http://127.0.0.1:${context.port}/models`, {
+      headers: { "x-api-key": "test-key" }
+    });
+    const doubleV1 = await fetch(`http://127.0.0.1:${context.port}/v1/v1/models`, {
+      headers: { "x-api-key": "test-key" }
+    });
+    const codexPrefix = await fetch(`http://127.0.0.1:${context.port}/codex/v1/models`, {
+      headers: { "x-api-key": "test-key" }
+    });
+
+    expect(bare.status).toBe(200);
+    expect(doubleV1.status).toBe(200);
+    expect(codexPrefix.status).toBe(200);
+    expect(upstream.requests.map((request) => request.url)).toEqual([
+      `https://chatgpt.com/backend-api/codex/models?client_version=${appInfo.version}`,
+      `https://chatgpt.com/backend-api/codex/models?client_version=${appInfo.version}`,
+      `https://chatgpt.com/backend-api/codex/models?client_version=${appInfo.version}`
+    ]);
   });
 
   it("preserves Codex JSON passthrough requests without forcing streaming", async () => {
@@ -868,7 +1221,7 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b"]);
   });
 
-  it("prioritizes the highest remaining quota instead of pinning the current account", async () => {
+  it("prioritizes the current account before falling back by remaining quota", async () => {
     const current = makeAccount("current", "acct-current", "access-current", 1);
     const better = makeAccount("better", "acct-better", "access-better", 2);
     current.usage = {
@@ -901,12 +1254,49 @@ describe("local proxy", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-better"]);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-current"]);
   });
 
   it("retries the next eligible account after a preflight SSE error before output", async () => {
     const upstream = new FakeUpstreamClient([
       sseErrorResult({ code: "model_restricted", message: "model is not available", status: 403 }),
+      sseResult("Recovered"),
+      sseResult("Again")
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi" }]
+    });
+    const second = await authorizedFetch(context.port, "/v1/chat/completions", {
+      model: "gpt-5-codex",
+      stream: false,
+      messages: [{ role: "user", content: "Hi again" }]
+    });
+
+    await expect(first.json()).resolves.toMatchObject({
+      choices: [{ message: { content: "Recovered" } }]
+    });
+    await expect(second.json()).resolves.toMatchObject({
+      choices: [{ message: { content: "Again" } }]
+    });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+  });
+
+  it("retries the next eligible account after a preflight SSE quota error", async () => {
+    const upstream = new FakeUpstreamClient([
+      sseErrorResult({ code: "rate_limit_exceeded", message: "You've reached your usage limit.", status: 429 }),
       sseResult("Recovered"),
       sseResult("Again")
     ]);
@@ -1008,7 +1398,7 @@ describe("local proxy", () => {
     });
   });
 
-  it("cools down a rate-limited account on later requests", async () => {
+  it("does not locally cool down generic rate limits on later requests", async () => {
     const upstream = new FakeUpstreamClient([
       new CodexUpstreamError(429, "HTTP 429", "rate limit"),
       successResult({ id: "resp-b" }),
@@ -1036,7 +1426,40 @@ describe("local proxy", () => {
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-a"]);
+  });
+
+  it("does not mark all accounts unavailable after transient retryable failures", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(503, "HTTP 503", "temporary upstream failure"),
+      new CodexUpstreamError(503, "HTTP 503", "temporary upstream failure"),
+      completedResponseResult({ id: "resp-retry" })
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [
+          makeAccount("a", "acct-a", "access-a", 1),
+          makeAccount("b", "acct-b", "access-b", 2)
+        ]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      stream: false,
+      input: []
+    });
+
+    expect(first.status).toBe(502);
+    await expect(second.json()).resolves.toMatchObject({ id: "resp-retry" });
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-a"]);
   });
 
   it("treats usage-limit 429s with retry wording as quota cooldowns", async () => {
@@ -1070,7 +1493,35 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-b", "acct-b"]);
   });
 
-  it("does not cool down transient high-load 429s so Codex provider retries can reattempt", async () => {
+  it("does not expose quota 429s to Codex clients when no fallback account is available", async () => {
+    const upstream = new FakeUpstreamClient([
+      new CodexUpstreamError(429, "HTTP 429", "You've reached your usage limit, try again later.")
+    ]);
+    const context = await makeProxyContext({
+      upstream,
+      store: {
+        version: 1,
+        accounts: [makeAccount("a", "acct-a", "access-a", 1)]
+      }
+    });
+
+    const first = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const second = await authorizedFetch(context.port, "/v1/responses", {
+      model: "gpt-5-codex",
+      input: []
+    });
+    const secondBody = await second.json() as { error?: { message?: string } };
+
+    expect(first.status).toBe(502);
+    expect(second.status).toBe(503);
+    expect(secondBody.error?.message).toContain("All accounts are unavailable");
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a"]);
+  });
+
+  it("does not cool down high-load 429s so Codex provider retries can reattempt", async () => {
     const upstream = new FakeUpstreamClient([
       new CodexUpstreamError(429, "HTTP 429", "model is currently experiencing high load"),
       successResult({ id: "resp-retry" })
@@ -1097,7 +1548,7 @@ describe("local proxy", () => {
     expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-a"]);
   });
 
-  it("uses the mac-compatible short cooldown for exhausted accounts with unknown reset time", async () => {
+  it("does not cool down accounts only because cached usage has no reset time", async () => {
     let now = 1_780_000_000;
     const accountA = makeAccount("a", "acct-a", "access-a", 1);
     const accountB = makeAccount("b", "acct-b", "access-b", 2);
@@ -1152,7 +1603,7 @@ describe("local proxy", () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(third.status).toBe(200);
-    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-b", "acct-b", "acct-a"]);
+    expect(upstream.requests.map((request) => request.accountId)).toEqual(["acct-a", "acct-a", "acct-a"]);
   });
 
   it("does not reject accounts only because the catalog omits the requested model", async () => {
@@ -1188,6 +1639,21 @@ describe("Codex SSE parsing", () => {
       "data: first",
       "data: second"
     ]);
+  });
+
+  it("allows large Codex response.created lines split across chunks", async () => {
+    const instructions = "x".repeat(96 * 1024);
+    const line = `data: ${JSON.stringify({
+      response: { instructions },
+      type: "response.created"
+    })}\n`;
+    const lines = await collectTextLines(chunkStrings(line.slice(0, 4096), line.slice(4096)));
+
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]!.slice("data: ".length))).toMatchObject({
+      response: { instructions },
+      type: "response.created"
+    });
   });
 
   it("rejects unterminated lines that exceed the bounded stream limit", async () => {
@@ -1540,11 +2006,12 @@ function sseResult(text: string): CodexUpstreamResult {
   };
 }
 
-function streamingSSEResult(body: AsyncIterable<Buffer>): CodexUpstreamResult {
+function streamingSSEResult(body: AsyncIterable<Buffer>, headers: Record<string, string> = {}): CodexUpstreamResult {
   return {
     statusCode: 200,
     headers: {
-      "content-type": "text/event-stream; charset=utf-8"
+      "content-type": "text/event-stream; charset=utf-8",
+      ...headers
     },
     body,
     stream: true
@@ -1612,13 +2079,17 @@ async function withTimeout<Result>(promise: Promise<Result>, timeoutMs: number, 
   }
 }
 
-async function readUntilText(reader: ReadableStreamDefaultReader<Uint8Array>, expected: string): Promise<string> {
+async function readUntilText(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  expected: string,
+  readTimeoutMs = 500
+): Promise<string> {
   const decoder = new TextDecoder();
   let text = "";
   for (let index = 0; index < 5; index += 1) {
     const result = await Promise.race([
       reader.read(),
-      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500))
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), readTimeoutMs))
     ]);
     if (result === "timeout") {
       throw new Error(`Timed out waiting for streamed text: ${expected}`);
@@ -1632,6 +2103,30 @@ async function readUntilText(reader: ReadableStreamDefaultReader<Uint8Array>, ex
     }
   }
   throw new Error(`Streamed text did not include ${expected}: ${text}`);
+}
+
+async function readRemainingStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<{ errored: boolean; text: string }> {
+  const decoder = new TextDecoder();
+  let text = "";
+  try {
+    while (true) {
+      const result = await Promise.race([
+        reader.read(),
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 500))
+      ]);
+      if (result === "timeout") {
+        throw new Error("Timed out waiting for stream to finish");
+      }
+      if (result.done) {
+        return { errored: false, text };
+      }
+      text += decoder.decode(result.value, { stream: true });
+    }
+  } catch {
+    return { errored: true, text };
+  }
 }
 
 async function collectTextLines(chunks: AsyncIterable<Uint8Array>, maxLineBytes?: number): Promise<string[]> {

@@ -7,6 +7,7 @@ export type DesktopPlatformID = "windows" | "macos" | "linux";
 
 export interface CodexLauncherLike {
   launchApp(workspacePath?: string): Promise<boolean>;
+  restartApp(workspacePath?: string): Promise<boolean>;
 }
 
 export interface EditorAppServiceLike {
@@ -23,6 +24,7 @@ export interface LaunchAtStartupServiceLike {
 
 export interface GUIEnvironmentServiceLike {
   setEnvironmentVariable(name: string, value: string): Promise<{ warning?: string }>;
+  unsetEnvironmentVariable?(name: string): Promise<{ warning?: string }>;
 }
 
 export interface DesktopPlatformRequestHeaders {

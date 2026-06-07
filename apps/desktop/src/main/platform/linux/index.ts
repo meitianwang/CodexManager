@@ -44,6 +44,9 @@ export function createLinuxDesktopPlatform(_electronApp: App): DesktopPlatform {
       return {
         async launchApp(): Promise<boolean> {
           return unsupported("Codex launch");
+        },
+        async restartApp(): Promise<boolean> {
+          return unsupported("Codex restart");
         }
       };
     },
@@ -66,6 +69,9 @@ export function createLinuxDesktopPlatform(_electronApp: App): DesktopPlatform {
           return {
             warning: `${name} was not persisted for Linux GUI applications. Start Codex from an environment that exports the variable.`
           };
+        },
+        async unsetEnvironmentVariable(): Promise<{ warning?: string }> {
+          return {};
         }
       };
     }

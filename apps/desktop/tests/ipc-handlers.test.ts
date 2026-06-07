@@ -136,7 +136,8 @@ describe("ipc handlers", () => {
     await expect(ipcMain.invoke(ipcChannels.codexAppRestore)).resolves.toMatchObject({ state: "not_configured" });
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledTimes(1);
     expect(context.codexAppIntegrationService.restore).toHaveBeenCalledTimes(1);
-    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
+    expect(context.codexCLIService.restartApp).toHaveBeenCalledTimes(2);
+    expect(context.codexCLIService.launchApp).not.toHaveBeenCalled();
     expect(context.proxyRuntimeService.getState).toHaveBeenCalledTimes(1);
     expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -196,11 +197,11 @@ describe("ipc handlers", () => {
 
     expect(context.proxyRuntimeService.start).toHaveBeenCalledWith(18_317, "sk-local-test");
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledOnce();
-    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
+    expect(context.codexCLIService.restartApp).toHaveBeenCalledOnce();
     expect(publishedProxyStates).toEqual([runningProxyState]);
   });
 
-  it("keeps Codex app configuration successful when launching Codex app reports a warning", async () => {
+  it("keeps Codex app configuration successful when restarting Codex app reports a warning", async () => {
     const codexAppStatus = {
       canRestore: true,
       configPath: "/Users/nik/.codex/config.toml",
@@ -225,7 +226,8 @@ describe("ipc handlers", () => {
           configure: vi.fn(async () => codexAppStatus)
         },
         codexCLIService: {
-          launchApp: vi.fn(async () => {
+          launchApp: vi.fn(async () => false),
+          restartApp: vi.fn(async () => {
             throw new Error("open failed");
           })
         },
@@ -242,10 +244,10 @@ describe("ipc handlers", () => {
 
     await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).resolves.toMatchObject({
       state: "configured",
-      warning: "Codex.app configuration was saved, but Codex.app could not be opened: open failed"
+      warning: "Codex.app configuration was saved, but Codex.app could not be restarted: open failed"
     });
     expect(context.codexAppIntegrationService.configure).toHaveBeenCalledOnce();
-    expect(context.codexCLIService.launchApp).toHaveBeenCalledOnce();
+    expect(context.codexCLIService.restartApp).toHaveBeenCalledOnce();
   });
 
   it("does not write Codex app config when the local proxy health check fails", async () => {
@@ -292,7 +294,7 @@ describe("ipc handlers", () => {
       "Codex.app proxy health check failed (503): Proxy is unavailable"
     );
     expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
-    expect(context.codexCLIService.launchApp).not.toHaveBeenCalled();
+    expect(context.codexCLIService.restartApp).not.toHaveBeenCalled();
   });
 
   it("rejects Codex app configuration before an account is available", async () => {
@@ -316,7 +318,7 @@ describe("ipc handlers", () => {
 
     await expect(ipcMain.invoke(ipcChannels.codexAppConfigure)).rejects.toThrow("Add and authorize at least one account");
     expect(context.codexAppIntegrationService.configure).not.toHaveBeenCalled();
-    expect(context.codexCLIService.launchApp).not.toHaveBeenCalled();
+    expect(context.codexCLIService.restartApp).not.toHaveBeenCalled();
     expect(context.proxyRuntimeService.getState).not.toHaveBeenCalled();
     expect(context.proxyRuntimeService.start).not.toHaveBeenCalled();
   });
@@ -436,7 +438,10 @@ function stubCodexAppProxyHealth(status = 200, body: unknown = { status: "ok" })
 function appContext(accountsCoordinator: Record<string, unknown>, patch: Record<string, unknown> = {}): DesktopAppContext {
   return {
     accountsCoordinator,
-    codexCLIService: { launchApp: vi.fn(async () => false) },
+    codexCLIService: {
+      launchApp: vi.fn(async () => false),
+      restartApp: vi.fn(async () => false)
+    },
     editorAppService: {},
     proxyRuntimeService: {},
     settingsCoordinator: {},

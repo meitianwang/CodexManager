@@ -16,13 +16,14 @@ afterEach(async () => {
 });
 
 describe("Codex app integration service", () => {
-  it("configures an empty Codex config with a managed provider and GUI environment key", async () => {
+  it("configures an empty Codex config with a managed provider and Codex .env key", async () => {
     const paths = await makeTempPaths();
     const guiEnvironment = new RecordingGUIEnvironment();
     const service = new CodexAppIntegrationService(paths, proxyRuntime(), guiEnvironment, { unixSecondsNow: () => 1_780_200_001 });
 
     const status = await service.configure();
     const config = await readFile(paths.codexConfigPath, "utf8");
+    const envFile = await readFile(join(dirname(paths.codexConfigPath), ".env"), "utf8");
     const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as Record<string, unknown>;
 
     expect(status.state).toBe("configured");
@@ -33,12 +34,16 @@ describe("Codex app integration service", () => {
     expect(config).toContain('base_url = "http://127.0.0.1:18317/v1"');
     expect(config).toContain("request_max_retries = 4");
     expect(config).toContain("stream_max_retries = 5");
+    expect(config).toContain(`env_key = "${codexAppProxyApiKeyEnvironmentVariable}"`);
+    expect(envFile).toContain("# BEGIN CODEXMANAGER CODEX.APP PROXY");
+    expect(envFile).toContain(`export ${codexAppProxyApiKeyEnvironmentVariable}="sk-local-test"`);
+    expect(envFile).toContain("# END CODEXMANAGER CODEX.APP PROXY");
     expect(guiEnvironment.values).toEqual([{ name: codexAppProxyApiKeyEnvironmentVariable, value: "sk-local-test" }]);
     expect(JSON.stringify(manifest)).not.toContain("sk-local-test");
     expect(manifest).not.toHaveProperty("backupPath");
   });
 
-  it("enables proxy mode without rewriting Codex history providers", async () => {
+  it("enables proxy mode and makes OpenAI history visible under the managed provider", async () => {
     const paths = await makeTempPaths();
     const historyPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-test.jsonl");
     const otherProviderHistoryPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-ollama.jsonl");
@@ -60,17 +65,18 @@ describe("Codex app integration service", () => {
 
     const status = await service.configure();
     const config = await readFile(paths.codexConfigPath, "utf8");
-    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as Record<string, unknown>;
+    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as {
+      historyPatches?: Array<{ appliedProvider: string; path: string; previousProvider: string | null }>;
+    };
 
     expect(status).toMatchObject({ state: "configured", model: "gpt-5.5", providerId: "codexmanager" });
     expect(config).toContain('model = "gpt-5.5"');
     expect(config).toContain('model_provider = "codexmanager"');
     expect(config).toContain("[projects.example]");
     expect(config).toContain("[model_providers.codexmanager]");
-    await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
+    await expect(readRolloutProvider(historyPath)).resolves.toBe("codexmanager");
     await expect(readRolloutProvider(otherProviderHistoryPath)).resolves.toBe("ollama");
-    expect(manifest).not.toHaveProperty("historyPatches");
-    expect(manifest).not.toHaveProperty("historySyncedAt");
+    expect(manifest.historyPatches).toEqual([{ appliedProvider: "codexmanager", path: historyPath, previousProvider: "openai" }]);
 
     await service.restore();
 
@@ -78,7 +84,23 @@ describe("Codex app integration service", () => {
     await expect(readRolloutProvider(otherProviderHistoryPath)).resolves.toBe("ollama");
   });
 
-  sqliteIt("leaves Codex rollout database providers unchanged", async () => {
+  it("syncs and restores every session_meta provider in a Codex rollout", async () => {
+    const paths = await makeTempPaths();
+    const historyPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-multi-meta.jsonl");
+    await writeFile(paths.codexConfigPath, "", "utf8");
+    await writeRolloutWithProviders(historyPath, ["openai", undefined]);
+    const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
+
+    await service.configure();
+
+    await expect(readRolloutProviders(historyPath)).resolves.toEqual(["codexmanager", "codexmanager"]);
+
+    await service.restore();
+
+    await expect(readRolloutProviders(historyPath)).resolves.toEqual(["openai", "openai"]);
+  });
+
+  sqliteIt("syncs OpenAI history provider in the Codex rollout database", async () => {
     const paths = await makeTempPaths();
     const historyPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-test.jsonl");
     const otherProviderHistoryPath = join(dirname(paths.codexConfigPath), "sessions", "2026", "06", "05", "rollout-ollama.jsonl");
@@ -93,17 +115,50 @@ describe("Codex app integration service", () => {
     const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
 
     await service.configure();
-    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as Record<string, unknown>;
+    const manifest = JSON.parse(await readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")) as {
+      historyPatches?: Array<{
+        appliedProvider: string;
+        path: string;
+        previousDatabaseProvider?: string;
+        previousProvider: string | null;
+      }>;
+    };
 
-    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("openai");
+    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("codexmanager");
     await expect(readThreadProvider(stateDatabasePath, otherProviderHistoryPath)).resolves.toBe("ollama");
-    expect(manifest).not.toHaveProperty("historyPatches");
+    expect(manifest.historyPatches).toEqual([
+      { appliedProvider: "codexmanager", path: historyPath, previousDatabaseProvider: "openai", previousProvider: "openai" }
+    ]);
 
     await service.restore();
 
     await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
     await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("openai");
     await expect(readThreadProvider(stateDatabasePath, otherProviderHistoryPath)).resolves.toBe("ollama");
+  });
+
+  sqliteIt("syncs Codex history database when Codex uses sqlite_home", async () => {
+    const paths = await makeTempPaths();
+    const codexHome = dirname(paths.codexConfigPath);
+    const sqliteHome = join(codexHome, "state");
+    const historyPath = join(codexHome, "sessions", "2026", "06", "05", "rollout-sqlite-home.jsonl");
+    const stateDatabasePath = join(sqliteHome, "state_5.sqlite");
+    await mkdir(sqliteHome, { recursive: true });
+    await writeFile(paths.codexConfigPath, `sqlite_home = "${sqliteHome}"\n`, "utf8");
+    await writeRollout(historyPath, "openai");
+    await createStateDatabase(stateDatabasePath, [
+      { id: "thread-openai", path: historyPath, provider: "openai" }
+    ]);
+    const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
+
+    await service.configure();
+
+    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("codexmanager");
+
+    await service.restore();
+
+    await expect(readRolloutProvider(historyPath)).resolves.toBe("openai");
+    await expect(readThreadProvider(stateDatabasePath, historyPath)).resolves.toBe("openai");
   });
 
   sqliteIt("restores legacy history patches left by older proxy configuration", async () => {
@@ -166,8 +221,33 @@ describe("Codex app integration service", () => {
     await expect(readFile(join(paths.applicationSupportDirectory, "codex-app-integration.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  sqliteIt("discovers and restores managed history when metadata is missing", async () => {
+    const paths = await makeTempPaths();
+    const codexHome = dirname(paths.codexConfigPath);
+    const restoredRolloutPath = join(codexHome, "sessions", "2026", "06", "05", "rollout-restored.jsonl");
+    const staleRolloutPath = join(codexHome, "sessions", "2026", "06", "05", "rollout-stale.jsonl");
+    const stateDatabasePath = join(codexHome, "state_5.sqlite");
+    await writeFile(paths.codexConfigPath, managedCodexConfig(), "utf8");
+    await writeRollout(restoredRolloutPath, "openai");
+    await writeRollout(staleRolloutPath, "codexmanager");
+    await createStateDatabase(stateDatabasePath, [
+      { id: "thread-restored", path: restoredRolloutPath, provider: "codexmanager" },
+      { id: "thread-stale", path: staleRolloutPath, provider: "codexmanager" }
+    ]);
+    const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
+
+    await service.restore();
+
+    await expect(readRolloutProvider(restoredRolloutPath)).resolves.toBe("openai");
+    await expect(readRolloutProvider(staleRolloutPath)).resolves.toBe("openai");
+    await expect(readThreadProvider(stateDatabasePath, restoredRolloutPath)).resolves.toBe("openai");
+    await expect(readThreadProvider(stateDatabasePath, staleRolloutPath)).resolves.toBe("openai");
+    await expect(readFile(paths.codexConfigPath, "utf8")).resolves.not.toContain("[model_providers.codexmanager]");
+  });
+
   it("restores managed keys while preserving unrelated user edits", async () => {
     const paths = await makeTempPaths();
+    const envPath = join(dirname(paths.codexConfigPath), ".env");
     await writeFile(
       paths.codexConfigPath,
       [
@@ -182,9 +262,11 @@ describe("Codex app integration service", () => {
       ].join("\n"),
       "utf8"
     );
+    await writeFile(envPath, 'export USER_DEFINED_KEY="keep-me"\n', "utf8");
     const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
 
     await service.configure();
+    await expect(readFile(envPath, "utf8")).resolves.toContain(`export ${codexAppProxyApiKeyEnvironmentVariable}="sk-local-test"`);
     await writeFile(
       paths.codexConfigPath,
       `${await readFile(paths.codexConfigPath, "utf8")}\n[mcp_servers.example]\ncommand = "example"\n`,
@@ -200,32 +282,12 @@ describe("Codex app integration service", () => {
     expect(restored).toContain("[model_providers.openai_proxy]");
     expect(restored).toContain("[mcp_servers.example]");
     expect(restored).not.toContain("[model_providers.codexmanager]");
+    await expect(readFile(envPath, "utf8")).resolves.toBe('export USER_DEFINED_KEY="keep-me"\n');
   });
 
   it("restores without metadata by removing only managed config", async () => {
     const paths = await makeTempPaths();
-    await writeFile(
-      paths.codexConfigPath,
-      [
-        'model = "gpt-5.5"',
-        'model_provider = "codexmanager"',
-        "",
-        "[projects.example]",
-        'trust_level = "trusted"',
-        "",
-        "[model_providers.codexmanager]",
-        'name = "CodexManager Proxy"',
-        'base_url = "http://127.0.0.1:18317/v1"',
-        'wire_api = "responses"',
-        `env_key = "${codexAppProxyApiKeyEnvironmentVariable}"`,
-        "requires_openai_auth = false",
-        "request_max_retries = 4",
-        "stream_max_retries = 5",
-        "stream_idle_timeout_ms = 300000",
-        ""
-      ].join("\n"),
-      "utf8"
-    );
+    await writeFile(paths.codexConfigPath, managedCodexConfig(), "utf8");
     const service = new CodexAppIntegrationService(paths, proxyRuntime(), new RecordingGUIEnvironment());
 
     await expect(service.status()).resolves.toMatchObject({ canRestore: true, state: "configured" });
@@ -267,29 +329,67 @@ describe("Codex app integration service", () => {
 });
 
 async function writeRollout(path: string, provider: string | undefined): Promise<void> {
+  await writeRolloutWithProviders(path, [provider]);
+}
+
+async function writeRolloutWithProviders(path: string, providers: Array<string | undefined>): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const payload: Record<string, unknown> = {
-    id: "019e94fd-0000-7000-8000-000000000001",
-    timestamp: "2026-06-05T00:00:00.000Z",
-    cwd: "/tmp/project",
-    originator: "Codex Desktop",
-    cli_version: "0.0.0",
-    source: "app"
-  };
-  if (provider !== undefined) {
-    payload.model_provider = provider;
-  }
+  const sessionMetaLines = providers.map((provider, index) => {
+    const payload: Record<string, unknown> = {
+      id: `019e94fd-0000-7000-8000-00000000000${index + 1}`,
+      timestamp: "2026-06-05T00:00:00.000Z",
+      cwd: "/tmp/project",
+      originator: "Codex Desktop",
+      cli_version: "0.0.0",
+      source: "app"
+    };
+    if (provider !== undefined) {
+      payload.model_provider = provider;
+    }
+    return JSON.stringify({ timestamp: "2026-06-05T00:00:01.000Z", type: "session_meta", payload });
+  });
   await writeFile(
     path,
-    `${JSON.stringify({ timestamp: "2026-06-05T00:00:01.000Z", type: "session_meta", payload })}\n{"type":"noop"}\n`,
+    `${sessionMetaLines.join("\n")}\n{"type":"noop"}\n`,
     "utf8"
   );
+}
+
+function managedCodexConfig(): string {
+  return [
+    'model = "gpt-5.5"',
+    'model_provider = "codexmanager"',
+    "",
+    "[projects.example]",
+    'trust_level = "trusted"',
+    "",
+    "[model_providers.codexmanager]",
+    'name = "CodexManager Proxy"',
+    'base_url = "http://127.0.0.1:18317/v1"',
+    'wire_api = "responses"',
+    `env_key = "${codexAppProxyApiKeyEnvironmentVariable}"`,
+    "requires_openai_auth = false",
+    "request_max_retries = 4",
+    "stream_max_retries = 5",
+    "stream_idle_timeout_ms = 300000",
+    ""
+  ].join("\n");
 }
 
 async function readRolloutProvider(path: string): Promise<unknown> {
   const [firstLine] = (await readFile(path, "utf8")).split("\n");
   const parsed = JSON.parse(firstLine ?? "") as { payload?: { model_provider?: unknown } };
   return parsed.payload?.model_provider;
+}
+
+async function readRolloutProviders(path: string): Promise<unknown[]> {
+  return (await readFile(path, "utf8"))
+    .split("\n")
+    .filter((line) => line.includes("session_meta"))
+    .map((line) => {
+      const parsed = JSON.parse(line) as { payload?: { model_provider?: unknown } };
+      return parsed.payload?.model_provider;
+    });
 }
 
 async function createStateDatabase(

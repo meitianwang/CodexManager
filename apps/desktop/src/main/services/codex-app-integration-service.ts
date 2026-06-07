@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFile, readdir, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   codexAppDefaultModel,
@@ -26,14 +27,15 @@ interface CodexAppIntegrationManifest {
   configuredAt: number;
   configuredConfigHash: string;
   envVarName: string;
-  historyPatches?: LegacyCodexAppHistoryPatch[];
+  historyPatches?: CodexAppHistoryPatch[];
+  historySyncedAt?: number;
   previousRootModelLine?: string;
   previousRootModelProviderLine?: string;
   proxyURL: string;
   version: 1;
 }
 
-interface LegacyCodexAppHistoryPatch {
+interface CodexAppHistoryPatch {
   appliedProvider: string;
   path: string;
   previousDatabaseProvider?: string;
@@ -56,6 +58,8 @@ const expectedWireAPI = "responses";
 const expectedRequestMaxRetries = "4";
 const expectedStreamMaxRetries = "5";
 const expectedStreamIdleTimeoutMs = "300000";
+const managedCodexEnvStart = "# BEGIN CODEXMANAGER CODEX.APP PROXY";
+const managedCodexEnvEnd = "# END CODEXMANAGER CODEX.APP PROXY";
 const maxSQLiteOutputBytes = 64 * 1024;
 const sqlitePathChunkSize = 200;
 
@@ -93,12 +97,18 @@ export class CodexAppIntegrationService {
     );
 
     await writeFileAtomically(configured, this.paths.codexConfigPath);
+    await writeManagedCodexEnv(this.codexEnvPath(), codexAppProxyApiKeyEnvironmentVariable, proxy.apiKey);
+    const historySync = await syncCodexHistoryProviders(
+      this.paths.codexConfigPath,
+      existingManifest?.historyPatches ?? []
+    );
 
     const manifest: CodexAppIntegrationManifest = {
       configuredAt: this.unixSecondsNow(),
       configuredConfigHash: sha256(configured),
       envVarName: codexAppProxyApiKeyEnvironmentVariable,
-      ...(existingManifest?.historyPatches ? { historyPatches: existingManifest.historyPatches } : {}),
+      historyPatches: historySync.patches,
+      historySyncedAt: this.unixSecondsNow(),
       previousRootModelLine: existingManifest?.previousRootModelLine ?? previousRoot.model?.line,
       previousRootModelProviderLine:
         existingManifest?.previousRootModelProviderLine ?? previousRoot.modelProvider?.line,
@@ -116,7 +126,7 @@ export class CodexAppIntegrationService {
 
     return {
       ...this.statusFor(configured, manifest, proxyURL),
-      ...(warning ? { warning } : {})
+      warning: [warning, ...historySync.warnings].filter(Boolean).join(" ")
     };
   }
 
@@ -127,12 +137,29 @@ export class CodexAppIntegrationService {
     const config = await this.readConfig();
     const withoutManagedBlock = removeManagedProviderBlock(config.raw);
     const { raw: restored, warning } = restoreManagedRootAssignments(withoutManagedBlock, manifest);
-    const historyRestore = await restoreLegacyCodexHistoryProviders(manifest?.historyPatches ?? []);
+    let envWarning: string | undefined;
+    try {
+      await removeManagedCodexEnv(this.codexEnvPath());
+      envWarning = (await this.guiEnvironmentService.unsetEnvironmentVariable?.(codexAppProxyApiKeyEnvironmentVariable))?.warning;
+    } catch (error) {
+      envWarning = `Skipped Codex.app provider key restore: ${errorMessage(error)}.`;
+    }
+    const discoveredHistoryRestore = await discoverCodexHistoryRestorePatches(this.paths.codexConfigPath);
+    const historyPatches = mergeHistoryPatches([
+      ...(manifest?.historyPatches ?? []),
+      ...discoveredHistoryRestore.patches
+    ]);
+    const historyRestore = await restoreCodexHistoryProviders(historyPatches, this.paths.codexConfigPath);
     if (restored !== config.raw || manifest !== undefined) {
       await writeFileAtomically(restored, this.paths.codexConfigPath);
       await this.clearManifest();
     }
-    return this.statusFor(restored, undefined, proxyURL, [warning, ...historyRestore.warnings].filter(Boolean).join(" "));
+    return this.statusFor(
+      restored,
+      undefined,
+      proxyURL,
+      [warning, envWarning, ...discoveredHistoryRestore.warnings, ...historyRestore.warnings].filter(Boolean).join(" ")
+    );
   }
 
   private async readConfig(): Promise<ConfigReadResult> {
@@ -148,6 +175,10 @@ export class CodexAppIntegrationService {
 
   private manifestPath(): string {
     return join(this.paths.applicationSupportDirectory, manifestFileName);
+  }
+
+  private codexEnvPath(): string {
+    return join(dirname(this.paths.codexConfigPath), ".env");
   }
 
   private async readManifestOptional(): Promise<CodexAppIntegrationManifest | undefined> {
@@ -236,12 +267,15 @@ function parseManifest(value: unknown): CodexAppIntegrationManifest {
     manifest.previousRootModelProviderLine = value.previousRootModelProviderLine;
   }
   if (Array.isArray(value.historyPatches)) {
-    manifest.historyPatches = value.historyPatches.map(parseLegacyHistoryPatch);
+    manifest.historyPatches = value.historyPatches.map(parseHistoryPatch);
+  }
+  if (typeof value.historySyncedAt === "number") {
+    manifest.historySyncedAt = value.historySyncedAt;
   }
   return manifest;
 }
 
-function parseLegacyHistoryPatch(value: unknown): LegacyCodexAppHistoryPatch {
+function parseHistoryPatch(value: unknown): CodexAppHistoryPatch {
   if (!isRecord(value)) {
     throw new Error("Invalid Codex.app integration metadata: historyPatches item must be an object.");
   }
@@ -261,11 +295,12 @@ function parseLegacyHistoryPatch(value: unknown): LegacyCodexAppHistoryPatch {
   };
 }
 
-function previousRootAssignments(raw: string): { model?: RootAssignment; modelProvider?: RootAssignment } {
+function previousRootAssignments(raw: string): { model?: RootAssignment; modelProvider?: RootAssignment; sqliteHome?: RootAssignment } {
   const { lines } = splitConfig(raw);
   return {
     model: rootAssignment(lines, "model"),
-    modelProvider: rootAssignment(lines, "model_provider")
+    modelProvider: rootAssignment(lines, "model_provider"),
+    sqliteHome: rootAssignment(lines, "sqlite_home")
   };
 }
 
@@ -463,47 +498,311 @@ function trimTrailingBlankLines(lines: readonly string[]): string[] {
   return next;
 }
 
-async function restoreLegacyCodexHistoryProviders(
-  patches: readonly LegacyCodexAppHistoryPatch[]
+async function writeManagedCodexEnv(path: string, keyName: string, keyValue: string): Promise<void> {
+  const raw = await readOptionalTextFile(path);
+  const withoutManagedBlock = removeManagedCodexEnvBlock(raw).trimEnd();
+  const prefix = withoutManagedBlock ? `${withoutManagedBlock}\n\n` : "";
+  await writeFileAtomically(`${prefix}${managedCodexEnvBlock(keyName, keyValue)}\n`, path);
+}
+
+async function removeManagedCodexEnv(path: string): Promise<void> {
+  const raw = await readOptionalTextFile(path);
+  const withoutManagedBlock = removeManagedCodexEnvBlock(raw).trimEnd();
+  if (!withoutManagedBlock) {
+    await rm(path, { force: true });
+    return;
+  }
+  await writeFileAtomically(`${withoutManagedBlock}\n`, path);
+}
+
+async function readOptionalTextFile(path: string): Promise<string> {
+  try {
+    return await readTextFile(path);
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return "";
+    }
+    throw error;
+  }
+}
+
+function managedCodexEnvBlock(keyName: string, keyValue: string): string {
+  return [managedCodexEnvStart, `export ${keyName}=${JSON.stringify(keyValue)}`, managedCodexEnvEnd].join("\n");
+}
+
+function removeManagedCodexEnvBlock(raw: string): string {
+  const newline = raw.includes("\r\n") ? "\r\n" : "\n";
+  const lines = raw.split(/\r?\n/);
+  const nextLines: string[] = [];
+  let skipping = false;
+  for (const line of lines) {
+    if (line.trim() === managedCodexEnvStart) {
+      skipping = true;
+      continue;
+    }
+    if (skipping && line.trim() === managedCodexEnvEnd) {
+      skipping = false;
+      continue;
+    }
+    if (!skipping) {
+      nextLines.push(line);
+    }
+  }
+  return nextLines.join(newline);
+}
+
+async function syncCodexHistoryProviders(
+  codexConfigPath: string,
+  existingPatches: readonly CodexAppHistoryPatch[]
+): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
+  const existingPatchByPath = new Map(existingPatches.map((patch) => [patch.path, patch]));
+  const patches = new Map(existingPatchByPath);
+  const warnings: string[] = [];
+  const rolloutPaths = await listRolloutFiles(codexConfigPath);
+
+  for (const path of rolloutPaths) {
+    try {
+      const patch = await syncRolloutFileProvider(path, existingPatchByPath.get(path));
+      if (patch) {
+        patches.set(path, patch);
+      }
+    } catch (error) {
+      warnings.push(`Skipped Codex history provider sync for ${path}: ${errorMessage(error)}.`);
+    }
+  }
+
+  const databaseSync = await syncHistoryDatabaseProviders(codexConfigPath, [...patches.values()]);
+  warnings.push(...databaseSync.warnings);
+
+  return {
+    patches: databaseSync.patches.sort((left, right) => left.path.localeCompare(right.path)),
+    warnings
+  };
+}
+
+async function restoreCodexHistoryProviders(
+  patches: readonly CodexAppHistoryPatch[],
+  codexConfigPath?: string
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = [];
   for (const patch of patches) {
     try {
-      await restoreLegacyRolloutFileProvider(patch);
+      await restoreRolloutFileProvider(patch);
     } catch (error) {
-      warnings.push(`Skipped legacy Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
+      warnings.push(`Skipped Codex history provider restore for ${patch.path}: ${errorMessage(error)}.`);
     }
   }
-  warnings.push(...(await restoreLegacyHistoryDatabaseProviders(patches)).warnings);
+  warnings.push(...(await restoreHistoryDatabaseProviders(patches, codexConfigPath)).warnings);
   return { warnings };
 }
 
-async function restoreLegacyRolloutFileProvider(patch: LegacyCodexAppHistoryPatch): Promise<void> {
-  const rollout = parseLegacyRolloutHead(await readTextFile(patch.path));
-  if (!rollout || rollout.provider !== patch.appliedProvider) {
-    return;
+function mergeHistoryPatches(patches: readonly CodexAppHistoryPatch[]): CodexAppHistoryPatch[] {
+  const byPath = new Map<string, CodexAppHistoryPatch>();
+  for (const patch of patches) {
+    const existing = byPath.get(patch.path);
+    if (!existing) {
+      byPath.set(patch.path, patch);
+      continue;
+    }
+    byPath.set(patch.path, {
+      ...patch,
+      previousDatabaseProvider: existing.previousDatabaseProvider ?? patch.previousDatabaseProvider,
+      previousProvider: existing.previousProvider
+    });
   }
-  if (patch.previousProvider === null) {
-    delete rollout.payload.model_provider;
-  } else {
-    rollout.payload.model_provider = patch.previousProvider;
-  }
-  await writeFileAtomically(renderLegacyRolloutHead(rollout), patch.path);
+  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
-async function restoreLegacyHistoryDatabaseProviders(
-  patches: readonly LegacyCodexAppHistoryPatch[]
+async function discoverCodexHistoryRestorePatches(
+  codexConfigPath: string
+): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
+  const warnings: string[] = [];
+  const patches = new Map<string, CodexAppHistoryPatch>();
+
+  let rolloutPaths: string[] = [];
+  try {
+    rolloutPaths = await listRolloutFiles(codexConfigPath);
+  } catch (error) {
+    warnings.push(`Skipped Codex history restore scan: ${errorMessage(error)}.`);
+  }
+
+  for (const path of rolloutPaths) {
+    try {
+      const rollout = parseRolloutProviders(await readTextFile(path));
+      if (rollout.providers.has(codexAppProviderId)) {
+        patches.set(path, {
+          appliedProvider: codexAppProviderId,
+          path,
+          previousProvider: "openai"
+        });
+      }
+    } catch (error) {
+      warnings.push(`Skipped Codex history restore scan for ${path}: ${errorMessage(error)}.`);
+    }
+  }
+
+  const databasePaths = await listCodexStateDatabases([codexConfigPath, ...patches.keys()], codexConfigPath);
+  for (const databasePath of databasePaths) {
+    let databaseRolloutPaths: string[];
+    try {
+      databaseRolloutPaths = await runSQLiteQuery(
+        databasePath,
+        `SELECT rollout_path FROM threads WHERE model_provider = ${sqliteString(codexAppProviderId)};`
+      );
+    } catch (error) {
+      warnings.push(`Skipped Codex history database restore scan for ${databasePath}: ${errorMessage(error)}.`);
+      continue;
+    }
+
+    for (const path of databaseRolloutPaths) {
+      const existing = patches.get(path);
+      if (existing) {
+        patches.set(path, {
+          ...existing,
+          previousDatabaseProvider: existing.previousDatabaseProvider ?? "openai"
+        });
+        continue;
+      }
+
+      let previousProvider = "openai";
+      try {
+        const rollout = parseRolloutProviders(await readTextFile(path));
+        const firstNonManagedProvider = [...rollout.providers].find((provider) => provider !== codexAppProviderId);
+        if (firstNonManagedProvider) {
+          previousProvider = firstNonManagedProvider;
+        }
+      } catch {
+        // Missing rollout files still need their sqlite rows restored.
+      }
+      patches.set(path, {
+        appliedProvider: codexAppProviderId,
+        path,
+        previousDatabaseProvider: previousProvider,
+        previousProvider
+      });
+    }
+  }
+
+  return { patches: [...patches.values()].sort((left, right) => left.path.localeCompare(right.path)), warnings };
+}
+
+async function listRolloutFiles(codexConfigPath: string): Promise<string[]> {
+  const codexHome = dirname(codexConfigPath);
+  const roots = [join(codexHome, "sessions"), join(codexHome, "archived_sessions")];
+  const results: string[] = [];
+  for (const root of roots) {
+    await collectRolloutFiles(root, results);
+  }
+  return results.sort((left, right) => left.localeCompare(right));
+}
+
+async function collectRolloutFiles(directory: string, results: string[]): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collectRolloutFiles(path, results);
+    } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+      results.push(path);
+    }
+  }
+}
+
+async function syncRolloutFileProvider(
+  path: string,
+  existingPatch: CodexAppHistoryPatch | undefined
+): Promise<CodexAppHistoryPatch | undefined> {
+  const raw = await readTextFile(path);
+  const rewrite = rewriteSessionMetaProviders(raw, {
+    fromProviders: [null, "openai"],
+    toProvider: codexAppProviderId
+  });
+  if (!rewrite.changed) {
+    return existingPatch;
+  }
+  const patch: CodexAppHistoryPatch = {
+    appliedProvider: codexAppProviderId,
+    path,
+    previousProvider: existingPatch ? existingPatch.previousProvider : rewrite.firstPreviousProvider
+  };
+  await writeFileAtomically(rewrite.raw, path);
+  return patch;
+}
+
+async function restoreRolloutFileProvider(patch: CodexAppHistoryPatch): Promise<void> {
+  const raw = await readTextFile(patch.path);
+  const rewrite = rewriteSessionMetaProviders(raw, {
+    fromProviders: [patch.appliedProvider],
+    toProvider: patch.previousProvider
+  });
+  if (!rewrite.changed) {
+    return;
+  }
+  await writeFileAtomically(rewrite.raw, patch.path);
+}
+
+async function syncHistoryDatabaseProviders(
+  codexConfigPath: string,
+  patches: readonly CodexAppHistoryPatch[]
+): Promise<{ patches: CodexAppHistoryPatch[]; warnings: string[] }> {
+  const databasePaths = await listCodexStateDatabases([codexConfigPath], codexConfigPath);
+  const openAIHistoryPatches = patches.filter(
+    (patch) =>
+      patch.previousDatabaseProvider === "openai" ||
+      patch.previousProvider === "openai" ||
+      patch.previousProvider === null
+  );
+  if (databasePaths.length === 0 || openAIHistoryPatches.length === 0) {
+    return { patches: [...patches], warnings: [] };
+  }
+
+  const warnings: string[] = [];
+  const script = sqliteUpdateScript(openAIHistoryPatches.map((patch) => patch.path), "openai", codexAppProviderId);
+  for (const databasePath of databasePaths) {
+    try {
+      await runSQLiteScript(databasePath, script);
+    } catch (error) {
+      warnings.push(`Skipped Codex history database provider sync for ${databasePath}: ${errorMessage(error)}.`);
+    }
+  }
+
+  return {
+    patches: patches.map((patch) =>
+      patch.previousDatabaseProvider === undefined &&
+      (patch.previousProvider === "openai" || patch.previousProvider === null)
+        ? { ...patch, previousDatabaseProvider: "openai" }
+        : patch
+    ),
+    warnings
+  };
+}
+
+async function restoreHistoryDatabaseProviders(
+  patches: readonly CodexAppHistoryPatch[],
+  codexConfigPath?: string
 ): Promise<{ warnings: string[] }> {
   if (patches.length === 0) {
     return { warnings: [] };
   }
-  const databasePaths = await listLegacyCodexStateDatabases(patches.map((patch) => patch.path));
+  const databasePaths = await listCodexStateDatabases(
+    codexConfigPath ? [codexConfigPath, ...patches.map((patch) => patch.path)] : patches.map((patch) => patch.path),
+    codexConfigPath
+  );
   if (databasePaths.length === 0) {
     return { warnings: [] };
   }
 
   const warnings: string[] = [];
-  const patchesByPreviousProvider = new Map<string, LegacyCodexAppHistoryPatch[]>();
+  const patchesByPreviousProvider = new Map<string, CodexAppHistoryPatch[]>();
   for (const patch of patches) {
     const previousProvider = patch.previousDatabaseProvider ?? (patch.previousProvider === "openai" ? "openai" : undefined);
     if (!previousProvider) {
@@ -520,7 +819,7 @@ async function restoreLegacyHistoryDatabaseProviders(
       try {
         await runSQLiteScript(databasePath, script);
       } catch (error) {
-        warnings.push(`Skipped legacy Codex history database provider restore for ${databasePath}: ${errorMessage(error)}.`);
+        warnings.push(`Skipped Codex history database provider restore for ${databasePath}: ${errorMessage(error)}.`);
       }
     }
   }
@@ -528,8 +827,15 @@ async function restoreLegacyHistoryDatabaseProviders(
   return { warnings };
 }
 
-async function listLegacyCodexStateDatabases(pathsInsideCodexHome: readonly string[]): Promise<string[]> {
-  const codexHomes = [...new Set(pathsInsideCodexHome.map(codexHomeFromPath))];
+async function listCodexStateDatabases(pathsInsideCodexHome: readonly string[], codexConfigPath?: string): Promise<string[]> {
+  const codexHomes = new Set(pathsInsideCodexHome.map(codexHomeFromPath));
+  if (codexConfigPath) {
+    codexHomes.add(dirname(codexConfigPath));
+    const sqliteHome = await sqliteHomeFromCodexConfig(codexConfigPath);
+    if (sqliteHome) {
+      codexHomes.add(sqliteHome);
+    }
+  }
   const databasePaths: string[] = [];
   for (const codexHome of codexHomes) {
     let entries;
@@ -548,6 +854,29 @@ async function listLegacyCodexStateDatabases(pathsInsideCodexHome: readonly stri
     );
   }
   return [...new Set(databasePaths)].sort((left, right) => left.localeCompare(right));
+}
+
+async function sqliteHomeFromCodexConfig(codexConfigPath: string): Promise<string | undefined> {
+  try {
+    const raw = await readTextFile(codexConfigPath);
+    const value = previousRootAssignments(raw).sqliteHome?.value?.trim();
+    return value ? resolveUserPath(value) : undefined;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function resolveUserPath(raw: string): string {
+  if (raw === "~") {
+    return homedir();
+  }
+  if (raw.startsWith("~/") || raw.startsWith("~\\")) {
+    return join(homedir(), raw.slice(2));
+  }
+  return raw;
 }
 
 function codexHomeFromPath(pathInsideCodexHome: string): string {
@@ -581,6 +910,34 @@ function chunks<T>(values: readonly T[], size: number): T[][] {
 
 function sqliteString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
+}
+
+async function runSQLiteQuery(databasePath: string, query: string): Promise<string[]> {
+  return await new Promise<string[]>((resolve, reject) => {
+    const child = spawn("sqlite3", ["-batch", "-noheader", databasePath, query], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+
+    const appendStdout = (chunk: Buffer) => {
+      stdout = appendBounded(stdout, chunk.toString("utf8"), maxSQLiteOutputBytes);
+    };
+    const appendStderr = (chunk: Buffer) => {
+      stderr = appendBounded(stderr, chunk.toString("utf8"), maxSQLiteOutputBytes);
+    };
+
+    child.stdout?.on("data", appendStdout);
+    child.stderr?.on("data", appendStderr);
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) {
+        resolve(stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+        return;
+      }
+      reject(new Error(`sqlite3 exited with ${code ?? "unknown"}${stderr ? `: ${stderr.trim()}` : ""}${stdout ? ` stdout: ${stdout.trim()}` : ""}`));
+    });
+  });
 }
 
 async function runSQLiteScript(databasePath: string, script: string): Promise<void> {
@@ -618,36 +975,77 @@ function appendBounded(current: string, next: string, maxBytes: number): string 
   return combined.slice(-maxBytes);
 }
 
-interface LegacyParsedRolloutHead {
-  firstLine: Record<string, unknown>;
-  payload: Record<string, unknown>;
-  provider: string | null;
-  rest: string;
+function parseRolloutProviders(raw: string): { providers: Set<string> } {
+  const providers = new Set<string>();
+  for (const segment of splitLinesPreservingNewline(raw)) {
+    const line = segment.endsWith("\n") ? segment.slice(0, -1) : segment;
+    const parsed = parseSessionMetaLine(line);
+    if (parsed?.provider) {
+      providers.add(parsed.provider);
+    }
+  }
+  return { providers };
 }
 
-function parseLegacyRolloutHead(raw: string): LegacyParsedRolloutHead | undefined {
-  const newlineIndex = raw.indexOf("\n");
-  const firstLineRaw = newlineIndex >= 0 ? raw.slice(0, newlineIndex) : raw;
-  const rest = newlineIndex >= 0 ? raw.slice(newlineIndex) : "";
-  if (!firstLineRaw.trim()) {
-    return undefined;
-  }
+function rewriteSessionMetaProviders(
+  raw: string,
+  options: { fromProviders: readonly (string | null)[]; toProvider: string | null }
+): { changed: boolean; firstPreviousProvider: string | null; raw: string } {
+  const fromProviders = new Set(options.fromProviders);
+  let changed = false;
+  let firstPreviousProvider: string | null | undefined;
+  const next = splitLinesPreservingNewline(raw).map((segment) => {
+    const hasNewline = segment.endsWith("\n");
+    const line = hasNewline ? segment.slice(0, -1) : segment;
+    const parsed = parseSessionMetaLine(line);
+    if (!parsed || !fromProviders.has(parsed.provider)) {
+      return segment;
+    }
 
-  const firstLine = JSON.parse(firstLineRaw) as unknown;
-  if (!isRecord(firstLine) || firstLine.type !== "session_meta" || !isRecord(firstLine.payload)) {
-    return undefined;
-  }
+    if (firstPreviousProvider === undefined) {
+      firstPreviousProvider = parsed.provider;
+    }
+    if (options.toProvider === null) {
+      delete parsed.payload.model_provider;
+    } else {
+      parsed.payload.model_provider = options.toProvider;
+    }
+    changed = true;
+    return `${JSON.stringify(parsed.value)}${hasNewline ? "\n" : ""}`;
+  }).join("");
 
   return {
-    firstLine,
-    payload: firstLine.payload,
-    provider: typeof firstLine.payload.model_provider === "string" ? firstLine.payload.model_provider : null,
-    rest
+    changed,
+    firstPreviousProvider: firstPreviousProvider ?? null,
+    raw: next
   };
 }
 
-function renderLegacyRolloutHead(rollout: LegacyParsedRolloutHead): string {
-  return `${JSON.stringify(rollout.firstLine)}${rollout.rest || "\n"}`;
+function parseSessionMetaLine(line: string): { payload: Record<string, unknown>; provider: string | null; value: Record<string, unknown> } | undefined {
+  if (!line.includes("session_meta")) {
+    return undefined;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(value) || value.type !== "session_meta" || !isRecord(value.payload)) {
+    return undefined;
+  }
+  return {
+    payload: value.payload,
+    provider: typeof value.payload.model_provider === "string" ? value.payload.model_provider : null,
+    value
+  };
+}
+
+function splitLinesPreservingNewline(raw: string): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw.match(/[^\n]*\n|[^\n]+$/g) ?? [];
 }
 
 function parseTomlScalar(rawValue: string): string | undefined {

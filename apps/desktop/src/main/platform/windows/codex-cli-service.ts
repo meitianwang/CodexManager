@@ -85,6 +85,12 @@ export class CodexCLIService {
     }
   }
 
+  async restartApp(workspacePath?: string): Promise<boolean> {
+    await this.forceKillCodexProcesses();
+    await this.sleep(220);
+    return this.launchApp(workspacePath);
+  }
+
   findCodexCLIPath(): string {
     const fromPath = resolveExecutable("codex", {
       environment: this.environment,
@@ -144,6 +150,18 @@ export class CodexCLIService {
       }
     }
     return false;
+  }
+
+  private async forceKillCodexProcesses(): Promise<void> {
+    await Promise.all(
+      codexProcessNames.map(async (processName) => {
+        const result = await this.runCommand("taskkill", ["/IM", processName, "/F", "/T"], { timeoutMs: 1_500 });
+        if (result.status === 0 || isTaskkillProcessAbsent(result)) {
+          return;
+        }
+        throw new Error(`Failed to stop Codex process ${processName}: ${commandResultDetails(result)}`);
+      })
+    );
   }
 
   private async launchViaCodexCLI(workspacePath?: string): Promise<void> {
@@ -209,6 +227,15 @@ function taskListIncludesProcess(stdout: string, processName: string): boolean {
     .some((line) => line.trim().toLowerCase().startsWith(expected));
 }
 
+function isTaskkillProcessAbsent(result: CommandResult): boolean {
+  const details = `${result.stdout} ${result.stderr}`.toLowerCase();
+  return result.status === 128 || details.includes("not found") || details.includes("no tasks are running");
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function commandResultDetails(result: CommandResult): string {
+  return (result.stderr || result.stdout).trim() || `exit status ${result.status}`;
 }

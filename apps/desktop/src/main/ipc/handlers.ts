@@ -171,11 +171,21 @@ export function registerIpcHandlers(ipcMain: IpcMain, context: DesktopAppContext
       proxyState = await context.proxyRuntimeService.start(proxyState.port, proxyState.apiKey);
     }
     await verifyCodexAppProxyHealth(proxyState);
-    const status = await launchCodexAppAfterConfigure(context, await context.codexAppIntegrationService.configure());
+    const status = await restartCodexAppAfterIntegrationChange(
+      context,
+      await context.codexAppIntegrationService.configure(),
+      "configuration was saved"
+    );
     options.onProxyStateChanged?.(proxyState);
     return status;
   });
-  ipcMain.handle(ipcChannels.codexAppRestore, () => context.codexAppIntegrationService.restore());
+  ipcMain.handle(ipcChannels.codexAppRestore, async () =>
+    restartCodexAppAfterIntegrationChange(
+      context,
+      await context.codexAppIntegrationService.restore(),
+      "configuration was restored"
+    )
+  );
 
   ipcMain.handle(ipcChannels.proxyGetState, () => context.proxyRuntimeService.getState());
   ipcMain.handle(ipcChannels.proxyRegenerateApiKey, () => context.proxyRuntimeService.regenerateApiKey());
@@ -269,19 +279,20 @@ function proxyErrorMessage(text: string): string {
   return text || "Unknown proxy error";
 }
 
-async function launchCodexAppAfterConfigure(
+async function restartCodexAppAfterIntegrationChange(
   context: DesktopAppContext,
-  status: CodexAppIntegrationStatus
+  status: CodexAppIntegrationStatus,
+  actionDescription: string
 ): Promise<CodexAppIntegrationStatus> {
   try {
-    await context.codexCLIService.launchApp();
+    await context.codexCLIService.restartApp();
     return status;
   } catch (error) {
     return {
       ...status,
       warning: appendWarning(
         status.warning,
-        `Codex.app configuration was saved, but Codex.app could not be opened: ${errorMessage(error)}`
+        `Codex.app ${actionDescription}, but Codex.app could not be restarted: ${errorMessage(error)}`
       )
     };
   }

@@ -21,4 +21,13 @@ export class MacOSGUIEnvironmentService {
     });
     return {};
   }
+
+  async unsetEnvironmentVariable(name: string): Promise<{ warning?: string }> {
+    await this.runChecked("/bin/launchctl", ["unsetenv", name], {
+      errorPrefix: `Failed to unset ${name} for GUI applications`,
+      maxOutputBytes: 8 * 1024,
+      timeoutMs: 5_000
+    });
+    return {};
+  }
 }

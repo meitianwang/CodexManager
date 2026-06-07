@@ -111,6 +111,34 @@ describe("Codex CLI service", () => {
     expect(commands.some((command) => command.launchPath === "taskkill")).toBe(false);
   });
 
+  it("restarts the Windows Codex desktop app before opening it", async () => {
+    const codexApp = String.raw`C:\Users\me\AppData\Local\Programs\Codex\Codex.exe`;
+    const commands: CommandCall[] = [];
+    const launched: DetachedLaunchCall[] = [];
+    const service = new CodexCLIService({
+      environment: {
+        LOCALAPPDATA: String.raw`C:\Users\me\AppData\Local`,
+        PATH: ""
+      },
+      executableExists: existingPathSet([codexApp]),
+      launchDetached: recordingLauncher(launched),
+      runCommand: codexProcessRunner(commands, true),
+      sleep: async () => undefined
+    });
+
+    await expect(service.restartApp(String.raw`C:\workspaces\demo`)).resolves.toBe(false);
+    expect(commands).toContainEqual({ launchPath: "taskkill", argumentsList: ["/IM", "Codex.exe", "/F", "/T"] });
+    expect(commands).toContainEqual({ launchPath: "taskkill", argumentsList: ["/IM", "Codex Desktop.exe", "/F", "/T"] });
+    expect(launched).toEqual([
+      {
+        launchPath: codexApp,
+        argumentsList: [String.raw`C:\workspaces\demo`],
+        environmentPath: undefined
+      }
+    ]);
+    expect(commands.some((command) => command.launchPath === "tasklist")).toBe(true);
+  });
+
   it("falls back to codex app when the desktop process does not appear after launch", async () => {
     const codexApp = String.raw`C:\Users\me\AppData\Local\Programs\Codex\Codex.exe`;
     const codexCLI = String.raw`C:\Users\me\AppData\Roaming\npm\codex.cmd`;
@@ -192,6 +220,32 @@ describe("macOS Codex CLI service", () => {
     });
     expect(commands.some((command) => command.launchPath === "/usr/bin/pgrep")).toBe(true);
     expect(commands.some((command) => command.launchPath === "/usr/bin/pkill")).toBe(false);
+  });
+
+  it("restarts the macOS Codex desktop app bundle before opening it", async () => {
+    const commands: CommandCall[] = [];
+    const launched: DetachedLaunchCall[] = [];
+    const service = new MacOSCodexCLIService({
+      environment: {
+        HOME: "/Users/me",
+        PATH: ""
+      },
+      executableExists: existingPathSet([]),
+      launchDetached: recordingLauncher(launched),
+      pathExists: existingPathSet(["/Applications/Codex.app"]),
+      runCommand: macCodexProcessRunner(commands, true),
+      sleep: async () => undefined
+    });
+
+    await expect(service.restartApp("/workspaces/demo")).resolves.toBe(false);
+    expect(launched).toEqual([]);
+    expect(commands).toContainEqual({ launchPath: "/usr/bin/pkill", argumentsList: ["-9", "-x", "Codex"] });
+    expect(commands).toContainEqual({ launchPath: "/usr/bin/pkill", argumentsList: ["-9", "-x", "Codex Desktop"] });
+    expect(commands).toContainEqual({
+      launchPath: "/usr/bin/open",
+      argumentsList: ["-na", "/Applications/Codex.app", "/workspaces/demo"]
+    });
+    expect(commands.some((command) => command.launchPath === "/usr/bin/pgrep")).toBe(true);
   });
 
   it("falls back to codex app through the CLI when the macOS app bundle is unavailable", async () => {

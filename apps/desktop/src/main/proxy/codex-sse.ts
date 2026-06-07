@@ -17,7 +17,7 @@ export type CodexSSEPreflightLineResult =
 
 const maxPreflightBytes = 64 * 1024;
 const maxPreflightLines = 128;
-const maxDecodedLineBytes = 64 * 1024;
+const maxDecodedLineBytes = 8 * 1024 * 1024;
 
 export function parseCodexSSEEvents(text: string): ParsedCodexSSEEvent[] {
   const events: ParsedCodexSSEEvent[] = [];
@@ -240,7 +240,6 @@ function isReadyForClient(event: ParsedCodexSSEEvent): boolean {
   switch (event.type) {
     case "response.output_text.delta":
     case "response.reasoning_summary_text.delta":
-    case "response.output_item.added":
     case "response.function_call_arguments.delta":
     case "response.completed":
       return true;

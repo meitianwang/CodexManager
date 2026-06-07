@@ -116,6 +116,9 @@ export class CodexUpstreamClient implements CodexUpstreamClientLike {
       headers.set("version", appInfo.version);
     }
     headers.set("Accept", request.isStream ? "text/event-stream" : "application/json");
+    if (request.isStream) {
+      headers.set("Accept-Encoding", "identity");
+    }
 
     const response = await this.fetchImpl(request.url, {
       method: request.method,

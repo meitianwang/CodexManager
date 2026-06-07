@@ -162,7 +162,10 @@ export async function createDesktopAppContext(
 
 function createSmokePlatformSideEffects():
   | (SmokePlatformSideEffects & {
-      codexCLIService: { launchApp(workspacePath?: string): Promise<boolean> };
+      codexCLIService: {
+        launchApp(workspacePath?: string): Promise<boolean>;
+        restartApp(workspacePath?: string): Promise<boolean>;
+      };
       editorAppService: {
         restartSelectedApps(targets: readonly EditorAppID[]): Promise<{ restarted: EditorAppID[] }>;
       };
@@ -202,6 +205,10 @@ function createSmokePlatformSideEffects():
   return {
     codexCLIService: {
       async launchApp(workspacePath?: string): Promise<boolean> {
+        log.codexLaunches.push(workspacePath === undefined ? {} : { workspacePath });
+        return true;
+      },
+      async restartApp(workspacePath?: string): Promise<boolean> {
         log.codexLaunches.push(workspacePath === undefined ? {} : { workspacePath });
         return true;
       }

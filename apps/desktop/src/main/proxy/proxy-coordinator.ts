@@ -45,11 +45,10 @@ import {
 
 const maxRequestBytes = 50 * 1024 * 1024;
 const maxBufferedUpstreamBytes = 50 * 1024 * 1024;
-const maxPreflightBytes = 64 * 1024;
-const maxPreflightLines = 128;
 const accountCooldownSeconds = 60;
 const authCooldownSeconds = 5 * 60;
 const shortCooldownSeconds = 15;
+const streamingFirstChunkTimeoutMs = 90_000;
 const corsAllowedHeaders = [
   "Content-Type",
   "Authorization",
@@ -83,12 +82,28 @@ const corsExposedHeaders = [
   "x-codex-ratelimit-limit-tokens"
 ].join(", ");
 const supportedPostPaths = new Set([
+  "/chat/completions",
+  "/messages",
+  "/responses",
+  "/responses/compact",
   "/v1/chat/completions",
   "/v1/messages",
   "/v1/responses",
   "/v1/responses/compact",
   "/v1/memories/trace_summarize",
-  "/v1/alpha/search"
+  "/v1/alpha/search",
+  "/v1/v1/chat/completions",
+  "/v1/v1/messages",
+  "/v1/v1/responses",
+  "/v1/v1/responses/compact",
+  "/v1/v1/memories/trace_summarize",
+  "/v1/v1/alpha/search",
+  "/codex/v1/chat/completions",
+  "/codex/v1/messages",
+  "/codex/v1/responses",
+  "/codex/v1/responses/compact",
+  "/codex/v1/memories/trace_summarize",
+  "/codex/v1/alpha/search"
 ]);
 const unsupportedRouteMessage =
   "Proxy only supports GET /health, GET /v1/models, POST /v1/chat/completions, POST /v1/responses, POST /v1/responses/compact, POST /v1/memories/trace_summarize, POST /v1/alpha/search, POST /v1/messages";
@@ -225,7 +240,9 @@ export class ProxyCoordinator {
     }
 
     try {
-      if (request.method === "GET" && url.pathname === "/v1/models") {
+      const normalizedProxyPath = normalizeProxyPath(url.pathname);
+
+      if (request.method === "GET" && normalizedProxyPath === "/v1/models") {
         await this.forwardProxyRequest(request, response, signal, "models", Buffer.alloc(0), false, "", true, modelsQueryString(request, url));
         return;
       }
@@ -241,13 +258,13 @@ export class ProxyCoordinator {
       }
 
       const body = await readRequestBody(request);
-      if (url.pathname === "/v1/messages") {
+      if (normalizedProxyPath === "/v1/messages") {
         await this.handleAnthropicMessages(request, response, signal, parseAnthropicJsonObject(body));
         return;
       }
 
       const json = parseJsonObject(body);
-      switch (url.pathname) {
+      switch (normalizedProxyPath) {
         case "/v1/chat/completions":
           await this.handleChatCompletions(request, response, signal, json);
           return;
@@ -277,10 +294,10 @@ export class ProxyCoordinator {
         return;
       }
       if (error instanceof ProxyResponseError) {
-        sendProxyError(response, error.statusCode, error.message);
+        sendProxyError(response, clientVisibleStatusCode(error.statusCode), error.message);
         return;
       }
-      sendJson(response, error instanceof CodexUpstreamError ? error.statusCode : 500, {
+      sendJson(response, error instanceof CodexUpstreamError ? clientVisibleStatusCode(error.statusCode) : 500, {
         error: {
           message: error instanceof Error ? error.message : String(error),
           type: "proxy_error"
@@ -394,11 +411,13 @@ export class ProxyCoordinator {
       Buffer.from(JSON.stringify(body)),
       forceStream,
       model,
-      false
+      false,
+      "",
+      true
     );
     if (forceStream && !clientWantsStream) {
       const completed = collectCompletedResponseFromSSE(await upstreamResultText(result));
-      sendJson(response, completed.statusCode, completed.body, result.headers);
+      sendJson(response, clientVisibleStatusCode(completed.statusCode), completed.body, result.headers);
       return;
     }
     await sendUpstream(response, result, forceStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
@@ -422,7 +441,9 @@ export class ProxyCoordinator {
       body,
       false,
       model,
-      false
+      false,
+      "",
+      true
     );
     await sendUpstream(response, result, "application/json; charset=utf-8");
   }
@@ -436,13 +457,14 @@ export class ProxyCoordinator {
     isStream: boolean,
     model: string,
     writeResponse = true,
-    queryString = ""
+    queryString = "",
+    hideCodexRetryableSSEErrors = false
   ): Promise<CodexUpstreamResult> {
     const store = await this.options.storeRepository.loadStore();
     const selection = await this.selectEligibleAccounts(store, model);
     if (selection.accounts.length === 0) {
       if (selection.hasStoredAccounts) {
-        throw new ProxyResponseError(429, allAccountsUnavailableMessage(selection.unavailableReasons));
+        throw new ProxyResponseError(503, allAccountsUnavailableMessage(selection.unavailableReasons));
       }
       throw new ProxyResponseError(503, noAccountsAvailableMessage);
     }
@@ -460,10 +482,13 @@ export class ProxyCoordinator {
           isStream,
           signal
         }, account, extracted, model);
+        const clientResult = hideCodexRetryableSSEErrors
+          ? this.hideStreamingRetryableCodexSSEErrors(result, account, model)
+          : result;
         if (writeResponse) {
-          await sendUpstream(response, result, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
+          await sendUpstream(response, clientResult, isStream ? "text/event-stream; charset=utf-8" : "application/json; charset=utf-8");
         }
-        return result;
+        return clientResult;
       } catch (error) {
         if (signal.aborted) {
           throw signalAbortError(signal);
@@ -519,6 +544,22 @@ export class ProxyCoordinator {
     }
   }
 
+  private hideStreamingRetryableCodexSSEErrors(
+    result: CodexUpstreamResult,
+    account: StoredAccount,
+    model: string
+  ): CodexUpstreamResult {
+    if (!isStreamingUpstreamResult(result)) {
+      return result;
+    }
+    return {
+      ...result,
+      body: hideRetryableCodexSSEErrors(result.body, (error) => {
+        this.recordHiddenStreamingRetryableError(account, model, error);
+      })
+    };
+  }
+
   private async preflightUpstreamResult(result: CodexUpstreamResult): Promise<CodexUpstreamResult> {
     if (isStreamingUpstreamResult(result)) {
       return preflightStreamingUpstreamResult(result);
@@ -533,7 +574,10 @@ export class ProxyCoordinator {
   private async selectEligibleAccounts(store: AccountsStore, model: string): Promise<ProxyAccountSelection> {
     const now = this.dateProvider.unixSecondsNow();
     this.expireCooldowns(now);
-    const summaries = accountSummaries(store).sort((left, right) => {
+    const summaries = accountSummaries(store, await this.currentAuthAccountKey()).sort((left, right) => {
+      if (left.isCurrent !== right.isCurrent) {
+        return left.isCurrent ? -1 : 1;
+      }
       const scoreDelta = remainingScore(right) - remainingScore(left);
       return scoreDelta !== 0 ? scoreDelta : left.addedAt - right.addedAt;
     });
@@ -575,12 +619,6 @@ export class ProxyCoordinator {
     now: number
   ): string | undefined {
     const accountKey = accountKeyForStoredAccount(account);
-    const quotaResetTime = exhaustedQuotaResetTime(account.usage, now);
-    if (quotaResetTime !== undefined) {
-      this.accountCooldowns.set(accountKey, quotaResetTime);
-      return `${account.label}: quota resets ${formatResetTime(quotaResetTime)}`;
-    }
-
     const cooldownUntil = this.accountCooldowns.get(accountKey);
     if (cooldownUntil !== undefined && cooldownUntil > now) {
       return `${account.label}: cooling down until ${formatResetTime(cooldownUntil)}`;
@@ -662,7 +700,6 @@ export class ProxyCoordinator {
 
   private recordCooldown(account: StoredAccount, model: string, error: unknown): void {
     if (!(error instanceof CodexUpstreamError)) {
-      this.accountCooldowns.set(accountKeyForStoredAccount(account), this.dateProvider.unixSecondsNow() + shortCooldownSeconds);
       return;
     }
 
@@ -675,18 +712,22 @@ export class ProxyCoordinator {
     if (isRateLimited(error)) {
       if (isQuotaRateLimit(error)) {
         this.accountCooldowns.set(accountKey, quotaRetryCooldown(account.usage, now));
-        return;
-      }
-      if (!isTransientCapacityFailure(error)) {
-        this.accountCooldowns.set(accountKey, now + shortCooldownSeconds);
       }
       return;
     }
     if (isModelRestriction(error) && model) {
       this.accountModelCooldowns.set(modelCooldownKey(accountKey, model), now + authCooldownSeconds);
-      return;
     }
-    if (error.isRetryable) {
+  }
+
+  private recordHiddenStreamingRetryableError(account: StoredAccount, model: string, error: ParsedCodexSSEError): void {
+    const upstreamError = new CodexUpstreamError(error.statusCode, `SSE ${error.statusCode}`, error.body);
+    this.recordCooldown(account, model, upstreamError);
+
+    const now = this.dateProvider.unixSecondsNow();
+    const accountKey = accountKeyForStoredAccount(account);
+    const cooldownUntil = this.accountCooldowns.get(accountKey);
+    if (cooldownUntil === undefined || cooldownUntil <= now) {
       this.accountCooldowns.set(accountKey, now + shortCooldownSeconds);
     }
   }
@@ -803,6 +844,22 @@ function normalizedResponsesBody(json: Record<string, unknown>): Record<string, 
   return body;
 }
 
+function normalizeProxyPath(pathname: string): string {
+  if (pathname.startsWith("/v1/v1/")) {
+    return pathname.replace(/^\/v1\/v1\//, "/v1/");
+  }
+  if (pathname.startsWith("/codex/v1/")) {
+    return pathname.replace(/^\/codex\/v1\//, "/v1/");
+  }
+  if (pathname === "/models" || pathname.startsWith("/models/")) {
+    return `/v1${pathname}`;
+  }
+  if (pathname === "/chat/completions" || pathname === "/messages" || pathname === "/responses" || pathname.startsWith("/responses/")) {
+    return `/v1${pathname}`;
+  }
+  return pathname;
+}
+
 function requestHeaders(request: IncomingMessage): Record<string, string> {
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(request.headers)) {
@@ -845,74 +902,36 @@ async function collectBufferedStream(chunks: AsyncIterable<Uint8Array>): Promise
 
 async function preflightStreamingUpstreamResult(result: CodexUpstreamStreamingResult): Promise<CodexUpstreamStreamingResult> {
   const iterator = result.body[Symbol.asyncIterator]();
-  const buffered: Buffer[] = [];
-  let lines = 0;
-  let bytes = 0;
+  let first: IteratorResult<Buffer>;
 
-  const inspectedChunks = inspectStreamingPreflight(iterator, buffered, (line) => {
-    lines += 1;
-    bytes += Buffer.byteLength(line);
-    const inspected = inspectCodexSSEPreflightLine(line);
-    if (inspected.kind === "error") {
-      return inspected.error;
-    }
-    if (inspected.kind === "ready" || lines >= maxPreflightLines || bytes >= maxPreflightBytes) {
-      return false;
-    }
-    return undefined;
-  });
+  try {
+    first = await withTimeout(iterator.next(), streamingFirstChunkTimeoutMs, "SSE stream did not produce an initial chunk");
+  } catch (error) {
+    await iterator.return?.();
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CodexUpstreamError(502, message, message);
+  }
 
-  for await (const preflightError of inspectedChunks) {
-    if (preflightError) {
-      await iterator.return?.();
-      throw new CodexUpstreamError(preflightError.statusCode, `SSE ${preflightError.statusCode}`, preflightError.body);
-    }
-    break;
+  if (first.done) {
+    await iterator.return?.();
+    throw new CodexUpstreamError(502, "SSE stream ended before an initial chunk", "Upstream SSE stream ended before an initial chunk");
+  }
+
+  const firstBuffer = Buffer.isBuffer(first.value) ? first.value : Buffer.from(first.value);
+  const firstError = firstPreflightCodexSSEError(firstBuffer.toString("utf8"));
+  if (firstError) {
+    await iterator.return?.();
+    throw new CodexUpstreamError(firstError.statusCode, `SSE ${firstError.statusCode}`, firstError.body);
   }
 
   return {
     ...result,
-    body: replayBufferedThenRest(buffered, iterator)
+    body: replayFirstThenRest(firstBuffer, iterator)
   };
 }
 
-async function* inspectStreamingPreflight(
-  iterator: AsyncIterator<Buffer>,
-  buffered: Buffer[],
-  inspectLine: (line: string) => false | ParsedCodexSSEError | undefined
-): AsyncGenerator<ParsedCodexSSEError | undefined> {
-  const preflightChunks = (async function* () {
-    while (true) {
-      const next = await iterator.next();
-      if (next.done) {
-        return;
-      }
-      const buffer = Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value);
-      buffered.push(buffer);
-      yield buffer;
-    }
-  })();
-
-  for await (const line of decodeTextLines(preflightChunks)) {
-    const result = inspectLine(line);
-    if (result === false) {
-      yield undefined;
-      return;
-    }
-    if (result) {
-      yield result;
-      return;
-    }
-  }
-
-  yield undefined;
-}
-
-async function* replayBufferedThenRest(buffered: readonly Buffer[], iterator: AsyncIterator<Buffer>): AsyncGenerator<Buffer> {
-  for (const buffer of buffered) {
-    yield buffer;
-  }
-
+async function* replayFirstThenRest(first: Buffer, iterator: AsyncIterator<Buffer>): AsyncGenerator<Buffer> {
+  yield first;
   try {
     while (true) {
       const next = await iterator.next();
@@ -924,6 +943,29 @@ async function* replayBufferedThenRest(buffered: readonly Buffer[], iterator: As
   } finally {
     await iterator.return?.();
   }
+}
+
+function withTimeout<Result>(promise: Promise<Result>, timeoutMs: number, message: string): Promise<Result> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  return new Promise<Result>((resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+        resolve(value);
+      },
+      (error: unknown) => {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+        reject(error);
+      }
+    );
+  });
 }
 
 async function sendUpstream(response: ServerResponse, result: CodexUpstreamResult, contentType: string): Promise<void> {
@@ -960,12 +1002,14 @@ async function sendByteStream(
 ): Promise<void> {
   const disconnect = responseDisconnectSignal(response);
   const iterator = chunks[Symbol.asyncIterator]();
+  const resolvedContentType = headers["content-type"] ?? contentType;
   response.writeHead(statusCode, {
     ...filterResponseHeaders(headers),
-    "Content-Type": headers["content-type"] ?? contentType,
+    "Content-Type": resolvedContentType,
     "Cache-Control": "no-cache",
     Connection: "keep-alive"
   });
+  response.flushHeaders();
 
   try {
     while (true) {
@@ -1089,11 +1133,24 @@ function abortable<Result>(promise: Promise<Result>, signal: AbortSignal): Promi
   });
 }
 
+const blockedResponseHeaders = new Set([
+  "connection",
+  "content-encoding",
+  "content-length",
+  "content-type",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade"
+]);
+
 function filterResponseHeaders(headers: Record<string, string>): Record<string, string> {
   const filtered: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    const lower = key.toLowerCase();
-    if (lower !== "transfer-encoding" && lower !== "content-length" && lower !== "content-type") {
+    if (!blockedResponseHeaders.has(key.toLowerCase())) {
       filtered[key] = value;
     }
   }
@@ -1117,6 +1174,49 @@ function sendProxyError(response: ServerResponse, statusCode: number, message: s
       type: "proxy_error"
     }
   });
+}
+
+function clientVisibleStatusCode(statusCode: number): number {
+  // Codex's provider request retry policy does not retry HTTP 429, and 429
+  // bodies like usage_limit_reached are mapped to non-retryable Codex errors.
+  // Keep account switching inside this proxy, then expose remaining 429s as a
+  // plain retryable 5xx without server_is_overloaded/usage-limit semantics.
+  return statusCode === 429 ? 503 : statusCode;
+}
+
+async function* hideRetryableCodexSSEErrors(
+  chunks: AsyncIterable<Uint8Array>,
+  onHiddenError?: (error: ParsedCodexSSEError) => void
+): AsyncGenerator<Buffer> {
+  let sawReadyOrTerminalEvent = false;
+  for await (const line of decodeTextLines(chunks)) {
+    const inspected = inspectCodexSSEPreflightLine(line);
+    if (inspected.kind === "error") {
+      if (shouldHideFromCodexRetry(inspected.error)) {
+        onHiddenError?.(inspected.error);
+        throw new Error(`Upstream SSE ${inspected.error.statusCode}: ${inspected.error.message}`);
+      }
+      sawReadyOrTerminalEvent = true;
+    }
+    if (inspected.kind === "ready") {
+      sawReadyOrTerminalEvent = true;
+    }
+    yield Buffer.from(`${line}\n`, "utf8");
+  }
+
+  if (!sawReadyOrTerminalEvent) {
+    const endedError = {
+      body: "Upstream SSE stream ended before a ready event",
+      message: "Upstream SSE stream ended before a ready event",
+      statusCode: 502
+    };
+    onHiddenError?.(endedError);
+    throw new Error(endedError.message);
+  }
+}
+
+function shouldHideFromCodexRetry(error: ParsedCodexSSEError): boolean {
+  return error.statusCode === 429 || error.statusCode >= 500;
 }
 
 function sendText(response: ServerResponse, statusCode: number, value: string, contentType: string): void {
@@ -1209,17 +1309,6 @@ function isAuthenticationFailure(error: CodexUpstreamError): boolean {
 
 function isRateLimited(error: CodexUpstreamError): boolean {
   return error.statusCode === 429;
-}
-
-function isTransientCapacityFailure(error: CodexUpstreamError): boolean {
-  const text = upstreamErrorText(error);
-  return (
-    text.includes("high load") ||
-    text.includes("overload") ||
-    text.includes("capacity") ||
-    text.includes("busy") ||
-    text.includes("temporarily unavailable")
-  );
 }
 
 function isQuotaRateLimit(error: CodexUpstreamError): boolean {

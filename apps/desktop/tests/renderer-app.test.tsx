@@ -22,20 +22,21 @@ describe("desktop renderer app", () => {
     const { container } = render(<App />);
 
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("accounts");
-    expect(rendererStyles()).toContain("grid-template-columns: 163px minmax(0, 1fr);");
+    expect(rendererStyles()).toContain("grid-template-columns: var(--sidebar-width) minmax(0, 1fr);");
+    expect(rendererStyles()).toContain("--sidebar-width: 180px;");
+    expect(rendererStyles()).toContain("--titlebar-safe-area: 16px;");
     expect(rendererStyles()).toContain("gap: 18px;");
-    expect(rendererStyles()).toContain("padding: 18px 14px 14px;");
-    expect(rendererStyles()).toContain("padding: 16px 22px 22px;");
-    expect(rendererStyles()).toContain("margin-bottom: 14px;");
-    expect(rendererStyles()).toContain("font-size: 20px;");
-    expect(rendererStyles()).toContain("background: #fafafc;");
-    expect(rendererStyles()).toContain("min-width: 900px;");
-    expect(rendererStyles()).toContain("min-height: 520px;");
-    expect(rendererStyles()).toContain("background: #f7f5fc;");
-    expect(rendererStyles()).toContain("background: #5933d6;");
-    expect(rendererStyles()).toContain("color: #121217;");
+    expect(rendererStyles()).toContain("padding: calc(18px + var(--titlebar-safe-area)) 10px 14px;");
+    expect(rendererStyles()).toContain("padding: calc(22px + var(--titlebar-safe-area)) 28px 18px;");
+    expect(rendererStyles()).toContain("--accent: #0b8c88;");
+    expect(rendererStyles()).toContain("min-width: 0;");
+    expect(rendererStyles()).toContain("min-height: 560px;");
+    expect(rendererStyles()).toContain("--sidebar: #f2f4f5;");
+    expect(rendererStyles()).toContain(".accounts-split-workspace");
+    expect(rendererStyles()).toContain(".account-detail-panel");
     expect(rendererStyles()).not.toContain("#12130f");
     expect(rendererStyles()).not.toContain("rgba(214, 240, 95");
+    expect(rendererStyles()).not.toContain("#5933d6");
     expect(container.querySelector(".brand-block .brand-mark .brand-mark-icon")).toBeTruthy();
     expect(container.querySelector(".brand-block h1")?.textContent).toBe("CodexManager");
     expect(container.querySelector(".brand-block p")).toBeNull();
@@ -54,14 +55,15 @@ describe("desktop renderer app", () => {
     expect(container.querySelector(".sidebar-footer .sidebar-status-row")?.textContent).toBe("Proxy: Stopped");
     expect(container.querySelector(".sidebar-footer .app-version")?.textContent).toBe(`v${fallbackAppInfo.version}`);
     expect(screen.getByRole("heading", { level: 2, name: "Accounts" })).toBeTruthy();
+    expect(screen.getByText("0 accounts, 0 active")).toBeTruthy();
     expect(screen.getByText("No accounts yet. Add or import an account to get started.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Proxy" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("proxy");
     expect(screen.getByRole("heading", { level: 2, name: "Proxy" })).toBeTruthy();
     expect(screen.getByText("/v1/chat/completions")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Configure Codex.app" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("Add or import an account before configuring Codex.app.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Configure Codex" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("Add or import an account before configuring Codex.app.")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(container.querySelector(".app-shell")?.getAttribute("data-active-page")).toBe("settings");
@@ -86,7 +88,7 @@ describe("desktop renderer app", () => {
       await pendingAccounts.promise;
     });
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
   });
 
   it("shows the desktop accounts load error state instead of the empty state", async () => {
@@ -108,7 +110,7 @@ describe("desktop renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     expect(within(accountRow("a@example.com")).getByText("a@example.com")).toBeTruthy();
     expect(screen.queryByLabelText("Set team name Work")).toBeNull();
     expect(accountRow("a@example.com").querySelector(".alias-line")).toBeNull();
@@ -116,7 +118,7 @@ describe("desktop renderer app", () => {
     expect(accountRow("a@example.com").querySelector(".account-card-header .badge.plan.pro-plan")?.textContent).toBe("PRO");
     expect(rendererStyles()).not.toContain("compact-plan");
     expect(rendererStyles()).not.toContain(".alias-line");
-    expect(rendererStyles()).toContain("background: #e8e0ff;");
+    expect(rendererStyles()).toContain("background: var(--info-soft);");
     expect(accountRow("a@example.com").querySelector(".account-card-header .ellipsis-icon")).toBeTruthy();
     expect(accountRow("a@example.com").querySelector(".account-title-line")?.textContent).toBe("a@example.com");
     expect(accountRow("a@example.com").querySelector(".account-identifier")).toBeNull();
@@ -221,7 +223,7 @@ describe("desktop renderer app", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     expect(within(accountRow("a@example.com")).getAllByText("0%")).toHaveLength(2);
     expect(within(accountRow("a@example.com")).getAllByText("Used 100%")).toHaveLength(2);
     expect(screen.queryByText("No data")).toBeNull();
@@ -235,7 +237,7 @@ describe("desktop renderer app", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     const switchButton = within(accountRow("a@example.com")).getByRole("button", { name: "Switch to this" }) as HTMLButtonElement;
     fireEvent.click(switchButton);
 
@@ -256,7 +258,7 @@ describe("desktop renderer app", () => {
     const { container } = render(<App />);
     const toolbar = (): HTMLElement => container.querySelector(".toolbar") as HTMLElement;
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
 
     const pendingExport = deferred<{ canceled: boolean; path?: string }>();
     api.accounts.exportPackage = vi.fn(() => pendingExport.promise);
@@ -310,7 +312,7 @@ describe("desktop renderer app", () => {
     const api = installMockAPI({ accounts: [account] });
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
 
     api.accounts.warmUpWeeklyQuota = vi.fn(async () => ({
       accounts: [account],
@@ -348,7 +350,7 @@ describe("desktop renderer app", () => {
     api.accounts.importFile = vi.fn(async () => undefined);
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
 
@@ -362,7 +364,7 @@ describe("desktop renderer app", () => {
     api.accounts.importFile = vi.fn(async () => ({ kind: "auth" as const, account: imported }));
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Import file" }));
 
     await waitFor(() => expect(api.accounts.importFile).toHaveBeenCalledOnce());
@@ -376,7 +378,7 @@ describe("desktop renderer app", () => {
     installMockAPI({ accounts: [account] });
     render(<App />);
 
-    expect(await screen.findByText("Usage refresh failed")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed"));
     expect(accountRow("a@example.com").querySelector(".usage-error")?.textContent).toBe("Usage refresh failed");
     const usageError = accountRow("a@example.com").querySelector(".usage-error");
     const accountActions = accountRow("a@example.com").querySelector(".account-actions");
@@ -391,21 +393,21 @@ describe("desktop renderer app", () => {
     installMockAPI({ accounts: [account] });
     const { container } = render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     expect(Array.from(container.querySelectorAll(".accounts-view-controls button")).map((button) => button.getAttribute("aria-label"))).toEqual([
       "Grid view",
       "List view"
     ]);
-    expect(container.querySelector(".account-row")?.classList.contains("grid")).toBe(true);
-    expect(container.querySelector(".account-list")?.classList.contains("grid")).toBe(true);
-    expect(screen.getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed")).toBe("true");
-    expect(rendererStyles()).toContain("grid-template-columns: repeat(auto-fit, minmax(220px, 280px));");
-    expect(rendererStyles()).toContain("max-width: 280px;");
+    expect(container.querySelector(".account-row")?.classList.contains("list")).toBe(true);
+    expect(container.querySelector(".account-list")?.classList.contains("list")).toBe(true);
+    expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe("true");
+    expect(rendererStyles()).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(rendererStyles()).toContain("border-top: 1px solid var(--line-soft);");
     expect(rendererStyles()).toContain("flex-wrap: wrap;");
     expect(rendererStyles()).toContain("min-width: max-content;");
     expect(rendererStyles()).toContain(".account-list.list");
     expect(rendererStyles()).toContain("grid-template-columns: 58px 58px minmax(0, 1fr);");
-    expect(rendererStyles()).toContain("min-height: 178px;");
+    expect(rendererStyles()).toContain("min-height: 142px;");
     expect(rendererStyles()).not.toContain(".account-row:not(.grid) .account-actions");
     expect(rendererStyles()).not.toContain(".account-row.collapsed");
     expect(rendererStyles()).not.toContain("collapsed-switch-overlay");
@@ -424,7 +426,7 @@ describe("desktop renderer app", () => {
     const api = installMockAPI({ accounts: [currentAccount] });
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
 
     expect(await screen.findByText("Current account is already the best available")).toBeTruthy();
@@ -446,7 +448,7 @@ describe("desktop renderer app", () => {
     }));
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Smart switch" }));
     expect(
       await screen.findByText("Smart switched to: Personal · Switched account (via codex app command) · Editors restarted: cursor")
@@ -489,10 +491,14 @@ describe("desktop renderer app", () => {
     expect(modelList.querySelector(".model-chip.selected")?.textContent).toBe("gpt-5.5");
     expect(screen.getByRole("heading", { name: "Codex.app" })).toBeTruthy();
     expect(screen.getByText("Not configured")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Configure Codex.app" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Configure Codex" }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole("button", { name: "Restore config" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("button", { name: "Safe restore" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Full restore" })).toBeNull();
+    expect(screen.queryByText("Configuring opens or focuses Codex.app.")).toBeNull();
+    expect(screen.queryByText("Managed provider codexmanager · Default model gpt-5.5")).toBeNull();
+    expect(screen.queryByText("Config /Users/nik/.codex/config.toml")).toBeNull();
+    expect(screen.queryByText("Proxy http://127.0.0.1:18317")).toBeNull();
     expect(rendererStyles()).toContain("flex-wrap: wrap;");
     expect(rendererStyles()).not.toContain("grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));");
     expect(codeBlockCopyButtons()).toHaveLength(2);
@@ -592,7 +598,7 @@ describe("desktop renderer app", () => {
     expect(container.querySelectorAll(".settings-section .toggle-row")).toHaveLength(5);
     expect(container.querySelectorAll(".settings-section .select-row")).toHaveLength(2);
     expect(rendererStyles()).toContain(".toggle-row input:checked");
-    expect(rendererStyles()).toContain("transform: translateX(18px);");
+    expect(rendererStyles()).toContain("transform: translateX(16px);");
 
     fireEvent.click(screen.getByLabelText("Launch at startup"));
     await waitFor(() => expect(api.settings.update).toHaveBeenCalledWith({ launchAtStartup: true }));
@@ -633,7 +639,7 @@ describe("desktop renderer app", () => {
     fireEvent.change(screen.getByLabelText("Language"), { target: { value: "zh-Hans" } });
     fireEvent.click(await screen.findByRole("button", { name: "账号" }));
 
-    const row = screen.getByText("a@example.com").closest("article");
+    const row = accountRow("a@example.com");
     expect(row).toBeTruthy();
     const accountActions = (row as HTMLElement).querySelector(".account-actions");
     expect(accountActions?.textContent).toBe("Switch刷新Delete");
@@ -673,7 +679,7 @@ describe("desktop renderer app", () => {
     const api = installMockAPI({ accounts: [makeAccount("a", "Work")] });
     render(<App />);
 
-    expect(await screen.findByText("a@example.com")).toBeTruthy();
+    await waitFor(() => expect(accountRow("a@example.com")).toBeTruthy());
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole("button", { name: "Import current auth" }));
@@ -845,7 +851,9 @@ function makeAccount(id: string, label: string): AccountSummary {
 }
 
 function accountRow(accountTitle: string): HTMLElement {
-  const row = screen.getByText(accountTitle).closest("article");
+  const row = Array.from(document.querySelectorAll<HTMLElement>("article.account-row")).find(
+    (candidate) => candidate.querySelector(".account-title-line")?.textContent === accountTitle
+  );
   if (!row) {
     throw new Error(`Account row ${accountTitle} was not found`);
   }

@@ -85,6 +85,42 @@ export class MacOSCodexCLIService {
     }
   }
 
+  async restartApp(workspacePath?: string): Promise<boolean> {
+    let appLaunchError: string | undefined;
+    const appPath = await this.findCodexAppPath();
+    if (appPath) {
+      await this.forceKillCodexProcesses();
+      await this.sleep(220);
+      try {
+        await runCheckedWithRunner(this.runCommand, "/usr/bin/open", ["-na", appPath, ...workspaceArguments(workspacePath)], {
+          errorPrefix: "Failed to restart Codex desktop app",
+          timeoutMs: 5_000
+        });
+        if (await this.waitForCodexProcess(codexProcessLaunchTimeoutMs)) {
+          return false;
+        }
+        appLaunchError = "Codex desktop process did not start";
+      } catch (error) {
+        appLaunchError = errorMessage(error);
+      }
+    } else {
+      await this.forceKillCodexProcesses();
+      await this.sleep(220);
+    }
+
+    try {
+      await this.launchViaCodexCLI(workspacePath);
+      return true;
+    } catch (error) {
+      if (appLaunchError) {
+        throw new Error(
+          `Failed to restart Codex desktop app: ${appLaunchError} | Codex CLI fallback failed: ${errorMessage(error)}`
+        );
+      }
+      throw error;
+    }
+  }
+
   findCodexCLIPath(): string {
     const fromPath = resolveExecutable("codex", {
       environment: this.environment,
@@ -140,6 +176,18 @@ export class MacOSCodexCLIService {
       }
     }
     return false;
+  }
+
+  private async forceKillCodexProcesses(): Promise<void> {
+    await Promise.all(
+      codexProcessNames.map(async (processName) => {
+        const result = await this.runCommand("/usr/bin/pkill", ["-9", "-x", processName], { timeoutMs: 1_500 });
+        if (result.status === 0 || result.status === 1) {
+          return;
+        }
+        throw new Error(`Failed to stop Codex process ${processName}: ${commandResultDetails(result)}`);
+      })
+    );
   }
 
   private async launchViaCodexCLI(workspacePath?: string): Promise<void> {
@@ -257,6 +305,10 @@ function defaultExecutableExists(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+function commandResultDetails(result: CommandResult): string {
+  return (result.stderr || result.stdout).trim() || `exit status ${result.status}`;
 }
 
 function uniqueStrings(values: readonly (string | undefined)[]): string[] {

@@ -196,12 +196,12 @@ function createMainWindow(options: CreateMainWindowOptions = {}): BrowserWindow 
   const appFileURL = pathToFileURL(rendererEntry()).toString();
   const devServerURL = allowedDevServerURL(process.env.VITE_DEV_SERVER_URL);
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 552,
+    width: 1180,
+    height: 720,
     minWidth: 900,
-    minHeight: 520,
-    maxWidth: 1080,
-    backgroundColor: "#fafafc",
+    minHeight: 560,
+    maxWidth: 1440,
+    backgroundColor: "#f6f7f8",
     icon: options.iconAssetName ? assetPath(options.iconAssetName) : undefined,
     show: false,
     title: appInfo.displayName,

@@ -827,8 +827,15 @@ interface AccountsPageProps {
 }
 
 function AccountsPage(props: AccountsPageProps): ReactElement {
-  const [viewMode, setViewMode] = useState<AccountViewMode>("grid");
+  const [viewMode, setViewMode] = useState<AccountViewMode>("list");
+  const [query, setQuery] = useState("");
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>();
   const displayAccounts = useMemo(() => sortForDisplay(props.accounts), [props.accounts]);
+  const filteredAccounts = useMemo(() => filterAccounts(displayAccounts, query), [displayAccounts, query]);
+  const selectedAccount = useMemo(
+    () => resolveSelectedAccount(displayAccounts, selectedAccountId),
+    [displayAccounts, selectedAccountId]
+  );
   const isContentLoading = props.contentState.status === "loading";
   const isAccountActionDisabled = Boolean(props.busyAction) || isContentLoading || props.accounts.length === 0;
   const exportActionLabel =
@@ -845,11 +852,31 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
       : props.t("accounts.action.warm_weekly_quota");
   const isRefreshAllBusy = props.accountToolbarBusyAction === "refreshAll";
 
+  useEffect(() => {
+    if (displayAccounts.length === 0) {
+      if (selectedAccountId !== undefined) {
+        setSelectedAccountId(undefined);
+      }
+      return;
+    }
+    if (!selectedAccount) {
+      setSelectedAccountId(resolveSelectedAccount(displayAccounts, undefined)?.id);
+    }
+  }, [displayAccounts, selectedAccount, selectedAccountId]);
+
   return (
     <div className="accounts-layout">
       <div className="accounts-action-bar">
         <div className="accounts-action-title-row">
-          <h2 className="page-title">{props.t("tab.accounts")}</h2>
+          <div>
+            <h2 className="page-title">{props.t("tab.accounts")}</h2>
+            <p className="page-subtitle">
+              {props.t("accounts.summary.format", {
+                active: props.accounts.filter((account) => account.isCurrent).length,
+                count: props.accounts.length
+              })}
+            </p>
+          </div>
           <div className="accounts-view-controls">
             <div className="segmented-control" role="group" aria-label={props.t("accounts.action.view_mode")}>
               <button
@@ -968,20 +995,56 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
           <p>{props.t("accounts.empty.message")}</p>
         </div>
       ) : (
-        <div className={viewMode === "grid" ? "account-list grid" : "account-list list"}>
-          {displayAccounts.map((account) => (
-            <AccountRow
-              key={account.id}
-              account={account}
-              isSwitching={props.switchingAccountId === account.id}
-              viewMode={viewMode}
-              onDelete={() => props.onDeleteAccount(account.id)}
-              onRefresh={() => props.onRefreshUsage(account.id)}
-              onSwitch={() => props.onSwitchAccount(account.id)}
-              locale={props.locale}
-              t={props.t}
-            />
-          ))}
+        <div className="accounts-split-workspace">
+          <section className="accounts-list-panel" aria-label={props.t("tab.accounts")}>
+            <div className="accounts-list-tools">
+              <label className="account-search-field">
+                <span>{props.t("accounts.search.label")}</span>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={props.t("accounts.search.placeholder")}
+                />
+              </label>
+              <span className="accounts-result-count">
+                {props.t("accounts.search.result_count_format", { count: filteredAccounts.length })}
+              </span>
+            </div>
+            {filteredAccounts.length === 0 ? (
+              <div className="empty-state account-filter-empty">
+                <h3>{props.t("accounts.search.empty_title")}</h3>
+                <p>{props.t("accounts.search.empty_message")}</p>
+              </div>
+            ) : (
+              <div className={viewMode === "grid" ? "account-list grid" : "account-list list"}>
+                {filteredAccounts.map((account) => (
+                  <AccountRow
+                    key={account.id}
+                    account={account}
+                    isSelected={selectedAccount?.id === account.id}
+                    isSwitching={props.switchingAccountId === account.id}
+                    viewMode={viewMode}
+                    onDelete={() => props.onDeleteAccount(account.id)}
+                    onRefresh={() => props.onRefreshUsage(account.id)}
+                    onSelect={() => setSelectedAccountId(account.id)}
+                    onSwitch={() => props.onSwitchAccount(account.id)}
+                    locale={props.locale}
+                    t={props.t}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <AccountDetailPanel
+            account={selectedAccount}
+            isSwitching={selectedAccount ? props.switchingAccountId === selectedAccount.id : false}
+            locale={props.locale}
+            onDelete={(id) => props.onDeleteAccount(id)}
+            onRefresh={(id) => props.onRefreshUsage(id)}
+            onSwitch={(id) => props.onSwitchAccount(id)}
+            t={props.t}
+          />
         </div>
       )}
     </div>
@@ -990,16 +1053,18 @@ function AccountsPage(props: AccountsPageProps): ReactElement {
 
 interface AccountRowProps {
   account: AccountSummary;
+  isSelected: boolean;
   isSwitching: boolean;
   onDelete: () => void;
   onRefresh: () => void;
+  onSelect: () => void;
   onSwitch: () => void;
   locale: AppLocaleID;
   t: Translator;
   viewMode: AccountViewMode;
 }
 
-function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitch, t, viewMode }: AccountRowProps): ReactElement {
+function AccountRow({ account, isSelected, isSwitching, locale, onDelete, onRefresh, onSelect, onSwitch, t, viewMode }: AccountRowProps): ReactElement {
   const accountTitle = fullAccountName(account);
   const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
   const switchToThisLabel = t("accounts.card.switch_to_this");
@@ -1007,10 +1072,19 @@ function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitc
 
   return (
     <article
-      className={accountCardClassName(account.isCurrent, viewMode)}
+      className={accountCardClassName(account.isCurrent, isSelected, viewMode)}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
     >
       <div className="account-main">
         <div className="account-card-header">
+          <span className="account-avatar" aria-hidden="true">{accountInitials(account)}</span>
           <span className={`badge plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{account.normalizedPlanLabel}</span>
           <span className="header-spacer" />
           {account.isCurrent ? (
@@ -1040,7 +1114,10 @@ function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitc
           disabled={account.isCurrent || isSwitching}
           title={switchToThisLabel}
           type="button"
-          onClick={onSwitch}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSwitch();
+          }}
         >
           {isSwitching ? (
             <span className="account-action-icon loading-icon" aria-hidden="true" />
@@ -1051,11 +1128,27 @@ function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitc
             </>
           )}
         </button>
-        <button aria-label={refreshUsageLabel} className="account-action-button" title={refreshUsageLabel} type="button" onClick={onRefresh}>
+        <button
+          aria-label={refreshUsageLabel}
+          className="account-action-button"
+          title={refreshUsageLabel}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRefresh();
+          }}
+        >
           <SymbolIcon className="account-action-icon refresh-icon" name="refresh" size={14} strokeWidth={2.3} />
           <span>{t("common.refresh")}</span>
         </button>
-        <button className="account-action-button danger" type="button" onClick={onDelete}>
+        <button
+          className="account-action-button danger"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+        >
           <SymbolIcon className="account-action-icon trash-icon" name="trash" size={14} strokeWidth={2.3} />
           <span>Delete</span>
         </button>
@@ -1064,12 +1157,163 @@ function AccountRow({ account, isSwitching, locale, onDelete, onRefresh, onSwitc
   );
 }
 
-function accountCardClassName(isCurrent: boolean, viewMode: AccountViewMode): string {
+function AccountDetailPanel({
+  account,
+  isSwitching,
+  locale,
+  onDelete,
+  onRefresh,
+  onSwitch,
+  t
+}: {
+  account?: AccountSummary;
+  isSwitching: boolean;
+  locale: AppLocaleID;
+  onDelete: (id: string) => void;
+  onRefresh: (id: string) => void;
+  onSwitch: (id: string) => void;
+  t: Translator;
+}): ReactElement {
+  if (!account) {
+    return (
+      <aside className="account-detail-panel empty-detail">
+        <h3>{t("accounts.detail.title")}</h3>
+        <p>{t("accounts.detail.no_selection")}</p>
+      </aside>
+    );
+  }
+
+  const accountTitle = fullAccountName(account);
+  const workspaceTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : undefined;
+  const switchToThisLabel = t("accounts.card.switch_to_this");
+  const refreshUsageLabel = t("common.refresh_usage");
+
+  return (
+    <aside className="account-detail-panel" aria-label={t("accounts.detail.title")}>
+      <div className="account-detail-header">
+        <span className="account-detail-avatar" aria-hidden="true">{accountInitials(account)}</span>
+        <div className="account-detail-heading">
+          <div className="account-detail-badges">
+            <span className={`badge plan ${planBadgeClassName(account.normalizedPlanLabel)}`}>{account.normalizedPlanLabel}</span>
+            {account.isCurrent && <span className="badge current-badge">{t("accounts.card.current")}</span>}
+          </div>
+          <h3>{accountTitle}</h3>
+          <span>{account.accountId}</span>
+        </div>
+      </div>
+
+      <section className="detail-section">
+        <h4>{t("proxy.section.usage")}</h4>
+        <div className="detail-usage-grid">
+          <DetailUsageCard tone="success" title={t("accounts.window.five_hour")} usedPercent={account.usage?.fiveHour?.usedPercent} t={t} />
+          <DetailUsageCard tone="info" title={t("accounts.window.weekly")} usedPercent={account.usage?.oneWeek?.usedPercent} t={t} />
+        </div>
+        <div className="detail-reset-card">
+          <span>{t("accounts.window.reset_header")}</span>
+          <ResetRow resetAt={account.usage?.fiveHour?.resetAt} title={t("accounts.window.five_hour")} locale={locale} t={t} />
+          <ResetRow resetAt={account.usage?.oneWeek?.resetAt} title={t("accounts.window.weekly")} locale={locale} t={t} />
+        </div>
+        {account.usageError && <p className="usage-error detail-usage-error">{account.usageError}</p>}
+      </section>
+
+      <section className="detail-section">
+        <h4>{t("accounts.detail.workspace")}</h4>
+        <div className="detail-meta-grid">
+          <span>{workspaceTag ?? t("accounts.detail.no_workspace")}</span>
+          <span>{t("accounts.detail.account_id")}: {account.accountId}</span>
+        </div>
+      </section>
+
+      <section className="detail-section account-detail-actions">
+        <h4>{t("accounts.detail.actions")}</h4>
+        <p>{t("accounts.detail.switch_help")}</p>
+        <div>
+          <button
+            aria-label={switchToThisLabel}
+            className="primary-action"
+            disabled={account.isCurrent || isSwitching}
+            type="button"
+            onClick={() => onSwitch(account.id)}
+          >
+            {isSwitching ? <span className="account-action-icon loading-icon" aria-hidden="true" /> : <span>Switch</span>}
+          </button>
+          <button aria-label={refreshUsageLabel} type="button" onClick={() => onRefresh(account.id)}>
+            {t("common.refresh")}
+          </button>
+          <button className="danger" type="button" onClick={() => onDelete(account.id)}>
+            Delete
+          </button>
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function DetailUsageCard({
+  title,
+  tone,
+  usedPercent,
+  t
+}: {
+  title: string;
+  tone: "success" | "info";
+  usedPercent?: number;
+  t: Translator;
+}): ReactElement {
+  const used = usedPercent !== undefined && Number.isFinite(usedPercent) ? clampPercent(usedPercent) : 100;
+  const remaining = Math.max(0, 100 - used);
+  return (
+    <div className={`detail-usage-card quota-ring-card ${tone}`}>
+      <div className="quota-ring" style={quotaRingStyle(remaining)}>
+        <div className="quota-ring-center">
+          <span>{compactWindowTitle(title)}</span>
+          <strong>{Math.round(remaining)}%</strong>
+        </div>
+      </div>
+      <div>
+        <span>{title}</span>
+        <strong>{t("accounts.usage.used_percent", { percent: `${Math.round(used)}%` })}</strong>
+      </div>
+    </div>
+  );
+}
+
+function accountCardClassName(isCurrent: boolean, isSelected: boolean, viewMode: AccountViewMode): string {
   return [
     "account-row",
     viewMode,
-    isCurrent ? "current" : ""
+    isCurrent ? "current" : "",
+    isSelected ? "selected" : ""
   ].filter(Boolean).join(" ");
+}
+
+function resolveSelectedAccount(accounts: AccountSummary[], selectedAccountId: string | undefined): AccountSummary | undefined {
+  return accounts.find((account) => account.id === selectedAccountId) ?? accounts.find((account) => account.isCurrent) ?? accounts[0];
+}
+
+function filterAccounts(accounts: AccountSummary[], query: string): AccountSummary[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return accounts;
+  }
+  return accounts.filter((account) =>
+    [
+      account.label,
+      account.email,
+      account.accountId,
+      account.displayTeamName,
+      account.normalizedPlanLabel
+    ].some((value) => value?.toLowerCase().includes(normalizedQuery))
+  );
+}
+
+function accountInitials(account: AccountSummary): string {
+  const source = (account.email ?? account.label ?? account.accountId).trim();
+  const [first = "", second = ""] = source
+    .replace(/@.*$/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  return `${first.charAt(0)}${second.charAt(0) || first.charAt(1) || ""}`.toUpperCase() || "CM";
 }
 
 function planBadgeClassName(planLabel: string): string {
@@ -1284,7 +1528,6 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
   const configText = proxyConfigText(props.proxyState.proxyURL, endpoint.id, apiKeyDisplay);
   const isBusy = Boolean(props.busyAction);
   const codexAppConfigureDisabled = isBusy || !props.hasAccounts;
-  const codexAppHint = props.hasAccounts ? props.t("proxy.codex_app.restart_hint") : props.t("proxy.codex_app.no_accounts_hint");
 
   return (
     <div className="proxy-layout">
@@ -1397,7 +1640,6 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
                 {codexAppStatusLabel(props.codexAppStatus.state, props.t)}
               </span>
             </div>
-            <p className="codex-app-hint">{codexAppHint}</p>
           </div>
           <div className="codex-app-actions">
             <button className="primary-action" type="button" disabled={codexAppConfigureDisabled} onClick={props.onConfigureCodexApp}>
@@ -1407,11 +1649,6 @@ function ProxyPage(props: ProxyPageProps): ReactElement {
               {props.t("proxy.codex_app.restore")}
             </button>
           </div>
-        </div>
-        <div className="codex-app-details">
-          <span>{props.t("proxy.codex_app.provider_model_format", { provider: props.codexAppStatus.providerId, model: props.codexAppStatus.model })}</span>
-          <span>{props.t("proxy.codex_app.config_path_format", { path: props.codexAppStatus.configPath })}</span>
-          <span>{props.t("proxy.codex_app.proxy_format", { url: props.codexAppStatus.proxyURL })}</span>
         </div>
         {props.codexAppStatus.warning && <p className="integration-warning">{props.codexAppStatus.warning}</p>}
       </section>
